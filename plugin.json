@@ -1,0 +1,21 @@
+{
+    "name": "Deckarr",
+    "author": "Aviv Illoz",
+    "flags": [
+        "debug",
+        "root"
+    ],
+    "api_version": 1,
+    "publish": {
+        "tags": [
+            "nas",
+            "home",
+            "lab",
+            "server",
+            "deckarr",
+            "nonsteam"
+        ],
+        "description": "A plugin to manage non steam games, automatically setup proton prefixes and sync game saves. You can optionally download games from a remote server.",
+        "image": "https://opengraph.githubassets.com/1/SteamDeckHomebrew/PluginLoader"
+    }
+}
