@@ -1,5 +1,5 @@
 {
-    "name": "Deckarr",
+    "name": "Deckyfin",
     "author": "Aviv Illoz",
     "flags": [
         "debug",
@@ -12,7 +12,7 @@
             "home",
             "lab",
             "server",
-            "deckarr",
+            "deckyfin",
             "nonsteam"
         ],
         "description": "A plugin to manage non steam games, automatically setup proton prefixes and sync game saves. You can optionally download games from a remote server.",

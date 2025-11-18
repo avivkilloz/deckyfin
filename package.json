@@ -1,5 +1,5 @@
 {
-    "name": "deckarr",
+    "name": "deckyfin",
     "version": "0.0.1",
     "description": "A plugin to manage non steam games, automatically setup proton prefixes and sync game saves. You can optionally download games from a remote server.",
     "type": "module",
@@ -10,7 +10,7 @@
     },
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/avivkilloz/deckarr.git"
+        "url": "git+https://github.com/avivkilloz/deckyfin.git"
     },
     "keywords": [
         "decky",
