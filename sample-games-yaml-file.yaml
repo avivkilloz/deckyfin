@@ -1,0 +1,21 @@
+games:
+  - name: "The Witcher 3"
+    path: "/home/deck/Games/The Witcher 3"
+    remote_path: "rpg/witcher3"
+    steam_appid: 292030
+    proton_version: GE-Proton10-25
+    proton_dependencies:
+      - "VC 2019 Redist"
+      - "DirectX Jun 2010 Redist"
+    proton_sync_paths:
+      - "%USERPROFILE%/My Documents/The Witcher 3/"
+      - "%LOCALAPPDATA%/CD Projekt Red/The Witcher 3/"
+
+  - name: "Hades"
+    path: "Hades"
+    steam_appid: 1145360
+    proton_version: "GE-Proton9-15"
+    proton_dependencies:
+      - "dotnet48"
+    proton_sync_paths:
+      - "%USERPROFILE%/Saved Games/Hades/"
