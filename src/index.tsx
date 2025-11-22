@@ -19,18 +19,9 @@ import React, {
     useMemo,
     useState
 } from "react";
-import { FaCloudDownloadAlt, FaCogs, FaSyncAlt } from "react-icons/fa";
+import { FaCloudDownloadAlt, FaSyncAlt, FaTrash, FaCheck } from "react-icons/fa";
 import { GiConsoleController } from "react-icons/gi";
 import logo from "../assets/logo.png";
-
-type RemoteConfig = {
-    enabled: boolean;
-    host: string;
-    gamesPath: string;
-    gamesFileName: string;
-    rsyncFlags: string;
-    savePath: string;
-};
 
 type ProtonConfig = {
     compatdataPath: string;
@@ -38,11 +29,12 @@ type ProtonConfig = {
 };
 
 type DeckyfinSettings = {
-    localLibraryPath: string;
-    gamesFilePath: string;
-    remote: RemoteConfig;
+    remoteHost: string;
+    remoteConfigPath: string;
+    localGamesPath: string;
     proton: ProtonConfig;
     saveBackupPath: string;
+    rsyncFlags: string;
 };
 
 type GameEntry = {
@@ -54,6 +46,8 @@ type GameEntry = {
     proton_dependencies: string[];
     proton_sync_paths: string[];
     remote_path?: string;
+    executable?: string;
+    categories?: string[];
     installed: boolean;
     prefix_ready: boolean;
     prefix_path: string;
@@ -65,6 +59,7 @@ type GameEntry = {
 type GamesResponse = {
     games: GameEntry[];
     source: string;
+    savesPath?: string;
     refreshedAt: string;
 };
 
@@ -74,14 +69,15 @@ type OperationResult = {
     timestamp?: string;
     failures?: string[];
     prefix_path?: string;
+    steps?: string[];
 };
 
 const api = {
     getSettings: callable<[], DeckyfinSettings>("get_settings"),
     saveSettings: callable<[DeckyfinSettings], DeckyfinSettings>("save_settings"),
     loadGames: callable<[], GamesResponse>("load_games"),
-    downloadGame: callable<[string], OperationResult>("download_game"),
-    setupPrefix: callable<[number], OperationResult>("setup_proton_prefix"),
+    installGame: callable<[string], OperationResult>("install_game"),
+    removeGame: callable<[string], OperationResult>("remove_game"),
     syncGame: callable<[string], OperationResult>("sync_game_saves"),
     syncAll: callable<[], OperationResult>("sync_all_saves"),
 };
@@ -109,14 +105,14 @@ const InputRow = ({ label, description, input }: {
 
 const GameCard = ({
     game,
-    onDownload,
-    onSetup,
+    onInstall,
+    onRemove,
     onSync,
     busy
 }: {
     game: GameEntry;
-    onDownload: () => void;
-    onSetup: () => void;
+    onInstall: () => void;
+    onRemove: () => void;
     onSync: () => void;
     busy: boolean;
 }) => (
@@ -135,16 +131,21 @@ const GameCard = ({
                         <div style={{ fontSize: "1rem", fontWeight: 600 }}>{game.name}</div>
                         <div style={{ fontSize: "0.8rem", opacity: 0.7 }}>AppID {game.steam_appid} · Proton {game.proton_version}</div>
                     </div>
-                    <div style={{ textAlign: "right", fontSize: "0.8rem" }}>
-                        <div style={{ color: game.installed ? "#8ef68e" : "#f6aa8e" }}>
-                            {game.installed ? "Installed" : "Missing files"}
+                    <div style={{ textAlign: "right", fontSize: "0.8rem", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 4, color: game.installed ? "#8ef68e" : "#f6aa8e" }}>
+                            {game.installed && <FaCheck />}
+                            {game.installed ? "Installed" : "Not installed"}
                         </div>
-                        <div style={{ color: game.prefix_ready ? "#8ef68e" : "#f6aa8e" }}>
-                            {game.prefix_ready ? "Prefix ready" : "Prefix missing"}
-                        </div>
-                        <div style={{ color: game.last_backup ? "#8fdaff" : "#f6aa8e" }}>
-                            {game.last_backup ? `Last backup: ${game.last_backup}` : "No backup yet"}
-                        </div>
+                        {game.categories && game.categories.length > 0 && (
+                            <div style={{ fontSize: "0.7rem", opacity: 0.7 }}>
+                                {game.categories.join(", ")}
+                            </div>
+                        )}
+                        {game.last_backup && (
+                            <div style={{ color: "#8fdaff", fontSize: "0.7rem" }}>
+                                Last backup: {new Date(game.last_backup).toLocaleDateString()}
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -157,32 +158,35 @@ const GameCard = ({
                 </div>
 
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    {game.remote_available && (
+                    {!game.installed ? (
                         <ButtonItem
                             layout="below"
-                            disabled={busy}
-                            onClick={onDownload}
+                            disabled={busy || !game.remote_available}
+                            onClick={onInstall}
                             icon={<FaCloudDownloadAlt />}
                         >
-                            {busy ? "Syncing…" : "Download / Update"}
+                            {busy ? "Installing…" : "Install Game"}
                         </ButtonItem>
+                    ) : (
+                        <>
+                            <ButtonItem
+                                layout="below"
+                                disabled={busy}
+                                onClick={onRemove}
+                                icon={<FaTrash />}
+                            >
+                                {busy ? "Removing…" : "Remove Game"}
+                            </ButtonItem>
+                            <ButtonItem
+                                layout="below"
+                                disabled={busy}
+                                onClick={onSync}
+                                icon={<FaSyncAlt />}
+                            >
+                                {busy ? "Syncing…" : "Backup Saves"}
+                            </ButtonItem>
+                        </>
                     )}
-                    <ButtonItem
-                        layout="below"
-                        disabled={busy}
-                        onClick={onSetup}
-                        icon={<FaCogs />}
-                    >
-                        {busy ? "Working…" : "Prepare Proton Prefix"}
-                    </ButtonItem>
-                    <ButtonItem
-                        layout="below"
-                        disabled={busy}
-                        onClick={onSync}
-                        icon={<FaSyncAlt />}
-                    >
-                        {busy ? "Syncing…" : "Sync Saves"}
-                    </ButtonItem>
                 </div>
             </div>
         </Focusable>
@@ -248,7 +252,7 @@ function Content() {
             setGamesMeta({ source: payload.source, refreshedAt: payload.refreshedAt });
         } catch (error) {
             console.error(error);
-            setGlobalError("Failed to read games JSON file. Check the path and syntax.");
+            setGlobalError("Failed to read config file. Check remote host, config path, and JSON syntax.");
         } finally {
             setGamesLoading(false);
         }
@@ -296,22 +300,34 @@ function Content() {
         }
     };
 
-    const handleDownload = (name: string) => async () => {
-        const key = `download-${name}`;
+    const handleInstall = (name: string) => async () => {
+        const key = `install-${name}`;
         markBusy(key, true);
         try {
-            await callWithToaster(() => api.downloadGame(name), "Download complete");
+            const result = await callWithToaster(() => api.installGame(name), "Installation complete");
+            if (result.steps && result.steps.length > 0) {
+                toaster.toast({
+                    title: "Installation steps",
+                    body: result.steps.join(", "),
+                });
+            }
         } finally {
             markBusy(key, false);
             loadGames();
         }
     };
 
-    const handleSetup = (appid: number, name: string) => async () => {
-        const key = `setup-${appid}`;
+    const handleRemove = (name: string) => async () => {
+        const key = `remove-${name}`;
         markBusy(key, true);
         try {
-            await callWithToaster(() => api.setupPrefix(appid), "Prefix prepared");
+            const result = await callWithToaster(() => api.removeGame(name), "Game removed");
+            if (result.steps && result.steps.length > 0) {
+                toaster.toast({
+                    title: "Removal steps",
+                    body: result.steps.join(", "),
+                });
+            }
         } finally {
             markBusy(key, false);
             loadGames();
@@ -378,7 +394,7 @@ function Content() {
             {settingsDraft && (
                 <PanelSection title="Configuration">
                     <SectionHeader
-                        title="Local paths"
+                        title="Settings"
                         actions={
                             <ButtonItem
                                 layout="below"
@@ -390,120 +406,35 @@ function Content() {
                         }
                     />
                     <InputRow
+                        label="Remote host address"
+                        description="Format: user@host (requires SSH access and rsync on both ends)."
+                        input={
+                            <TextField
+                                value={settingsDraft.remoteHost}
+                                onChange={handleTextChange(["remoteHost"])}
+                            />
+                        }
+                    />
+                    <InputRow
+                        label="Remote config file path"
+                        description="Full path to deckyfin-config.json on remote host (e.g., /path/to/deckyfin-config.json)."
+                        input={
+                            <TextField
+                                value={settingsDraft.remoteConfigPath}
+                                onChange={handleTextChange(["remoteConfigPath"])}
+                            />
+                        }
+                    />
+                    <InputRow
                         label="Local games folder"
-                        description="Absolute path where non-Steam games live by default."
+                        description="Destination folder on Steam Deck where games will be downloaded."
                         input={
                             <TextField
-                                value={settingsDraft.localLibraryPath}
-                                onChange={handleTextChange(["localLibraryPath"])}
+                                value={settingsDraft.localGamesPath}
+                                onChange={handleTextChange(["localGamesPath"])}
                             />
                         }
                     />
-                    <InputRow
-                        label="Games definition path"
-                        description="Used when remote sync is disabled. Points to the games.json file."
-                        input={
-                            <TextField
-                                value={settingsDraft.gamesFilePath}
-                                onChange={handleTextChange(["gamesFilePath"])}
-                            />
-                        }
-                    />
-                    <InputRow
-                        label="Save backup folder"
-                        description="Where backups of Proton save paths will be mirrored."
-                        input={
-                            <TextField
-                                value={settingsDraft.saveBackupPath}
-                                onChange={handleTextChange(["saveBackupPath"])}
-                            />
-                        }
-                    />
-                    <SectionHeader title="Proton" />
-                    <InputRow
-                        label="Compatdata path"
-                        description="Root directory of Steam's compatdata (Proton prefixes)."
-                        input={
-                            <TextField
-                                value={settingsDraft.proton.compatdataPath}
-                                onChange={handleTextChange(["proton", "compatdataPath"])}
-                            />
-                        }
-                    />
-                    <InputRow
-                        label="Default Proton version"
-                        description="Used when a game entry does not specify proton_version."
-                        input={
-                            <TextField
-                                value={settingsDraft.proton.defaultVersion}
-                                onChange={handleTextChange(["proton", "defaultVersion"])}
-                            />
-                        }
-                    />
-
-                    <SectionHeader title="Remote sync" />
-                    <PanelSectionRow>
-                        <ToggleField
-                            label="Enable remote host"
-                            description="Mirror games.json, games and save backups using rsync."
-                            checked={settingsDraft.remote.enabled}
-                            onChange={val => mutateDraft(["remote", "enabled"], val)}
-                        />
-                    </PanelSectionRow>
-                    {settingsDraft.remote.enabled && (
-                        <Fragment>
-                            <InputRow
-                                label="Remote host"
-                                description="Format user@host (requires SSH and rsync)."
-                                input={
-                                    <TextField
-                                        value={settingsDraft.remote.host}
-                                        onChange={handleTextChange(["remote", "host"])}
-                                    />
-                                }
-                            />
-                            <InputRow
-                                label="Remote games path"
-                                description="Base directory on the remote host containing the games and games.json file."
-                                input={
-                                    <TextField
-                                        value={settingsDraft.remote.gamesPath}
-                                        onChange={handleTextChange(["remote", "gamesPath"])}
-                                    />
-                                }
-                            />
-                            <InputRow
-                                label="Remote games filename"
-                                description="Defaults to games.json."
-                                input={
-                                    <TextField
-                                        value={settingsDraft.remote.gamesFileName}
-                                        onChange={handleTextChange(["remote", "gamesFileName"])}
-                                    />
-                                }
-                            />
-                            <InputRow
-                                label="Remote save path"
-                                description="Relative folder inside the remote games directory where backups are stored."
-                                input={
-                                    <TextField
-                                        value={settingsDraft.remote.savePath}
-                                        onChange={handleTextChange(["remote", "savePath"])}
-                                    />
-                                }
-                            />
-                            <InputRow
-                                label="rsync flags"
-                                description="Advanced: space-separated flags passed to rsync."
-                                input={
-                                    <TextField
-                                        value={settingsDraft.remote.rsyncFlags}
-                                        onChange={handleTextChange(["remote", "rsyncFlags"])}
-                                    />
-                                }
-                            />
-                        </Fragment>
-                    )}
                 </PanelSection>
             )}
 
@@ -541,7 +472,7 @@ function Content() {
                 {sortedGames.length === 0 && (
                     <PanelSectionRow>
                         <div style={{ opacity: 0.7 }}>
-                            No games were found. Confirm that your games.json file follows the documented format.
+                            No games were found. Confirm that your config file has a "games" array and remote settings are correct.
                         </div>
                     </PanelSectionRow>
                 )}
@@ -556,8 +487,8 @@ function Content() {
                             key={game.name}
                             game={game}
                             busy={busy}
-                            onDownload={handleDownload(game.name)}
-                            onSetup={handleSetup(game.steam_appid, game.name)}
+                            onInstall={handleInstall(game.name)}
+                            onRemove={handleRemove(game.name)}
                             onSync={handleSync(game.name)}
                         />
                     );
