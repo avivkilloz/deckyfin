@@ -1,0 +1,14 @@
+I want to make sure this plugin is doing what I actually want. this is  a expected flow:
+- the user installs the plugin.
+- the plugin has the option to configure settings like:
+1. remote host address.
+2. deckyfin-config.json file path in remote host (this is the file where the games present in the remote host will be described). it doesn't need to have exaclty this name, but it needs to be json file that has the "games" key and the configuration for each game present in the remote host. there should also be a "savesPath" key pointing to the location in the remote host where saves should be backedup/synced to.
+3. destination games/ folder in the local computer (steam deck) where the games from remote host will be downloaded to.
+- when clicking the plugin in the list of plugins in deckyfiin, the user will be presented with a list of games present in the remote host.
+- each game entry will have an indication like a green check or sometinh similar showing if the game is also installed in the local pc or not.
+- by clicking a game entry, the user will be able to:
+1. remove the game from local (which will first backup its saves, delete the game folder, its prefix, and other related resources like the non-steam entry in steam deck UI).
+2. download the game is not yet installed. this will download the game from remote host to games/ folder sepecified in settings, install prefix with the correct proton version, install the proton tricks dependencies in the prefix, import saves from remote host, create non-steam game in steam deck UI.
+3- backup/sync game saves.
+- we should have a global button to backup game saves that will backup all game saves that are currently downloaded to local steam deck.
+- in the deckyfin-config.json for each game entry  we should also be able to specifcy the categories the game can be added to and when downloading the game we should add the game to the categories specified, and if the category does not exist we should create it.
