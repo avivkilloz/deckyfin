@@ -8,8 +8,8 @@
       "steam_appid": 292030,
       "proton_version": "GE-Proton10-25",
       "proton_dependencies": [
-        "VC 2019 Redist",
-        "DirectX Jun 2010 Redist"
+        "vcrun2019",
+        "d3dx9"
       ],
       "proton_sync_paths": [
         "%USERPROFILE%/My Documents/The Witcher 3/",
