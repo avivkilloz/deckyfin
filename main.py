@@ -19,6 +19,8 @@ DATA_DIR = os.path.join(USER_HOME, ".local", "share", PLUGIN_ID)
 SETTINGS_PATH = os.path.join(DATA_DIR, "settings.json")
 CACHE_GAMES_PATH = os.path.join(DATA_DIR, "games.json")
 SAVES_DIR = os.path.join(DATA_DIR, "saves")
+PROTONTRICKS_CMD = "flatpak run com.github.Matoking.protontricks"
+PROTONTRICKS_FLAGS = "--force --unattended"
 
 
 def _now_iso() -> str:
@@ -608,8 +610,10 @@ class Plugin:
         for dep in dependencies:
             try:
                 proc = await asyncio.create_subprocess_exec(
-                    "protontricks",
+                    PROTONTRICKS_CMD,
                     str(steam_appid),
+                    "--",
+                    PROTONTRICKS_FLAGS,
                     dep,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
