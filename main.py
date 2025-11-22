@@ -5,6 +5,7 @@ import shlex
 import shutil
 from datetime import datetime
 from typing import Any, Dict, List, Optional
+import vdf
 
 # The decky plugin module is located at decky-loader/plugin
 # For easy intellisense checkout the decky-loader code repo
@@ -791,34 +792,215 @@ class Plugin:
     ) -> None:
         """Add Steam shortcut via VDF file manipulation.
 
-        Note: VDF file manipulation is complex. This is a placeholder.
-        In production, you should use SteamClient API from Decky or a proper VDF library.
+        Since we use custom compatdata, we can use the real appid without conflicts.
+        Steam will use our STEAM_COMPAT_DATA_PATH from launch_options.
         """
-        # Find actual userdata directory
         userdata_base = os.path.join(USER_HOME, ".local", "share", "Steam", "userdata")
-        if os.path.exists(userdata_base):
-            for user_id in os.listdir(userdata_base):
-                if user_id.isdigit():
-                    shortcuts_file = os.path.join(
-                        userdata_base, user_id, "config", "shortcuts.vdf"
+        if not os.path.exists(userdata_base):
+            decky.logger.error("Steam userdata directory not found")
+            return
+
+        # Find the first valid user directory
+        for user_id in os.listdir(userdata_base):
+            if not user_id.isdigit():
+                continue
+
+            shortcuts_file = os.path.join(
+                userdata_base, user_id, "config", "shortcuts.vdf"
+            )
+
+            # Create config directory if it doesn't exist
+            os.makedirs(os.path.dirname(shortcuts_file), exist_ok=True)
+
+            # Load existing shortcuts or create new structure
+            if os.path.exists(shortcuts_file):
+                try:
+                    with open(shortcuts_file, "rb") as f:
+                        shortcuts_data = vdf.binary_load(f)
+                except Exception as e:
+                    decky.logger.error(f"Failed to read shortcuts.vdf: {e}")
+                    shortcuts_data = {"shortcuts": {}}
+            else:
+                shortcuts_data = {"shortcuts": {}}
+
+            # Ensure shortcuts dict exists
+            if "shortcuts" not in shortcuts_data:
+                shortcuts_data["shortcuts"] = {}
+
+            # Check if this shortcut already exists (by appid or name)
+            existing_key = None
+            for key, shortcut in shortcuts_data["shortcuts"].items():
+                # Match by appid first (most reliable), then by name
+                if shortcut.get("appid") == appid:
+                    existing_key = key
+                    decky.logger.info(
+                        f"Updating existing shortcut for '{name}' (appid: {appid})"
                     )
-                    if os.path.exists(shortcuts_file):
-                        # Note: VDF parsing/manipulation requires proper library
-                        # For now, log what we would do
-                        decky.logger.info(
-                            f"Would add shortcut to {shortcuts_file}:\n"
-                            f"  AppID: {appid}\n"
-                            f"  Name: {name}\n"
-                            f"  Exe: {exe_path}\n"
-                            f"  Launch Options: {launch_options}\n"
-                            f"  Categories: {categories}"
-                        )
-                        # TODO: Implement actual VDF manipulation or use SteamClient API
-                        break
+                    break
+                elif shortcut.get("AppName") == name:
+                    existing_key = key
+                    decky.logger.info(
+                        f"Updating existing shortcut for '{name}' (matched by name)"
+                    )
+                    break
+
+            # Generate next shortcut ID if creating new
+            if existing_key is None:
+                existing_ids = [
+                    int(k) for k in shortcuts_data["shortcuts"].keys() if k.isdigit()
+                ]
+                shortcut_id = str(max(existing_ids) + 1 if existing_ids else 0)
+            else:
+                shortcut_id = existing_key
+
+            # Create the shortcut entry
+            # Note: We use appid parameter directly since it's the real game's appid
+            # Steam stores paths without extra quotes - the VDF library handles quoting
+            shortcut_entry = {
+                "appid": appid,  # Use the real appid - no conflicts since custom compatdata
+                "AppName": name,
+                "Exe": exe_path,  # No extra quotes - VDF library handles it
+                "StartDir": os.path.dirname(exe_path),
+                "icon": "",
+                "ShortcutPath": "",
+                "LaunchOptions": launch_options,
+                "IsHidden": 0,
+                "AllowDesktopConfig": 1,
+                "AllowOverlay": 1,
+                "OpenVR": 0,
+                "Devkit": 0,
+                "DevkitGameID": "",
+                "DevkitOverrideAppID": 0,
+                "LastPlayTime": 0,
+                "tags": (
+                    {str(i): cat for i, cat in enumerate(categories)}
+                    if categories
+                    else {}
+                ),
+            }
+
+            # Add or update the shortcut
+            shortcuts_data["shortcuts"][shortcut_id] = shortcut_entry
+
+            # Write back to file
+            try:
+                # Create backup before writing
+                if os.path.exists(shortcuts_file):
+                    shutil.copy2(shortcuts_file, f"{shortcuts_file}.backup")
+
+                with open(shortcuts_file, "wb") as f:
+                    vdf.binary_dump(shortcuts_data, f)
+
+                decky.logger.info(
+                    f"Successfully added shortcut '{name}' (appid: {appid}) to Steam\n"
+                    f"  Exe: {exe_path}\n"
+                    f"  Launch Options: {launch_options}\n"
+                    f"  Categories: {categories}"
+                )
+
+                # Only process first valid user
+                break
+
+            except Exception as e:
+                decky.logger.error(f"Failed to write shortcuts.vdf: {e}")
+                # Restore backup if write failed
+                if os.path.exists(f"{shortcuts_file}.backup"):
+                    shutil.copy2(f"{shortcuts_file}.backup", shortcuts_file)
 
     async def _remove_from_steam(self, steam_appid: int) -> None:
-        """Remove game from Steam library."""
-        # Similar to _add_to_steam, but remove from shortcuts
-        decky.logger.info(f"Would remove appid {steam_appid} from Steam")
+        """Remove game from Steam library by appid."""
+        userdata_base = os.path.join(USER_HOME, ".local", "share", "Steam", "userdata")
+        if not os.path.exists(userdata_base):
+            decky.logger.error("Steam userdata directory not found")
+            return
+
+        for user_id in os.listdir(userdata_base):
+            if not user_id.isdigit():
+                continue
+
+            shortcuts_file = os.path.join(
+                userdata_base, user_id, "config", "shortcuts.vdf"
+            )
+
+            if not os.path.exists(shortcuts_file):
+                continue
+
+            try:
+                with open(shortcuts_file, "rb") as f:
+                    shortcuts_data = vdf.binary_load(f)
+
+                # Find and remove the shortcut with matching appid
+                shortcuts = shortcuts_data.get("shortcuts", {})
+                to_remove = None
+
+                for key, shortcut in shortcuts.items():
+                    if shortcut.get("appid") == steam_appid:
+                        to_remove = key
+                        name = shortcut.get("AppName", "Unknown")
+                        break
+
+                if to_remove:
+                    # Create backup before writing
+                    shutil.copy2(shortcuts_file, f"{shortcuts_file}.backup")
+
+                    del shortcuts[to_remove]
+
+                    # Write back
+                    with open(shortcuts_file, "wb") as f:
+                        vdf.binary_dump(shortcuts_data, f)
+
+                    decky.logger.info(
+                        f"Removed '{name}' (appid: {steam_appid}) from Steam"
+                    )
+                    break
+                else:
+                    decky.logger.warning(f"No shortcut found with appid {steam_appid}")
+
+            except Exception as e:
+                decky.logger.error(f"Failed to remove shortcut: {e}")
+                # Restore backup if something went wrong
+                if os.path.exists(f"{shortcuts_file}.backup"):
+                    shutil.copy2(f"{shortcuts_file}.backup", shortcuts_file)
+
+    # async def _add_steam_shortcut_vdf(
+    #     self,
+    #     appid: int,
+    #     name: str,
+    #     exe_path: str,
+    #     proton_version: str,
+    #     categories: List[str],
+    #     launch_options: str,
+    # ) -> None:
+    #     """Add Steam shortcut via VDF file manipulation.
+
+    #     Note: VDF file manipulation is complex. This is a placeholder.
+    #     In production, you should use SteamClient API from Decky or a proper VDF library.
+    #     """
+    #     # Find actual userdata directory
+    #     userdata_base = os.path.join(USER_HOME, ".local", "share", "Steam", "userdata")
+    #     if os.path.exists(userdata_base):
+    #         for user_id in os.listdir(userdata_base):
+    #             if user_id.isdigit():
+    #                 shortcuts_file = os.path.join(
+    #                     userdata_base, user_id, "config", "shortcuts.vdf"
+    #                 )
+    #                 if os.path.exists(shortcuts_file):
+    #                     # Note: VDF parsing/manipulation requires proper library
+    #                     # For now, log what we would do
+    #                     decky.logger.info(
+    #                         f"Would add shortcut to {shortcuts_file}:\n"
+    #                         f"  AppID: {appid}\n"
+    #                         f"  Name: {name}\n"
+    #                         f"  Exe: {exe_path}\n"
+    #                         f"  Launch Options: {launch_options}\n"
+    #                         f"  Categories: {categories}"
+    #                     )
+    #                     # TODO: Implement actual VDF manipulation or use SteamClient API
+    #                     break
+
+    # async def _remove_from_steam(self, steam_appid: int) -> None:
+    #     """Remove game from Steam library."""
+    #     # Similar to _add_to_steam, but remove from shortcuts
+    #     decky.logger.info(f"Would remove appid {steam_appid} from Steam")
 
     # endregion -----------------------------------------------------------
