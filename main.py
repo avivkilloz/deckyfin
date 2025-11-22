@@ -63,9 +63,7 @@ DEFAULT_SETTINGS: Dict[str, Any] = {
     "remoteConfigPath": "",
     "localGamesPath": os.path.join(USER_HOME, "Games"),
     "proton": {
-        "compatdataPath": os.path.join(
-            USER_HOME, ".local", "share", "Steam", "steamapps", "compatdata"
-        ),
+        "compatdataPath": os.path.join(DATA_DIR, "compatdata"),
         "defaultVersion": "GE-Proton10-25",
     },
     "saveBackupPath": os.path.join(SAVES_DIR),
@@ -129,6 +127,7 @@ class Plugin:
         return await self.install_game(game_name)
 
     async def setup_proton_prefix(self, steam_appid: int) -> Dict[str, Any]:
+        """Create and initialize Proton prefix with the specified Proton version."""
         game = await self._require_game_by_appid(str(steam_appid))
         compatdata_root = self.settings["proton"]["compatdataPath"]
         prefix_path = os.path.join(compatdata_root, str(game["steam_appid"]))
@@ -136,6 +135,7 @@ class Plugin:
         drive_c = os.path.join(pfx, "drive_c")
         user_profile = os.path.join(drive_c, "users", "steamuser")
 
+        # Create directory structure
         for path in [
             prefix_path,
             pfx,
@@ -146,10 +146,58 @@ class Plugin:
         ]:
             os.makedirs(path, exist_ok=True)
 
+        # Get Proton version
+        proton_version = (
+            game.get("proton_version") or self.settings["proton"]["defaultVersion"]
+        )
+
+        # Initialize prefix with Proton by running a dummy command
+        # This creates the wine prefix structure properly
+        try:
+            # Find Proton installation
+            steam_root = os.path.join(USER_HOME, ".local", "share", "Steam")
+            proton_path = os.path.join(
+                steam_root, "steamapps", "common", proton_version
+            )
+
+            if not os.path.exists(proton_path):
+                # Try alternative location
+                proton_path = os.path.join(
+                    steam_root, "compatibilitytools.d", proton_version
+                )
+
+            if os.path.exists(proton_path):
+                # Use Proton's wine to initialize the prefix
+                proton_wine = os.path.join(proton_path, "files", "bin", "wine")
+                if os.path.exists(proton_wine):
+                    # Set WINEPREFIX and run wineboot to initialize
+                    env = os.environ.copy()
+                    env["WINEPREFIX"] = pfx
+                    env["WINEARCH"] = "win64"
+
+                    proc = await asyncio.create_subprocess_exec(
+                        proton_wine,
+                        "wineboot",
+                        "--init",
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE,
+                        env=env,
+                    )
+                    await proc.communicate()
+                    # wineboot may return non-zero, that's okay for initialization
+            else:
+                decky.logger.warning(
+                    f"Proton version {proton_version} not found at {proton_path}. "
+                    "Prefix structure created but not initialized with Proton."
+                )
+        except Exception as e:
+            decky.logger.warning(f"Failed to initialize prefix with Proton: {e}")
+            # Continue anyway - structure is created
+
+        # Store metadata
         metadata = {
             "name": game["name"],
-            "proton_version": game.get("proton_version")
-            or self.settings["proton"]["defaultVersion"],
+            "proton_version": proton_version,
             "updated_at": _now_iso(),
         }
         metadata_path = os.path.join(prefix_path, "deckyfin.json")
@@ -301,16 +349,6 @@ class Plugin:
         # Step 5: Add to Steam
         try:
             executable = game.get("executable", "")
-            if not executable:
-                # Try to find common executables
-                for exe_name in ["game.exe", "Game.exe", f"{game['name']}.exe"]:
-                    test_path = os.path.join(local_target, exe_name)
-                    if os.path.exists(test_path):
-                        executable = exe_name
-                        break
-                if not executable:
-                    raise RuntimeError("No executable found and none specified")
-
             exe_path = os.path.join(local_target, executable)
             categories = game.get("categories", [])
             launch_options = game.get("launch_options", "")
@@ -676,96 +714,67 @@ class Plugin:
         categories: List[str],
         launch_options: str = "",
     ) -> None:
-        """Add game to Steam library with categories and launch options."""
-        try:
-            # Use SteamClient API if available
-            from decky import SteamClient
+        """Add game to Steam library with categories and launch options.
 
-            appid = steam_appid
-            if appid < 1000000:
-                # Generate a unique appid for non-Steam games
-                appid = 7000000 + abs(hash(name)) % 1000000
+        Uses the steam_appid directly (no fake appids needed since we use custom compatdata).
+        Sets STEAM_COMPAT_DATA_PATH to point to the parent of compatdata folder.
+        Uses PROTON_USE_VERSION to specify which Proton version to use.
+        """
+        # Use steam_appid directly - no need to generate fake appids
+        # since we're using a custom compatdata folder
 
-            # Build launch options - combine Proton compatdata path with user-provided options
-            compatdata_base = os.path.dirname(
-                os.path.dirname(self.settings["proton"]["compatdataPath"])
-            )
-            base_launch_opts = f"STEAM_COMPAT_DATA_PATH={compatdata_base} %command%"
+        # STEAM_COMPAT_DATA_PATH should point to the parent directory of compatdata
+        # (the "steamapps" equivalent in our custom structure)
+        compatdata_path = self.settings["proton"]["compatdataPath"]
+        compatdata_base = os.path.dirname(compatdata_path)
 
-            # If user provided launch options, append them (they should include %command% if needed)
-            if launch_options:
-                # If user's launch_options doesn't have %command%, append it
-                if "%command%" not in launch_options:
-                    final_launch_opts = f"{base_launch_opts} {launch_options}"
-                else:
-                    # Replace %command% in user's options with the full base options
-                    final_launch_opts = launch_options.replace(
-                        "%command%", base_launch_opts
-                    )
+        # Build launch options with Proton version and compatdata path
+        # PROTON_USE_VERSION tells Steam which Proton version to use
+        base_launch_opts = f"STEAM_COMPAT_DATA_PATH={compatdata_base} PROTON_USE_VERSION={proton_version} %command%"
+
+        # If user provided launch options, merge them properly
+        if launch_options:
+            # If user's launch_options doesn't have %command%, append it
+            if "%command%" not in launch_options:
+                final_launch_opts = f"{base_launch_opts} {launch_options}"
             else:
-                final_launch_opts = base_launch_opts
+                # Replace %command% in user's options with the full base options
+                final_launch_opts = launch_options.replace(
+                    "%command%", base_launch_opts
+                )
+        else:
+            final_launch_opts = base_launch_opts
 
-            # Add shortcut
-            shortcut = {
-                "appid": appid,
-                "AppName": name,
-                "Exe": exe_path,
-                "StartDir": os.path.dirname(exe_path),
-                "icon": "",
-                "ShortcutPath": "",
-                "LaunchOptions": final_launch_opts,
-            }
+        decky.logger.info(
+            f"Adding {name} to Steam with appid {steam_appid}, "
+            f"Proton {proton_version}, categories: {categories}, "
+            f"launch options: {final_launch_opts}"
+        )
 
-            # Note: Actual SteamClient API usage may vary
-            # This is a placeholder - you may need to use decky's SteamClient differently
-            decky.logger.info(
-                f"Would add {name} to Steam with categories: {categories}, launch options: {final_launch_opts}"
-            )
-
-            # For now, we'll use a workaround via Steam's shortcuts.vdf
-            await self._add_steam_shortcut_vdf(
-                name, exe_path, proton_version, categories, final_launch_opts
-            )
-
-        except ImportError:
-            # Fallback to VDF manipulation
-            compatdata_base = os.path.dirname(
-                os.path.dirname(self.settings["proton"]["compatdataPath"])
-            )
-            base_launch_opts = f"STEAM_COMPAT_DATA_PATH={compatdata_base} %command%"
-            if launch_options:
-                if "%command%" not in launch_options:
-                    final_launch_opts = f"{base_launch_opts} {launch_options}"
-                else:
-                    final_launch_opts = launch_options.replace(
-                        "%command%", base_launch_opts
-                    )
-            else:
-                final_launch_opts = base_launch_opts
-            await self._add_steam_shortcut_vdf(
-                name, exe_path, proton_version, categories, final_launch_opts
-            )
+        # Use VDF manipulation to add shortcut
+        await self._add_steam_shortcut_vdf(
+            appid=steam_appid,
+            name=name,
+            exe_path=exe_path,
+            proton_version=proton_version,
+            categories=categories,
+            launch_options=final_launch_opts,
+        )
 
     async def _add_steam_shortcut_vdf(
         self,
+        appid: int,
         name: str,
         exe_path: str,
         proton_version: str,
         categories: List[str],
         launch_options: str,
     ) -> None:
-        """Add Steam shortcut via VDF file manipulation."""
-        shortcuts_path = os.path.join(
-            USER_HOME,
-            ".local",
-            "share",
-            "Steam",
-            "userdata",
-            "*",
-            "config",
-            "shortcuts.vdf",
-        )
+        """Add Steam shortcut via VDF file manipulation.
 
+        Note: VDF file manipulation is complex. This is a placeholder.
+        In production, you should use SteamClient API from Decky or a proper VDF library.
+        """
         # Find actual userdata directory
         userdata_base = os.path.join(USER_HOME, ".local", "share", "Steam", "userdata")
         if os.path.exists(userdata_base):
@@ -775,11 +784,17 @@ class Plugin:
                         userdata_base, user_id, "config", "shortcuts.vdf"
                     )
                     if os.path.exists(shortcuts_file):
-                        # Note: VDF parsing/manipulation is complex
-                        # For now, log that we would add it
+                        # Note: VDF parsing/manipulation requires proper library
+                        # For now, log what we would do
                         decky.logger.info(
-                            f"Would add shortcut to {shortcuts_file} for {name}"
+                            f"Would add shortcut to {shortcuts_file}:\n"
+                            f"  AppID: {appid}\n"
+                            f"  Name: {name}\n"
+                            f"  Exe: {exe_path}\n"
+                            f"  Launch Options: {launch_options}\n"
+                            f"  Categories: {categories}"
                         )
+                        # TODO: Implement actual VDF manipulation or use SteamClient API
                         break
 
     async def _remove_from_steam(self, steam_appid: int) -> None:
