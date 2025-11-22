@@ -19,7 +19,8 @@
         "RPG",
         "Action"
       ],
-      "executable": "bin/x64/witcher3.exe"
+      "executable": "bin/x64/witcher3.exe",
+      "launch_options": "DXVK_HUD=1 %command%"
     },
     {
       "name": "Hades",
@@ -36,7 +37,8 @@
         "Roguelike",
         "Indie"
       ],
-      "executable": "Hades.exe"
+      "executable": "Hades.exe",
+      "launch_options": "%command%"
     }
   ]
 }

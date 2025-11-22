@@ -48,6 +48,7 @@ type GameEntry = {
     remote_path?: string;
     executable?: string;
     categories?: string[];
+    launch_options?: string;
     installed: boolean;
     prefix_ready: boolean;
     prefix_path: string;
@@ -152,6 +153,14 @@ const GameCard = ({
                 <div style={{ fontSize: "0.8rem", opacity: 0.8 }}>
                     <div>Library Path: {game.path}</div>
                     <div>Backup Path: {game.backup_path}</div>
+                    {game.executable && (
+                        <div>Executable: {game.executable}</div>
+                    )}
+                    {game.launch_options && (
+                        <div style={{ fontFamily: "monospace", fontSize: "0.75rem", marginTop: 4 }}>
+                            Launch Options: {game.launch_options}
+                        </div>
+                    )}
                     {game.remote_available && (
                         <div>Remote Path: {game.remote_path ?? "(derived from folder name)"}</div>
                     )}

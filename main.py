@@ -233,16 +233,16 @@ class Plugin:
     async def install_game(self, game_name: str) -> Dict[str, Any]:
         """Comprehensive game installation: download, prefix, dependencies, saves, Steam."""
         game = await self._require_game_by_name(game_name)
-        
+
         if game.get("installed"):
             raise RuntimeError(f"Game '{game_name}' is already installed")
-        
+
         remote_host = self.settings.get("remoteHost", "").strip()
         if not remote_host:
             raise RuntimeError("Remote host is not configured")
-        
+
         steps = []
-        
+
         # Step 1: Download game files
         try:
             remote_subpath = game.get("remote_path") or os.path.basename(
@@ -260,14 +260,14 @@ class Plugin:
             steps.append("Downloaded game files")
         except Exception as e:
             raise RuntimeError(f"Failed to download game: {e}") from e
-        
+
         # Step 2: Setup Proton prefix
         try:
             await self.setup_proton_prefix(game["steam_appid"])
             steps.append("Created Proton prefix")
         except Exception as e:
             raise RuntimeError(f"Failed to setup prefix: {e}") from e
-        
+
         # Step 3: Install Proton dependencies
         try:
             deps = game.get("proton_dependencies", [])
@@ -277,7 +277,7 @@ class Plugin:
         except Exception as e:
             decky.logger.warning(f"Failed to install some dependencies: {e}")
             steps.append(f"Dependency installation had issues: {e}")
-        
+
         # Step 4: Import saves from remote
         try:
             if self._config_saves_path:
@@ -286,7 +286,7 @@ class Plugin:
         except Exception as e:
             decky.logger.warning(f"Failed to import saves: {e}")
             steps.append(f"Save import had issues: {e}")
-        
+
         # Step 5: Add to Steam
         try:
             executable = game.get("executable", "")
@@ -299,23 +299,25 @@ class Plugin:
                         break
                 if not executable:
                     raise RuntimeError("No executable found and none specified")
-            
+
             exe_path = os.path.join(local_target, executable)
             categories = game.get("categories", [])
+            launch_options = game.get("launch_options", "")
             await self._add_to_steam(
                 game["steam_appid"],
                 game["name"],
                 exe_path,
                 game.get("proton_version") or self.settings["proton"]["defaultVersion"],
                 categories,
+                launch_options,
             )
             steps.append("Added to Steam library")
         except Exception as e:
             raise RuntimeError(f"Failed to add to Steam: {e}") from e
-        
+
         # Refresh cache
         await self.load_games()
-        
+
         return {
             "ok": True,
             "message": f"Game '{game_name}' installed successfully",
@@ -326,12 +328,12 @@ class Plugin:
     async def remove_game(self, game_name: str) -> Dict[str, Any]:
         """Remove game: backup saves, delete files, remove from Steam."""
         game = await self._require_game_by_name(game_name)
-        
+
         if not game.get("installed"):
             raise RuntimeError(f"Game '{game_name}' is not installed")
-        
+
         steps = []
-        
+
         # Step 1: Backup saves
         try:
             await self.sync_game_saves(game_name)
@@ -339,7 +341,7 @@ class Plugin:
         except Exception as e:
             decky.logger.warning(f"Save backup had issues: {e}")
             steps.append(f"Save backup warning: {e}")
-        
+
         # Step 2: Remove from Steam
         try:
             await self._remove_from_steam(game["steam_appid"])
@@ -347,7 +349,7 @@ class Plugin:
         except Exception as e:
             decky.logger.warning(f"Steam removal had issues: {e}")
             steps.append(f"Steam removal warning: {e}")
-        
+
         # Step 3: Delete game folder
         try:
             if os.path.exists(game["path"]):
@@ -355,7 +357,7 @@ class Plugin:
                 steps.append("Deleted game folder")
         except Exception as e:
             raise RuntimeError(f"Failed to delete game folder: {e}") from e
-        
+
         # Step 4: Delete Proton prefix
         try:
             if os.path.exists(game["prefix_path"]):
@@ -364,10 +366,10 @@ class Plugin:
         except Exception as e:
             decky.logger.warning(f"Prefix deletion had issues: {e}")
             steps.append(f"Prefix deletion warning: {e}")
-        
+
         # Refresh cache
         await self.load_games()
-        
+
         return {
             "ok": True,
             "message": f"Game '{game_name}' removed successfully",
@@ -398,7 +400,7 @@ class Plugin:
         """Ensure config file is available, syncing from remote if configured."""
         remote_host = self.settings.get("remoteHost", "").strip()
         remote_config_path = self.settings.get("remoteConfigPath", "").strip()
-        
+
         if remote_host and remote_config_path:
             # Sync from remote
             await self._rsync_file(remote_config_path, CACHE_GAMES_PATH)
@@ -437,6 +439,7 @@ class Plugin:
             "remote_path": entry.get("remote_path"),
             "executable": entry.get("executable", ""),
             "categories": entry.get("categories", []),
+            "launch_options": entry.get("launch_options", ""),
             "installed": os.path.exists(local_path),
             "prefix_ready": os.path.exists(os.path.join(prefix_path, "pfx")),
             "prefix_path": prefix_path,
@@ -601,7 +604,7 @@ class Plugin:
         )
         if not os.path.exists(prefix_path):
             raise RuntimeError(f"Prefix not found: {prefix_path}")
-        
+
         for dep in dependencies:
             try:
                 proc = await asyncio.create_subprocess_exec(
@@ -628,27 +631,25 @@ class Plugin:
         game = await self._require_game_by_name(game_name)
         if not self._config_saves_path:
             return
-        
+
         remote_host = self.settings.get("remoteHost", "").strip()
         if not remote_host:
             return
-        
-        remote_save_path = os.path.join(
-            self._config_saves_path, _slugify(game_name)
-        )
+
+        remote_save_path = os.path.join(self._config_saves_path, _slugify(game_name))
         local_backup_path = os.path.join(
             self.settings["saveBackupPath"], _slugify(game_name)
         )
-        
+
         # Download saves from remote
         if os.path.exists(local_backup_path):
             shutil.rmtree(local_backup_path)
         os.makedirs(local_backup_path, exist_ok=True)
-        
+
         await self._rsync_directory(
             remote_save_path, local_backup_path, download=True, delete=False
         )
-        
+
         # Restore saves to prefix
         prefix_path = os.path.join(
             self.settings["proton"]["compatdataPath"], str(game["steam_appid"])
@@ -668,17 +669,37 @@ class Plugin:
         exe_path: str,
         proton_version: str,
         categories: List[str],
+        launch_options: str = "",
     ) -> None:
-        """Add game to Steam library with categories."""
+        """Add game to Steam library with categories and launch options."""
         try:
             # Use SteamClient API if available
             from decky import SteamClient
-            
+
             appid = steam_appid
             if appid < 1000000:
                 # Generate a unique appid for non-Steam games
                 appid = 7000000 + abs(hash(name)) % 1000000
-            
+
+            # Build launch options - combine Proton compatdata path with user-provided options
+            compatdata_base = os.path.dirname(
+                os.path.dirname(self.settings["proton"]["compatdataPath"])
+            )
+            base_launch_opts = f"STEAM_COMPAT_DATA_PATH={compatdata_base} %command%"
+
+            # If user provided launch options, append them (they should include %command% if needed)
+            if launch_options:
+                # If user's launch_options doesn't have %command%, append it
+                if "%command%" not in launch_options:
+                    final_launch_opts = f"{base_launch_opts} {launch_options}"
+                else:
+                    # Replace %command% in user's options with the full base options
+                    final_launch_opts = launch_options.replace(
+                        "%command%", base_launch_opts
+                    )
+            else:
+                final_launch_opts = base_launch_opts
+
             # Add shortcut
             shortcut = {
                 "appid": appid,
@@ -687,22 +708,46 @@ class Plugin:
                 "StartDir": os.path.dirname(exe_path),
                 "icon": "",
                 "ShortcutPath": "",
-                "LaunchOptions": f"STEAM_COMPAT_DATA_PATH={os.path.dirname(os.path.dirname(self.settings['proton']['compatdataPath']))} %command%",
+                "LaunchOptions": final_launch_opts,
             }
-            
+
             # Note: Actual SteamClient API usage may vary
             # This is a placeholder - you may need to use decky's SteamClient differently
-            decky.logger.info(f"Would add {name} to Steam with categories: {categories}")
-            
+            decky.logger.info(
+                f"Would add {name} to Steam with categories: {categories}, launch options: {final_launch_opts}"
+            )
+
             # For now, we'll use a workaround via Steam's shortcuts.vdf
-            await self._add_steam_shortcut_vdf(name, exe_path, proton_version, categories)
-            
+            await self._add_steam_shortcut_vdf(
+                name, exe_path, proton_version, categories, final_launch_opts
+            )
+
         except ImportError:
             # Fallback to VDF manipulation
-            await self._add_steam_shortcut_vdf(name, exe_path, proton_version, categories)
+            compatdata_base = os.path.dirname(
+                os.path.dirname(self.settings["proton"]["compatdataPath"])
+            )
+            base_launch_opts = f"STEAM_COMPAT_DATA_PATH={compatdata_base} %command%"
+            if launch_options:
+                if "%command%" not in launch_options:
+                    final_launch_opts = f"{base_launch_opts} {launch_options}"
+                else:
+                    final_launch_opts = launch_options.replace(
+                        "%command%", base_launch_opts
+                    )
+            else:
+                final_launch_opts = base_launch_opts
+            await self._add_steam_shortcut_vdf(
+                name, exe_path, proton_version, categories, final_launch_opts
+            )
 
     async def _add_steam_shortcut_vdf(
-        self, name: str, exe_path: str, proton_version: str, categories: List[str]
+        self,
+        name: str,
+        exe_path: str,
+        proton_version: str,
+        categories: List[str],
+        launch_options: str,
     ) -> None:
         """Add Steam shortcut via VDF file manipulation."""
         shortcuts_path = os.path.join(
@@ -715,7 +760,7 @@ class Plugin:
             "config",
             "shortcuts.vdf",
         )
-        
+
         # Find actual userdata directory
         userdata_base = os.path.join(USER_HOME, ".local", "share", "Steam", "userdata")
         if os.path.exists(userdata_base):
