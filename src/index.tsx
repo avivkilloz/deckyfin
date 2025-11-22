@@ -27,7 +27,7 @@ type RemoteConfig = {
     enabled: boolean;
     host: string;
     gamesPath: string;
-    yamlFileName: string;
+    gamesFileName: string;
     rsyncFlags: string;
     savePath: string;
 };
@@ -39,7 +39,7 @@ type ProtonConfig = {
 
 type DeckyfinSettings = {
     localLibraryPath: string;
-    yamlFilePath: string;
+    gamesFilePath: string;
     remote: RemoteConfig;
     proton: ProtonConfig;
     saveBackupPath: string;
@@ -248,7 +248,7 @@ function Content() {
             setGamesMeta({ source: payload.source, refreshedAt: payload.refreshedAt });
         } catch (error) {
             console.error(error);
-            setGlobalError("Failed to read games YAML. Check the path and syntax.");
+            setGlobalError("Failed to read games JSON file. Check the path and syntax.");
         } finally {
             setGamesLoading(false);
         }
@@ -400,12 +400,12 @@ function Content() {
                         }
                     />
                     <InputRow
-                        label="YAML definition path"
-                        description="Used when remote sync is disabled. Points to the library descriptor."
+                        label="Games definition path"
+                        description="Used when remote sync is disabled. Points to the games.json file."
                         input={
                             <TextField
-                                value={settingsDraft.yamlFilePath}
-                                onChange={handleTextChange(["yamlFilePath"])}
+                                value={settingsDraft.gamesFilePath}
+                                onChange={handleTextChange(["gamesFilePath"])}
                             />
                         }
                     />
@@ -445,7 +445,7 @@ function Content() {
                     <PanelSectionRow>
                         <ToggleField
                             label="Enable remote host"
-                            description="Mirror YAML, games and save backups using rsync."
+                            description="Mirror games.json, games and save backups using rsync."
                             checked={settingsDraft.remote.enabled}
                             onChange={val => mutateDraft(["remote", "enabled"], val)}
                         />
@@ -464,7 +464,7 @@ function Content() {
                             />
                             <InputRow
                                 label="Remote games path"
-                                description="Base directory on the remote host containing the games and YAML file."
+                                description="Base directory on the remote host containing the games and games.json file."
                                 input={
                                     <TextField
                                         value={settingsDraft.remote.gamesPath}
@@ -473,12 +473,12 @@ function Content() {
                                 }
                             />
                             <InputRow
-                                label="Remote YAML filename"
-                                description="Defaults to games.yaml."
+                                label="Remote games filename"
+                                description="Defaults to games.json."
                                 input={
                                     <TextField
-                                        value={settingsDraft.remote.yamlFileName}
-                                        onChange={handleTextChange(["remote", "yamlFileName"])}
+                                        value={settingsDraft.remote.gamesFileName}
+                                        onChange={handleTextChange(["remote", "gamesFileName"])}
                                     />
                                 }
                             />
@@ -541,7 +541,7 @@ function Content() {
                 {sortedGames.length === 0 && (
                     <PanelSectionRow>
                         <div style={{ opacity: 0.7 }}>
-                            No games were found. Confirm that your YAML file follows the documented format.
+                            No games were found. Confirm that your games.json file follows the documented format.
                         </div>
                     </PanelSectionRow>
                 )}

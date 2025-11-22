@@ -4,42 +4,49 @@ Deckyfin is a Decky Loader plugin that keeps a curated list of non‑Steam games
 
 ## Features
 
-- Read a declarative game list from a YAML file (see `sample-games-yaml-file.yaml`).
+- Read a declarative game list from a JSON file (see `sample-games-json-file.json`).
 - Display per-game health (installation status, Proton prefix readiness, last save backup).
 - Create/prepare Proton prefixes so dependencies can be installed before running the game.
 - Copy user-defined Proton save paths into a structured backup directory and optionally mirror them to a remote server.
-- Mirror full game folders and the YAML definition from an SSH/rsync host.
+- Mirror full game folders and the games.json definition from an SSH/rsync host.
 
 Remote operations rely on `rsync` being available on both the Steam Deck and the remote host. Authentication uses your existing SSH configuration (keys/passwords).
 
-## YAML format
+## JSON format
 
-```yaml
-games:
-  - name: "The Witcher 3"
-    path: "/home/deck/Games/The Witcher 3"
-    remote_path: "rpg/witcher3"           # optional, defaults to local folder name
-    steam_appid: 292030
-    proton_version: GE-Proton10-25        # falls back to plugin default if omitted
-    proton_dependencies:
-      - "VC 2019 Redist"
-      - "DirectX Jun 2010 Redist"
-    proton_sync_paths:
-      - "%USERPROFILE%/My Documents/The Witcher 3/"
-      - "%LOCALAPPDATA%/CD Projekt Red/The Witcher 3/"
+```json
+{
+  "games": [
+    {
+      "name": "The Witcher 3",
+      "path": "/home/deck/Games/The Witcher 3",
+      "remote_path": "rpg/witcher3",
+      "steam_appid": 292030,
+      "proton_version": "GE-Proton10-25",
+      "proton_dependencies": [
+        "VC 2019 Redist",
+        "DirectX Jun 2010 Redist"
+      ],
+      "proton_sync_paths": [
+        "%USERPROFILE%/My Documents/The Witcher 3/",
+        "%LOCALAPPDATA%/CD Projekt Red/The Witcher 3/"
+      ]
+    }
+  ]
+}
 ```
 
 `proton_sync_paths` accept Windows-style placeholders that Deckyfin expands inside the Proton prefix (`%USERPROFILE%`, `%APPDATA%`, `%LOCALAPPDATA%`, `%DOCUMENTS%`, `%DRIVE_C%`). Absolute Linux paths are supported too.
 
 ## Configuration workflow
 
-1. Place your YAML definition locally or inside the remote games directory.
+1. Place your `games.json` definition locally or inside the remote games directory.
 2. Open Deckyfin and configure:
    - **Local games folder**: base for any relative `path` values.
-   - **YAML path**: used whenever remote sync is disabled.
+   - **Games definition path**: used whenever remote sync is disabled.
    - **Proton compatdata path** and **default Proton version**.
    - **Save backup folder**: where Deckyfin mirrors Proton save data.
-   - Optional **remote host** (`user@host`), **remote games path**, **YAML filename**, **remote save subfolder** and desired `rsync` flags.
+   - Optional **remote host** (`user@host`), **remote games path**, **games filename**, **remote save subfolder** and desired `rsync` flags.
 3. Press **Save settings** and then **Refresh** to load the library.
 4. Use the per-game actions:
    - **Download / Update**: pull files from the remote host into the local path.
@@ -78,9 +85,9 @@ The **Sync all saves** action runs the backup routine sequentially for every gam
 3. Package with the Decky CLI (`decky plugin build`) or copy the repository into `~/homebrew/plugins/deckyfin`.
 4. Restart Decky Loader (long-press the Decky menu → **Restart Decky**) to load the new version.
 5. Run a smoke test:
-   - Refresh the library (YAML parses without errors).
+   - Refresh the library (JSON parses without errors).
    - Prepare a Proton prefix.
    - Sync saves and verify files appear under the backup directory.
    - If remote sync is enabled, download/update a game and confirm the files arrive locally and that backups upload successfully.
 
-Feel free to adapt the YAML schema or extend the Python helpers to fit your workflow. Contributions and bug reports are welcome!
+Feel free to adapt the JSON schema or extend the Python helpers to fit your workflow. Contributions and bug reports are welcome!

@@ -11,11 +11,13 @@ from typing import Any, Dict, List, Optional
 # and add the `decky-loader/plugin/imports` path to `python.analysis.extraPaths` in `.vscode/settings.json`
 import decky
 
+# Using JSON for games configuration - no external dependencies needed
+
 PLUGIN_ID = "deckyfin"
 USER_HOME = decky.DECKY_USER_HOME
 DATA_DIR = os.path.join(USER_HOME, ".local", "share", PLUGIN_ID)
 SETTINGS_PATH = os.path.join(DATA_DIR, "settings.json")
-CACHE_YAML_PATH = os.path.join(DATA_DIR, "games.yaml")
+CACHE_GAMES_PATH = os.path.join(DATA_DIR, "games.json")
 SAVES_DIR = os.path.join(DATA_DIR, "saves")
 
 
@@ -30,92 +32,35 @@ def _slugify(value: str) -> str:
     return safe.strip("-").lower() or "game"
 
 
-def _parse_scalar(raw: str) -> Any:
-    if raw == "":
-        return ""
-    if raw.startswith('"') and raw.endswith('"'):
-        return raw[1:-1]
-    if raw.startswith("'") and raw.endswith("'"):
-        return raw[1:-1]
-    lowered = raw.lower()
-    if lowered in ("true", "false"):
-        return lowered == "true"
+def load_games_json(path: str) -> List[Dict[str, Any]]:
+    """Load games from a JSON file."""
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"Games file not found at {path}")
+
     try:
-        if "." in raw:
-            return float(raw)
-        return int(raw)
-    except ValueError:
-        return raw
-
-
-class SimpleGamesYaml:
-    @staticmethod
-    def load(path: str) -> List[Dict[str, Any]]:
-        if not os.path.exists(path):
-            raise FileNotFoundError(f"YAML file not found at {path}")
-
         with open(path, "r", encoding="utf-8") as handle:
-            lines = handle.readlines()
+            data = json.load(handle)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid JSON in games file: {e}") from e
 
-        games: List[Dict[str, Any]] = []
-        current: Optional[Dict[str, Any]] = None
-        active_list: Optional[str] = None
-        inside_games = False
+    if not isinstance(data, dict):
+        raise ValueError("Games file must contain a dictionary at the root level")
 
-        for raw in lines:
-            stripped = raw.strip()
-            if not stripped or stripped.startswith("#"):
-                continue
-            indent = len(raw) - len(raw.lstrip(" "))
-            if stripped == "games:":
-                inside_games = True
-                continue
-            if not inside_games:
-                continue
-            if stripped.startswith("- ") and indent == 2:
-                if current:
-                    games.append(current)
-                current = {}
-                active_list = None
-                remainder = stripped[2:].strip()
-                if remainder:
-                    if ":" not in remainder:
-                        raise ValueError(f"Malformed line: {raw}")
-                    key, value = remainder.split(":", 1)
-                    current[key.strip()] = _parse_scalar(value.strip())
-                continue
-            if current is None:
-                raise ValueError("Found property outside of a game entry")
-            if stripped.startswith("- ") and indent >= 6 and active_list:
-                current.setdefault(active_list, [])
-                current[active_list].append(_parse_scalar(stripped[2:].strip()))
-                continue
-            if ":" in stripped:
-                key, value = stripped.split(":", 1)
-                key = key.strip()
-                value = value.strip()
-                if value == "":
-                    current[key] = []
-                    active_list = key
-                else:
-                    current[key] = _parse_scalar(value)
-                    active_list = None
-                continue
+    games = data.get("games", [])
+    if not isinstance(games, list):
+        raise ValueError("Games file must have a 'games' key containing a list")
 
-        if current:
-            games.append(current)
-
-        return games
+    return games
 
 
 DEFAULT_SETTINGS: Dict[str, Any] = {
     "localLibraryPath": os.path.join(USER_HOME, "Games"),
-    "yamlFilePath": os.path.join(USER_HOME, "Games", "games.yaml"),
+    "gamesFilePath": os.path.join(USER_HOME, "Games", "games.json"),
     "remote": {
         "enabled": False,
         "host": "",
         "gamesPath": "",
-        "yamlFileName": "games.yaml",
+        "gamesFileName": "games.json",
         "rsyncFlags": "-avz",
         "savePath": "deckyfin-saves",
     },
@@ -166,13 +111,13 @@ class Plugin:
 
     # region games api ----------------------------------------------------
     async def load_games(self) -> Dict[str, Any]:
-        yaml_path = await self._ensure_games_yaml()
-        parsed_games = SimpleGamesYaml.load(yaml_path)
+        games_path = await self._ensure_games_file()
+        parsed_games = load_games_json(games_path)
         decorated = [self._decorate_game(entry) for entry in parsed_games]
         self._cached_games = decorated
         return {
             "games": decorated,
-            "source": yaml_path,
+            "source": games_path,
             "refreshedAt": _now_iso(),
         }
 
@@ -321,21 +266,21 @@ class Plugin:
         with open(SETTINGS_PATH, "w", encoding="utf-8") as handle:
             json.dump(payload, handle, indent=2)
 
-    async def _ensure_games_yaml(self) -> str:
+    async def _ensure_games_file(self) -> str:
         remote_cfg = self.settings.get("remote", {})
         if remote_cfg.get("enabled"):
             remote_host = remote_cfg.get("host")
             remote_path = remote_cfg.get("gamesPath")
-            yaml_name = remote_cfg.get("yamlFileName") or "games.yaml"
+            games_file_name = remote_cfg.get("gamesFileName") or "games.json"
             if not remote_host or not remote_path:
                 raise RuntimeError("Remote host and gamesPath are required")
-            remote_file = os.path.join(remote_path, yaml_name)
-            await self._rsync_file(remote_file, CACHE_YAML_PATH)
-            return CACHE_YAML_PATH
-        yaml_path = self.settings.get("yamlFilePath")
-        if not yaml_path:
-            raise RuntimeError("yamlFilePath is not configured")
-        return os.path.expanduser(yaml_path)
+            remote_file = os.path.join(remote_path, games_file_name)
+            await self._rsync_file(remote_file, CACHE_GAMES_PATH)
+            return CACHE_GAMES_PATH
+        games_path = self.settings.get("gamesFilePath")
+        if not games_path:
+            raise RuntimeError("gamesFilePath is not configured")
+        return os.path.expanduser(games_path)
 
     def _decorate_game(self, entry: Dict[str, Any]) -> Dict[str, Any]:
         local_path_raw = entry.get("path", "")
@@ -347,7 +292,9 @@ class Plugin:
         )
         remote_cfg = self.settings.get("remote", {})
         remote_available = bool(
-            remote_cfg.get("enabled") and remote_cfg.get("host") and remote_cfg.get("gamesPath")
+            remote_cfg.get("enabled")
+            and remote_cfg.get("host")
+            and remote_cfg.get("gamesPath")
         )
         metadata_path = os.path.join(prefix_path, "deckyfin.json")
         last_backup = self._read_last_backup(backup_path)
@@ -391,7 +338,7 @@ class Plugin:
             await self.load_games()
         matches = [game for game in self._cached_games if game["name"] == name]
         if not matches:
-            raise RuntimeError(f"Game '{name}' was not found in the YAML definition")
+            raise RuntimeError(f"Game '{name}' was not found in the games definition")
         return matches[0]
 
     async def _require_game_by_appid(self, appid: str) -> Dict[str, Any]:
@@ -409,8 +356,12 @@ class Plugin:
         base_drive = os.path.join(prefix, "pfx", "drive_c")
         env_map = {
             "%USERPROFILE%": os.path.join(base_drive, "users", "steamuser"),
-            "%APPDATA%": os.path.join(base_drive, "users", "steamuser", "AppData", "Roaming"),
-            "%LOCALAPPDATA%": os.path.join(base_drive, "users", "steamuser", "AppData", "Local"),
+            "%APPDATA%": os.path.join(
+                base_drive, "users", "steamuser", "AppData", "Roaming"
+            ),
+            "%LOCALAPPDATA%": os.path.join(
+                base_drive, "users", "steamuser", "AppData", "Local"
+            ),
             "%DOCUMENTS%": os.path.join(base_drive, "users", "steamuser", "Documents"),
         }
         for token, resolved in env_map.items():
