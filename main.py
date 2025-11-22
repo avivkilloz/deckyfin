@@ -247,14 +247,23 @@ class Plugin:
 
         # Step 1: Download game files
         try:
-            remote_subpath = game.get("remote_path") or os.path.basename(
-                game.get("defined_path") or game["path"]
-            )
-            # Extract remote games path from config path
+            # path in config is the remote path relative to the games directory
+            remote_path = game.get("path", "")
+            if not remote_path:
+                raise RuntimeError(
+                    "Game entry must have a 'path' field specifying remote location"
+                )
+
+            # Extract remote games base directory from config path
             remote_config_path = self.settings.get("remoteConfigPath", "")
             remote_games_base = os.path.dirname(remote_config_path)
-            remote_target = os.path.join(remote_games_base, remote_subpath)
-            local_target = game["path"]
+            remote_target = os.path.join(remote_games_base, remote_path)
+
+            # Local path is always in the configured local games folder, using game name
+            local_target = os.path.join(
+                self.settings["localGamesPath"], _slugify(game_name)
+            )
+
             os.makedirs(local_target, exist_ok=True)
             await self._rsync_directory(
                 remote_target, local_target, download=True, delete=False
@@ -415,13 +424,14 @@ class Plugin:
             )
 
     def _decorate_game(self, entry: Dict[str, Any]) -> Dict[str, Any]:
-        local_path_raw = entry.get("path", "")
-        local_path = self._resolve_local_path(local_path_raw)
+        # path in config is the remote path
+        remote_path = entry.get("path", "")
+        # Local path is always in the configured local games folder, using game name
+        game_name = entry.get("name", "game")
+        local_path = os.path.join(self.settings["localGamesPath"], _slugify(game_name))
         compatdata_root = self.settings["proton"]["compatdataPath"]
         prefix_path = os.path.join(compatdata_root, str(entry.get("steam_appid")))
-        backup_path = os.path.join(
-            self.settings["saveBackupPath"], _slugify(entry.get("name", "game"))
-        )
+        backup_path = os.path.join(self.settings["saveBackupPath"], _slugify(game_name))
         remote_available = bool(
             self.settings.get("remoteHost", "").strip()
             and self.settings.get("remoteConfigPath", "").strip()
@@ -430,15 +440,14 @@ class Plugin:
         last_backup = self._read_last_backup(backup_path)
 
         return {
-            "name": entry.get("name"),
+            "name": game_name,
             "path": local_path,
-            "defined_path": local_path_raw,
+            "remote_path": remote_path,
             "steam_appid": entry.get("steam_appid"),
             "proton_version": entry.get("proton_version")
             or self.settings["proton"]["defaultVersion"],
             "proton_dependencies": entry.get("proton_dependencies") or [],
             "proton_sync_paths": entry.get("proton_sync_paths") or [],
-            "remote_path": entry.get("remote_path"),
             "executable": entry.get("executable", ""),
             "categories": entry.get("categories", []),
             "launch_options": entry.get("launch_options", ""),
@@ -450,14 +459,6 @@ class Plugin:
             "remote_available": remote_available,
             "metadata_path": metadata_path if os.path.exists(metadata_path) else None,
         }
-
-    def _resolve_local_path(self, candidate: str) -> str:
-        if not candidate:
-            return self.settings["localGamesPath"]
-        expanded = os.path.expanduser(candidate)
-        if os.path.isabs(expanded):
-            return expanded
-        return os.path.join(self.settings["localGamesPath"], candidate)
 
     def _read_last_backup(self, backup_path: str) -> Optional[str]:
         marker = os.path.join(backup_path, ".last_sync")

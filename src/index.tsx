@@ -40,12 +40,11 @@ type DeckyfinSettings = {
 type GameEntry = {
     name: string;
     path: string;
-    defined_path?: string;
+    remote_path: string;
     steam_appid: number;
     proton_version: string;
     proton_dependencies: string[];
     proton_sync_paths: string[];
-    remote_path?: string;
     executable?: string;
     categories?: string[];
     launch_options?: string;
@@ -161,8 +160,8 @@ const GameCard = ({
                             Launch Options: {game.launch_options}
                         </div>
                     )}
-                    {game.remote_available && (
-                        <div>Remote Path: {game.remote_path ?? "(derived from folder name)"}</div>
+                    {game.remote_available && game.remote_path && (
+                        <div>Remote Path: {game.remote_path}</div>
                     )}
                 </div>
 
