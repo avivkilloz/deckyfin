@@ -717,20 +717,39 @@ class Plugin:
         """Add game to Steam library with categories and launch options.
 
         Uses the steam_appid directly (no fake appids needed since we use custom compatdata).
-        Sets STEAM_COMPAT_DATA_PATH to point to the parent of compatdata folder.
-        Uses PROTON_USE_VERSION to specify which Proton version to use.
+
+        STEAM_COMPAT_DATA_PATH structure:
+        - Our compatdata is at: {compatdataPath}/{appid}/pfx/
+        - Proton expects: {STEAM_COMPAT_DATA_PATH}/compatdata/{appid}/pfx/
+        - So STEAM_COMPAT_DATA_PATH should point to the parent of compatdata folder
+        - Example: If compatdata is at ~/.local/share/deckyfin/compatdata/292030/pfx/
+        - Then STEAM_COMPAT_DATA_PATH should be ~/.local/share/deckyfin
+        - And Proton will look for ~/.local/share/deckyfin/compatdata/292030/pfx/
+
+        Note: Proton version selection for non-Steam games is typically done via
+        Steam's Compatibility tool setting in game properties. However, we can
+        try to set it via PROTON_USE_VERSION in launch options (may not work
+        for all Proton versions, especially custom ones like GE-Proton).
         """
         # Use steam_appid directly - no need to generate fake appids
         # since we're using a custom compatdata folder
 
         # STEAM_COMPAT_DATA_PATH should point to the parent directory of compatdata
-        # (the "steamapps" equivalent in our custom structure)
+        # Proton will then look for {STEAM_COMPAT_DATA_PATH}/compatdata/{appid}/pfx/
         compatdata_path = self.settings["proton"]["compatdataPath"]
         compatdata_base = os.path.dirname(compatdata_path)
 
-        # Build launch options with Proton version and compatdata path
-        # PROTON_USE_VERSION tells Steam which Proton version to use
-        base_launch_opts = f"STEAM_COMPAT_DATA_PATH={compatdata_base} PROTON_USE_VERSION={proton_version} %command%"
+        # Build launch options with compatdata path
+        # STEAM_COMPAT_DATA_PATH structure:
+        # - Our structure: {compatdataPath}/{appid}/pfx/ (e.g., ~/.local/share/deckyfin/compatdata/292030/pfx/)
+        # - Proton expects: {STEAM_COMPAT_DATA_PATH}/compatdata/{appid}/pfx/
+        # - So we point to parent of compatdata: ~/.local/share/deckyfin
+        # - Proton will then find: ~/.local/share/deckyfin/compatdata/292030/pfx/
+        #
+        # Note: Proton version selection for non-Steam games must be done via
+        # Steam's Compatibility tool setting (right-click game > Properties > Compatibility).
+        # PROTON_USE_VERSION in launch options doesn't work reliably for non-Steam games.
+        base_launch_opts = f"STEAM_COMPAT_DATA_PATH={compatdata_base} %command%"
 
         # If user provided launch options, merge them properly
         if launch_options:
