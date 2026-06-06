@@ -20,7 +20,7 @@ from deckyfin_config import (
     find_game_executables,
     GameConfigError,
 )
-from steam_games import add_nonsteam_game, list_nonsteam_games
+from steam_games import add_nonsteam_game, list_nonsteam_games, remove_nonsteam_game
 from deckyfin_proton import list_available_proton, ensure_proton_available
 from deckyfin_proton_compat import set_proton_version
 from deckyfin_prefix import init_proton_prefix
@@ -150,11 +150,31 @@ class Plugin:
         start_dir: Optional[str] = None,
         launch_options: str = "",
     ) -> dict:
-        app_id = add_nonsteam_game(exe_path, app_name, start_dir, launch_options)
+        if not exe_path:
+            return {"success": False, "error": "Executable path is required"}
+        # Resolve relative paths against the configured games folder
+        exe = Path(exe_path)
+        if not exe.is_absolute():
+            games_folder = get_games_folder()
+            if games_folder:
+                exe = Path(games_folder) / exe_path
+        resolved_start = start_dir
+        if resolved_start and not Path(resolved_start).is_absolute():
+            games_folder = get_games_folder()
+            if games_folder:
+                resolved_start = str(Path(games_folder) / resolved_start)
+        app_id = add_nonsteam_game(str(exe), app_name, resolved_start, launch_options)
         return {
             "success": True,
             "app_id": app_id,
             "unsigned_appid": convert_appid_to_unsigned_32bit(app_id),
+        }
+
+    async def remove_steam_shortcut(self, app_name: str, user_id: Optional[str] = None) -> dict:
+        removed = remove_nonsteam_game(app_name, user_id)
+        return {
+            "success": removed,
+            "error": None if removed else f"'{app_name}' not found in Steam shortcuts",
         }
 
     # ── Proton ────────────────────────────────────────────────────────────

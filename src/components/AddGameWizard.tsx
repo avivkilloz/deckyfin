@@ -46,7 +46,10 @@ export const AddGameWizard: VFC<Props> = ({ folders, onDone, onBack }) => {
       <button onClick={onBack} style={{ marginBottom: "12px" }}>
         ← Cancel
       </button>
-      <h3>Add Game</h3>
+      <h3>Add Game to Deckyfin</h3>
+      <p style={{ fontSize: "0.85em", color: "#aaa", marginTop: 0 }}>
+        This saves the game to your Deckyfin config. Use "Add to Steam" from the game detail page to add a Steam shortcut.
+      </p>
 
       {result ? (
         <div>
@@ -58,7 +61,7 @@ export const AddGameWizard: VFC<Props> = ({ folders, onDone, onBack }) => {
           <p>Select a game folder:</p>
           {folders.map((f) => (
             <div key={f.path}>
-              <button onClick={() => { setSelectedFolder(f.name); setStep(1); }}>{f.name}</button>
+              <button onClick={() => { setSelectedFolder(f.name); setGameName(f.name); setStep(1); }}>{f.name}</button>
             </div>
           ))}
           {folders.length === 0 && <p>No folders detected.</p>}

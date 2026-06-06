@@ -12,23 +12,47 @@ from deckyfin_consts import LOGGER_STEAM, STEAM_ID64_BASE
 logger = logging.getLogger(LOGGER_STEAM)
 
 
+def _get_real_home() -> Path:
+    """Get the real user's home dir. Decky Loader runs as root, so Path.home() returns /root."""
+    import os
+    unprivileged = os.environ.get("UNPRIVILEGED_PATH")
+    if unprivileged:
+        home = Path(unprivileged).parent
+        if home.exists():
+            return home
+    sudo_user = os.environ.get("SUDO_USER")
+    if sudo_user:
+        home = Path("/home") / sudo_user
+        if home.exists():
+            return home
+    return Path.home()
+
+
 def find_steam_root() -> Path:
     """Find Steam installation directory (supports native and Flatpak Steam)."""
-    home_dir = Path.home()
+    home_dir = _get_real_home()
     candidates = [
         # Native Steam locations
         home_dir / ".local" / "share" / "Steam",
         home_dir / ".steam" / "steam",
         home_dir / ".steam" / "debian-installation",
-        Path("/usr/local/steam"),
-        Path("/usr/share/steam"),
         # Flatpak Steam location
         home_dir / ".var" / "app" / "com.valvesoftware.Steam" / "data" / "Steam",
+        # System-wide paths (launchers only — listed last; skipped if they lack userdata)
+        Path("/usr/local/steam"),
+        Path("/usr/share/steam"),
     ]
 
+    # Prefer any candidate that has actual user data
+    for candidate in candidates:
+        if (candidate / "userdata").exists():
+            logger.debug("Steam root detected at %s", candidate)
+            return candidate
+
+    # Fallback: first existing candidate even without userdata
     for candidate in candidates:
         if candidate.exists():
-            logger.debug("Steam root detected at %s", candidate)
+            logger.debug("Steam root (no userdata) detected at %s", candidate)
             return candidate
 
     raise RuntimeError("Could not find Steam installation")

@@ -8,14 +8,15 @@ import { GameDetail } from "../components/GameDetail";
 
 const getGames = callable<[], GameConfig[]>("get_games");
 const scanFolders = callable<[], GameFolder[]>("scan_games_folder");
-const getGamesFolder = callable<[], string | null>(
-  "get_games_folder"
-);
+const getGamesFolder = callable<[], string | null>("get_games_folder");
+const listNonSteamGames = callable<[], { name: string }[]>("list_nonsteam_games");
+const restartSteam = callable<[], { success: boolean; message?: string }>("restart_steam");
 
 export const GameLibrary: VFC = () => {
   const [games, setGames] = useState<GameConfig[]>([]);
   const [folders, setFolders] = useState<GameFolder[]>([]);
   const [gamesFolder, setGamesFolder] = useState<string | null>(null);
+  const [steamNames, setSteamNames] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<
@@ -23,6 +24,17 @@ export const GameLibrary: VFC = () => {
   >("library");
   const [selectedGame, setSelectedGame] = useState<GameConfig | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [restarting, setRestarting] = useState(false);
+
+  const handleRestartSteam = useCallback(async () => {
+    setRestarting(true);
+    try {
+      await restartSteam();
+    } catch (_) {
+      // Steam will close this UI as part of the restart — errors here are expected
+    }
+    setRestarting(false);
+  }, []);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -38,6 +50,13 @@ export const GameLibrary: VFC = () => {
       setGamesFolder(infoRes ?? null);
     } catch (err: any) {
       setError(String(err));
+    }
+    // Load Steam shortcuts separately — failure here shouldn't block the library
+    try {
+      const steamGames = await listNonSteamGames();
+      setSteamNames(new Set((steamGames || []).map((g) => g.name)));
+    } catch (_) {
+      setSteamNames(new Set());
     }
     setLoading(false);
   }, []);
@@ -97,7 +116,10 @@ export const GameLibrary: VFC = () => {
       >
         <h2 style={{ margin: 0 }}>🎮 Deckyfin</h2>
         <div style={{ display: "flex", gap: "6px" }}>
-          <button onClick={() => setView("add-game")}>+ Add</button>
+          <button onClick={() => setView("add-game")} title="Add game to Deckyfin config">+</button>
+          <button onClick={handleRestartSteam} disabled={restarting} title="Restart Steam">
+            {restarting ? "…" : "↺"}
+          </button>
           <button onClick={() => setView("settings")}>⚙</button>
         </div>
       </div>
@@ -136,7 +158,7 @@ export const GameLibrary: VFC = () => {
         }}
       >
         {filteredGames.map((game) => (
-          <GameCard key={game.name} game={game} onClick={() => openGame(game)} />
+          <GameCard key={game.name} game={game} isInSteam={steamNames.has(game.name)} onClick={() => openGame(game)} />
         ))}
       </div>
     </div>

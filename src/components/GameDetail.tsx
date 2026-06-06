@@ -1,4 +1,4 @@
-import { VFC } from "react";
+import { VFC, useState } from "react";
 import { callable } from "@decky/api";
 import { GameConfig } from "../types";
 
@@ -9,6 +9,10 @@ const addSteamShortcut = callable<
   [exe_path: string, app_name: string, start_dir?: string, launch_options?: string],
   { success: boolean; app_id?: number; unsigned_appid?: number; error?: string }
 >("add_steam_shortcut");
+const removeSteamShortcut = callable<
+  [app_name: string],
+  { success: boolean; error?: string }
+>("remove_steam_shortcut");
 
 interface Props {
   game: GameConfig;
@@ -16,7 +20,12 @@ interface Props {
 }
 
 export const GameDetail: VFC<Props> = ({ game, onBack }) => {
+  const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [addingToSteam, setAddingToSteam] = useState(false);
+
   const handleAddToSteam = async () => {
+    setAddingToSteam(true);
+    setFeedback(null);
     try {
       const res = await addSteamShortcut(
         game.executable,
@@ -25,21 +34,37 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
         game.launch_options || ""
       );
       if (res.success) {
-        alert(`✅ Added to Steam (App ID: ${res.unsigned_appid})`);
+        setFeedback({ ok: true, msg: `Added to Steam — restart Steam to see it (App ID: ${res.unsigned_appid})` });
       } else {
-        alert(`❌ ${res.error || "Failed to add to Steam"}`);
+        setFeedback({ ok: false, msg: res.error || "Failed to add to Steam" });
       }
     } catch (err: any) {
-      alert(`❌ ${err?.message || "Error"}`);
+      setFeedback({ ok: false, msg: err?.message || "Error" });
+    }
+    setAddingToSteam(false);
+  };
+
+  const handleRemoveSteam = async () => {
+    setFeedback(null);
+    try {
+      const res = await removeSteamShortcut(game.name);
+      if (res.success) {
+        setFeedback({ ok: true, msg: "Removed from Steam — restart Steam to apply" });
+      } else {
+        setFeedback({ ok: false, msg: res.error || "Not found in Steam shortcuts" });
+      }
+    } catch (err: any) {
+      setFeedback({ ok: false, msg: err?.message || "Error" });
     }
   };
 
   const handleRemove = async () => {
+    setFeedback(null);
     try {
       await removeGame(game.name);
       onBack();
     } catch (err: any) {
-      alert(`❌ ${err?.message || "Error removing game"}`);
+      setFeedback({ ok: false, msg: err?.message || "Error removing game" });
     }
   };
 
@@ -65,12 +90,20 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
           <b>Proton:</b> {game.proton_version}
         </p>
       )}
-      <div style={{ marginTop: "16px", display: "flex", gap: "8px" }}>
-        <button onClick={handleAddToSteam}>Add to Steam</button>
+      <div style={{ marginTop: "16px", display: "flex", gap: "8px", flexWrap: "wrap" }}>
+        <button onClick={handleAddToSteam} disabled={addingToSteam}>
+          {addingToSteam ? "Adding…" : "Add to Steam"}
+        </button>
+        <button onClick={handleRemoveSteam}>Remove from Steam</button>
         <button onClick={handleRemove} style={{ color: "red" }}>
-          Remove
+          Remove from Deckyfin
         </button>
       </div>
+      {feedback && (
+        <p style={{ marginTop: "10px", color: feedback.ok ? "lightgreen" : "tomato" }}>
+          {feedback.ok ? "✅" : "❌"} {feedback.msg}
+        </p>
+      )}
     </div>
   );
 };
