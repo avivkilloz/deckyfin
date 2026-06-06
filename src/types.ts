@@ -4,6 +4,7 @@ export interface GameConfig {
   name: string;
   path?: string;
   executable: string;
+  start_dir?: string;
   proton_version?: string;
   proton_dependencies?: string[];
   proton_sync_paths?: string[];

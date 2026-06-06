@@ -9,7 +9,8 @@
     "test": "echo 'No frontend tests yet'"
   },
   "dependencies": {
-    "decky-frontend-lib": "^1.0.0",
+    "@decky/api": "^1.0.0",
+    "@decky/ui": "^4.11.6",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "tslib": "^2.6.2"

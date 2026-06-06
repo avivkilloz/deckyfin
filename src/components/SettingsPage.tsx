@@ -1,66 +1,58 @@
-import { VFC, useState } from 'react';
-import { ServerAPI } from 'decky-frontend-lib';
+import { VFC, useState } from "react";
+import { callable } from "@decky/api";
+
+const setGamesFolder = callable<
+  [path: string],
+  { success: boolean; path?: string; error?: string }
+>("set_games_folder");
+const initialize = callable<
+  [games_folder?: string],
+  { success: boolean; error?: string; message?: string }
+>("initialize");
 
 interface Props {
-  serverAPI: ServerAPI;
   gamesFolder: string | null;
   onBack: () => void;
 }
 
-export const SettingsPage: VFC<Props> = ({ serverAPI, gamesFolder, onBack }) => {
-  const [folderPath, setFolderPath] = useState(gamesFolder || '');
-  const [saving, setSaving] = useState(false);
+export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
+  const [folderPath, setFolderPath] = useState(gamesFolder || "");
   const [message, setMessage] = useState<string | null>(null);
 
-  const saveFolder = async () => {
-    setSaving(true);
+  const handleSave = async () => {
     setMessage(null);
     try {
-      const result = await serverAPI.callPluginMethod<{ path: string }, any>(
-        'set_games_folder', { path: folderPath }
-      );
+      const result = await setGamesFolder(folderPath);
       if (result.success) {
-        // Initialize after setting folder
-        await serverAPI.callPluginMethod<{}, any>('initialize', {});
-        setMessage('✅ Games folder saved & initialized!');
+        setMessage("✅ Settings saved!");
+        await initialize(folderPath);
       } else {
-        setMessage(`❌ ${(result.result as any)?.error || 'Save failed'}`);
+        setMessage(`❌ ${result.error || "Save failed"}`);
       }
     } catch (err: any) {
-      setMessage(`❌ ${String(err)}`);
+      setMessage(`❌ ${err?.message || "Save failed"}`);
     }
-    setSaving(false);
   };
 
   return (
-    <div style={{ padding: '8px' }}>
-      <button onClick={onBack} style={{ marginBottom: '12px' }}>← Back to Library</button>
-      <h2 style={{ margin: '0 0 16px 0' }}>⚙ Settings</h2>
+    <div style={{ padding: "8px" }}>
+      <button onClick={onBack} style={{ marginBottom: "12px" }}>
+        ← Back
+      </button>
+      <h3>Settings</h3>
 
-      <div style={{ marginBottom: '16px' }}>
-        <label style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold' }}>
-          Games Folder
-        </label>
-        <input
-          type="text"
-          value={folderPath}
-          onChange={(e) => setFolderPath(e.target.value)}
-          placeholder="/home/deck/Games"
-          style={{
-            width: '100%',
-            padding: '8px',
-            boxSizing: 'border-box',
-            marginBottom: '8px',
-          }}
-        />
-        {gamesFolder && (
-          <p style={{ fontSize: '12px', color: '#888' }}>Current: {gamesFolder}</p>
-        )}
-        <button onClick={saveFolder} disabled={saving || !folderPath}>
-          {saving ? 'Saving...' : 'Save & Initialize'}
-        </button>
-        {message && <p style={{ marginTop: '8px', fontSize: '13px' }}>{message}</p>}
-      </div>
+      <label>Games Folder:</label>
+      <input
+        type="text"
+        value={folderPath}
+        onChange={(e) => setFolderPath(e.target.value)}
+        placeholder="/home/deck/games"
+        style={{ width: "100%", marginBottom: "12px", padding: "8px", boxSizing: "border-box" }}
+      />
+
+      <button onClick={handleSave}>Save</button>
+
+      {message && <p style={{ marginTop: "12px" }}>{message}</p>}
     </div>
   );
 };
