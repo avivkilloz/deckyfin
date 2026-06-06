@@ -127,7 +127,9 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
       const res = await setGameProton(steamInfo.app_id, selectedProton);
       if (res.success) {
         setCurrentProton(selectedProton);
-        setProtonFeedback(`✅ Proton set to ${selectedProton} — restart Steam to apply`);
+        const msg = `✅ Proton set to ${selectedProton} — restart Steam to apply`;
+        setProtonFeedback(msg);
+        setFeedback({ ok: true, msg });
         // Persist to Deckyfin config (non-critical — don't overwrite feedback)
         try {
           await updateGameConfig(game.name, { proton_version: selectedProton });
@@ -135,10 +137,14 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
           // Config persist failure is non-fatal
         }
       } else {
-        setProtonFeedback(`❌ ${res.error || "Failed to set Proton"}`);
+        const msg = `❌ ${res.error || "Failed to set Proton"}`;
+        setProtonFeedback(msg);
+        setFeedback({ ok: false, msg });
       }
     } catch (err: any) {
-      setProtonFeedback(`❌ ${err?.message || "Error"}`);
+      const msg = `❌ ${err?.message || "Error"}`;
+      setProtonFeedback(msg);
+      setFeedback({ ok: false, msg });
     }
   };
 
