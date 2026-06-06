@@ -1,7 +1,6 @@
 """Protontricks dependency installation — installs Windows DLLs into Proton prefixes."""
 
 import subprocess
-import shlex
 import os
 import shutil
 import logging
@@ -11,40 +10,46 @@ from deckyfin_consts import LOGGER_PROTONTRICKS, PROTONTRICKS_FLATPAK
 
 logger = logging.getLogger(LOGGER_PROTONTRICKS)
 
+# Minimal environment for flatpak subprocess — strip ALL PyInstaller env vars
+_FLATPAK_ENV = {
+    "HOME": os.environ.get("HOME", ""),
+    "USER": os.environ.get("USER", ""),
+    "PATH": "/usr/local/bin:/usr/bin:/bin",
+    "XDG_RUNTIME_DIR": os.environ.get("XDG_RUNTIME_DIR", "/run/user/1000"),
+    "DBUS_SESSION_BUS_ADDRESS": os.environ.get("DBUS_SESSION_BUS_ADDRESS", ""),
+    "DISPLAY": os.environ.get("DISPLAY", ":0"),
+    "LANG": os.environ.get("LANG", "en_US.UTF-8"),
+    "TZ": os.environ.get("TZ", ""),
+}
+
 
 def _build_try_cmds(pfxid: str, dep: str) -> list:
-    """Build ordered list of (cmd_list, desc) to try for protontricks."""
+    """Build ordered list of (cmd_or_args, desc, use_shell) to try for protontricks."""
     cmds = []
 
-    # 1. Try native protontricks CLI (Arch/AUR installs this)
-    if shutil.which("protontricks"):
-        cmds.append(
-            ([
-                "protontricks", pfxid,
-                "--force", "--no-background-wait", dep,
-            ], "native protontricks")
-        )
+    # 1. Try native protontricks CLI (Arch/AUR or pip install)
+    native = shutil.which("protontricks")
+    if native:
+        cmds.append((
+            [native, pfxid, "--force", "--no-background-wait", dep],
+            "native protontricks",
+            False,
+        ))
+    else:
+        logger.debug("Native protontricks not found, skipping")
 
-    # 2. Try flatpak with cleaned environment (strip PyInstaller libs)
-    cmds.append(
-        ([
-            "env", "-u", "LD_LIBRARY_PATH",
-            "-u", "LD_PRELOAD",
-            "flatpak", "run", PROTONTRICKS_FLATPAK,
+    # 2. Try flatpak with clean room environment (strip ALL PyInstaller env)
+    cmds.append((
+        [
+            "flatpak", "run",
+            "--env=LD_LIBRARY_PATH=",
+            "--env=LD_PRELOAD=",
+            PROTONTRICKS_FLATPAK,
             pfxid, "--", "--force", "--unattended", dep,
-        ], "flatpak protontricks (cleaned env)")
-    )
-
-    # 3. Try flatpak with just the env var stripped via shell
-    escaped = shlex.quote(dep)
-    cmds.append(
-        (
-            f"env -u LD_LIBRARY_PATH -u LD_PRELOAD "
-            f"flatpak run {PROTONTRICKS_FLATPAK} {pfxid} -- "
-            f"--force --unattended {escaped}",
-            "flatpak protontricks (shell fallback)",
-        )
-    )
+        ],
+        "flatpak --env",
+        False,
+    ))
 
     return cmds
 
@@ -55,7 +60,7 @@ def install_protontricks_dependencies(
     """
     Install Windows dependencies in a Proton prefix via protontricks.
 
-    Tries: native protontricks → flatpak (cleaned env) → flatpak (shell fallback).
+    Tries: native protontricks → flatpak with explicit env cleanup.
 
     Args:
         pfxid: Unsigned 32-bit app ID (used as prefix ID)
@@ -84,11 +89,13 @@ def install_protontricks_dependencies(
         installed = False
         last_error = None
 
-        for cmd, desc in _build_try_cmds(pfxid, dep):
+        for cmd, desc, use_shell in _build_try_cmds(pfxid, dep):
             try:
-                if isinstance(cmd, list):
+                if use_shell:
                     proc = subprocess.run(
                         cmd,
+                        shell=True,
+                        env=_FLATPAK_ENV,
                         capture_output=True,
                         text=True,
                         timeout=timeout,
@@ -96,7 +103,7 @@ def install_protontricks_dependencies(
                 else:
                     proc = subprocess.run(
                         cmd,
-                        shell=True,
+                        env=_FLATPAK_ENV,
                         capture_output=True,
                         text=True,
                         timeout=timeout,
@@ -104,8 +111,13 @@ def install_protontricks_dependencies(
 
                 if proc.returncode == 0:
                     results["installed"].append(dep)
-                    results["output"].append(f"✓ Successfully installed {dep} (via {desc})")
-                    logger.info("Protontricks installed %s in prefix %s (%s)", dep, pfxid, desc)
+                    results["output"].append(
+                        f"✓ Successfully installed {dep} (via {desc})"
+                    )
+                    logger.info(
+                        "Protontricks installed %s in prefix %s (%s)",
+                        dep, pfxid, desc,
+                    )
                     installed = True
                     break
                 else:

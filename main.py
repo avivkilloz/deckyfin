@@ -211,8 +211,17 @@ class Plugin:
         user_id: Optional[str] = None,
     ) -> dict:
         uid = user_id or get_user_id()
-        init_proton_prefix(app_id, uid, proton_name=proton_name, reinitialize=reinitialize)
-        return {"success": True, "app_id": app_id}
+        try:
+            init_proton_prefix(app_id, uid, proton_name=proton_name, reinitialize=reinitialize)
+            return {"success": True, "app_id": app_id}
+        except FileExistsError as e:
+            return {"success": False, "error": str(e)}
+        except ValueError as e:
+            return {"success": False, "error": str(e)}
+        except RuntimeError as e:
+            return {"success": False, "error": str(e)}
+        except Exception as e:
+            return {"success": False, "error": f"Failed to init prefix: {str(e)}"}
 
     async def install_dependencies(self, pfxid: str, dependencies: str) -> dict:
         return install_protontricks_dependencies(pfxid, dependencies)
