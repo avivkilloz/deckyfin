@@ -179,8 +179,10 @@ class Plugin:
 
 
 # ── Global error wrapper ─────────────────────────────────────────────
-# Wrap every public async method so ALL exceptions are caught, logged to
-# debug.log, and returned as dicts (never propagated to the sandbox IPC).
+# Wrap every public async method so ALL exceptions are logged to
+# debug.log with full traceback, then RE-RAISED so the sandbox IPC
+# layer handles them properly (frontend gets a rejected promise
+# with the error message = visible red text in the plugin UI).
 
 import inspect as _inspect
 
@@ -188,8 +190,8 @@ _SAFE_METHODS = frozenset({"_main"})
 
 
 def _wrap_method(cls, name: str, method):
-    """Replace an async method on Plugin with a wrapped version
-    that catches all exceptions and logs them to debug.log."""
+    """Replace an async method on Plugin with a logged version
+    that writes exceptions to debug.log then re-raises them."""
 
     async def wrapper(self, *args, **kwargs):
         try:
@@ -197,7 +199,7 @@ def _wrap_method(cls, name: str, method):
         except Exception as e:
             tb = traceback.format_exc()
             _debug(f"ERROR {name}: {e}\n{tb}")
-            return {"error": str(e), "_traceback": tb}
+            raise  # re-raise so sandbox IPC handles it
 
     wrapper.__name__ = method.__name__
     wrapper.__qualname__ = method.__qualname__
