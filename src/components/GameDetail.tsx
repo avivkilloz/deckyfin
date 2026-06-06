@@ -1,4 +1,4 @@
-import { VFC, useState, useEffect, useCallback } from "react";
+import { VFC, useState, useEffect } from "react";
 import { callable } from "@decky/api";
 import { GameConfig } from "../types";
 
@@ -68,6 +68,7 @@ const BTN_STYLE: React.CSSProperties = {
 export const GameDetail: VFC<Props> = ({ game, onBack }) => {
   // ── Editable config fields ──────────────────────────────────────────────
   const [name, setName] = useState(game.name);
+  const [storedName, setStoredName] = useState(game.name); // last saved name (lookup key)
   const [executable, setExecutable] = useState(game.executable);
   const [startDir, setStartDir] = useState(game.start_dir || "");
   const [protonVersion, setProtonVersion] = useState(
@@ -113,33 +114,30 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
       .catch(() => {});
   }, [game.name]);
 
-  // ── Auto-save helpers ──────────────────────────────────────────────────
-  const saveConfig = useCallback(
-    (updates: Record<string, any>) => {
-      updateGameConfig(name, updates).catch(() => {});
-    },
-    [name]
-  );
+  // ── Auto-save (none — use "Apply Config" button) ─────────────────────
 
-  const handleSaveName = (val: string) => {
-    saveConfig({ name: val });
-  };
-  const handleSaveExecutable = (val: string) => {
-    saveConfig({ executable: val });
-  };
-  const handleSaveStartDir = (val: string) => {
-    saveConfig({ start_dir: val });
-  };
-  const handleSaveProton = (val: string) => {
-    setProtonVersion(val);
-    saveConfig({ proton_version: val || null });
-  };
-  const handleSaveDeps = (val: string) => {
-    const arr = val
+  const handleApplyConfig = async () => {
+    const deps = dependencies
       .split(",")
       .map((d) => d.trim())
       .filter(Boolean);
-    saveConfig({ proton_dependencies: arr });
+    try {
+      const res = await updateGameConfig(storedName, {
+        name,
+        executable,
+        start_dir: startDir || null,
+        proton_version: protonVersion || null,
+        proton_dependencies: deps,
+      });
+      if (!res.success) {
+        setFeedback({ ok: false, msg: "Failed to save config" });
+      } else {
+        setStoredName(name);
+        setFeedback({ ok: true, msg: "Config saved" });
+      }
+    } catch (err: any) {
+      setFeedback({ ok: false, msg: err?.message || "Failed to save config" });
+    }
   };
 
   // ── Executable picker ───────────────────────────────────────────────────
@@ -161,7 +159,6 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
     const full = `${startDir}/${exe}`;
     setExecutable(full);
     setShowExePicker(false);
-    handleSaveExecutable(full);
   };
 
   // ── Action handlers ─────────────────────────────────────────────────────
@@ -307,7 +304,6 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
       <input
         value={name}
         onChange={(e) => setName(e.target.value)}
-        onBlur={(e) => handleSaveName(e.target.value)}
         style={FIELD_STYLE}
       />
 
@@ -323,7 +319,6 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
         <input
           value={executable}
           onChange={(e) => setExecutable(e.target.value)}
-          onBlur={(e) => handleSaveExecutable(e.target.value)}
           style={{ flex: 1, padding: "6px", boxSizing: "border-box" }}
         />
         <button onClick={handleOpenExePicker} style={BTN_STYLE}>
@@ -371,7 +366,6 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
       <input
         value={startDir}
         onChange={(e) => setStartDir(e.target.value)}
-        onBlur={(e) => handleSaveStartDir(e.target.value)}
         style={FIELD_STYLE}
       />
 
@@ -379,7 +373,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
       <label style={LABEL_STYLE}>Proton Version</label>
       <select
         value={protonVersion}
-        onChange={(e) => handleSaveProton(e.target.value)}
+        onChange={(e) => setProtonVersion(e.target.value)}
         style={FIELD_STYLE}
       >
         <option value="">— None —</option>
@@ -401,9 +395,27 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
       <input
         value={dependencies}
         onChange={(e) => setDependencies(e.target.value)}
-        onBlur={(e) => handleSaveDeps(e.target.value)}
         style={FIELD_STYLE}
       />
+
+      {/* ── Apply Config ──────────────────────────────────────────────────── */}
+      <button
+        onClick={handleApplyConfig}
+        style={{
+          width: "100%",
+          padding: "10px",
+          fontSize: "0.9em",
+          fontWeight: "bold",
+          cursor: "pointer",
+          borderRadius: "4px",
+          border: "1px solid #0078d4",
+          background: "#0078d4",
+          color: "white",
+          marginBottom: "14px",
+        }}
+      >
+        Apply Config
+      </button>
 
       {/* ── Separator ──────────────────────────────────────────────────── */}
       <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.12)", margin: "14px 0" }} />
