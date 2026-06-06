@@ -490,21 +490,6 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
         />
       </div>
 
-      {/* ── Apply Config ──────────────────────────────────────────────────── */}
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "14px" }}>
-        <button
-          onClick={handleApplyConfig}
-          style={{
-            ...BTN_STYLE,
-            border: "1px solid #0078d4",
-            background: "#0078d4",
-            color: "white",
-          }}
-        >
-          Apply Config
-        </button>
-      </div>
-
       {/* ── Separator ──────────────────────────────────────────────────── */}
       <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.12)", margin: "14px 0" }} />
 
@@ -533,6 +518,18 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
           marginBottom: "14px",
         }}
       >
+        <button
+          onClick={handleApplyConfig}
+          style={{
+            ...BTN_STYLE,
+            border: "1px solid #0078d4",
+            background: "#0078d4",
+            color: "white",
+          }}
+        >
+          Apply Config
+        </button>
+
         <button
           onClick={handleAddToSteam}
           disabled={loading === "add" || !!steamInfo}
