@@ -264,17 +264,21 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
             <label style={{ display: "block", marginBottom: "4px", fontSize: "0.9em" }}>
               Proton Prefix:
             </label>
-            <button onClick={handleInitPrefix} disabled={initLoading}>
-              {initLoading ? "Initializing…" : "Init Prefix"}
-            </button>
-            <label style={{ marginLeft: "8px", fontSize: "0.85em", cursor: "pointer" }}>
-              <input
-                type="checkbox"
-                checked={forceReinit}
-                onChange={(e) => setForceReinit(e.target.checked)}
-              />{" "}
-              Force re-init (deletes existing prefix)
-            </label>
+            <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+              <button onClick={handleInitPrefix} disabled={initLoading}>
+                {initLoading ? "Initializing…" : "Init Prefix"}
+              </button>
+              <label style={{ fontSize: "0.85em", cursor: "pointer", display: "flex", alignItems: "center", gap: "4px" }}>
+                <input
+                  type="checkbox"
+                  checked={forceReinit}
+                  onChange={(e) => setForceReinit(e.target.checked)}
+                />
+                <span style={{ color: forceReinit ? "#ff6666" : "#aaa" }}>
+                  Force re-init
+                </span>
+              </label>
+            </div>
             {initFeedback && (
               <p style={{ margin: "4px 0 0 0", fontSize: "0.85em", color: initFeedback.startsWith("✅") ? "lightgreen" : "tomato" }}>
                 {initFeedback}
