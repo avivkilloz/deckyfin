@@ -271,7 +271,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
   const handleRemove = async () => {
     setFeedback(null);
     try {
-      await removeGame(name);
+      await removeGame(storedName);
       onBack();
     } catch (err: any) {
       setFeedback({ ok: false, msg: err?.message || "Error removing game" });
@@ -282,19 +282,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
 
   return (
     <div style={{ padding: "8px" }}>
-      {/* Back + Remove */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          marginBottom: "12px",
-        }}
-      >
-        <button onClick={onBack}>← Back</button>
-        <button onClick={handleRemove} style={{ color: "tomato" }}>
-          ✕ Remove
-        </button>
-      </div>
+      {/* Back */}
+      <button onClick={onBack} style={{ marginBottom: "12px" }}>← Back</button>
 
       {/* ── Config Fields ──────────────────────────────────────────────── */}
       <h4 style={{ margin: "0 0 10px 0" }}>Game Settings</h4>
@@ -399,23 +388,19 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
       />
 
       {/* ── Apply Config ──────────────────────────────────────────────────── */}
-      <button
-        onClick={handleApplyConfig}
-        style={{
-          width: "100%",
-          padding: "10px",
-          fontSize: "0.9em",
-          fontWeight: "bold",
-          cursor: "pointer",
-          borderRadius: "4px",
-          border: "1px solid #0078d4",
-          background: "#0078d4",
-          color: "white",
-          marginBottom: "14px",
-        }}
-      >
-        Apply Config
-      </button>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "14px" }}>
+        <button
+          onClick={handleApplyConfig}
+          style={{
+            ...BTN_STYLE,
+            border: "1px solid #0078d4",
+            background: "#0078d4",
+            color: "white",
+          }}
+        >
+          Apply Config
+        </button>
+      </div>
 
       {/* ── Separator ──────────────────────────────────────────────────── */}
       <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.12)", margin: "14px 0" }} />
@@ -510,6 +495,25 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
           {feedback.msg}
         </p>
       )}
+
+      {/* ── Remove Game ─────────────────────────────────────────────────── */}
+      <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.08)", margin: "20px 0 12px" }} />
+      <div style={{ display: "flex", justifyContent: "center" }}>
+        <button
+          onClick={handleRemove}
+          style={{
+            padding: "10px 24px",
+            fontSize: "0.85em",
+            cursor: "pointer",
+            borderRadius: "4px",
+            border: "1px solid #e74c3c",
+            background: "#e74c3c",
+            color: "white",
+          }}
+        >
+          ✕ Remove "{name}" from Deckyfin
+        </button>
+      </div>
     </div>
   );
 };
