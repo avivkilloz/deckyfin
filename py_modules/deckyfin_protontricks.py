@@ -4,7 +4,7 @@ import subprocess
 import logging
 from typing import List
 
-from consts import LOGGER_PROTONTRICKS, PROTONTRICKS_FLATPAK
+from deckyfin_consts import LOGGER_PROTONTRICKS, PROTONTRICKS_FLATPAK
 
 logger = logging.getLogger(LOGGER_PROTONTRICKS)
 

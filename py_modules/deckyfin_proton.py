@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Optional
 
 from steam_utils import find_steam_root
-from consts import (
+from deckyfin_consts import (
     LOGGER_PROTON,
     PROTON_SCRIPT_NAME,
     PROTON_GE_REPO,

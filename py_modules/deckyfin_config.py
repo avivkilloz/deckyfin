@@ -9,7 +9,7 @@ import logging
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 
-from consts import (
+from deckyfin_consts import (
     APP_CONFIG_DIR,
     APP_CONFIG_SUBDIR,
     CONFIG_FILE,

@@ -5,7 +5,7 @@ import logging
 from pathlib import Path
 
 from steam_utils import find_steam_root
-from consts import LOGGER_STEAM_CONTROL
+from deckyfin_consts import LOGGER_STEAM_CONTROL
 
 logger = logging.getLogger(LOGGER_STEAM_CONTROL)
 

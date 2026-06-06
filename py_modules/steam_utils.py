@@ -7,7 +7,7 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from consts import LOGGER_STEAM, STEAM_ID64_BASE
+from deckyfin_consts import LOGGER_STEAM, STEAM_ID64_BASE
 
 logger = logging.getLogger(LOGGER_STEAM)
 

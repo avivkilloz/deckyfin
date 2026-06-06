@@ -6,7 +6,7 @@ from typing import Any, Optional
 
 from steam_utils import find_steam_root
 from steam_games import convert_appid_to_unsigned_32bit, convert_appid_to_config_format
-from consts import (
+from deckyfin_consts import (
     LOGGER_PROTON_COMPAT,
     STEAM_USERDATA_FOLDER,
     STEAM_CONFIG_FOLDER,

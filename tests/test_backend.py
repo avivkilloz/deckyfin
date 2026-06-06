@@ -58,7 +58,7 @@ def test_convert_to_unsigned_32bit():
 def test_convert_to_config_format():
     """Config format app ID is a 64-bit number with the mask bit set."""
     from steam_games import convert_appid_to_unsigned_32bit, convert_appid_to_config_format
-    from consts import APPID_CONFIG_FORMAT_MASK
+    from deckyfin_consts import APPID_CONFIG_FORMAT_MASK
 
     unsigned = 12345
     config_fmt = convert_appid_to_config_format(12345)  # signed positive, so unsigned = 12345
@@ -71,7 +71,7 @@ def test_convert_to_config_format():
 def test_steam_id64_to_account_id():
     """Account ID = Steam ID64 - base."""
     from steam_utils import steam_id64_to_account_id
-    from consts import STEAM_ID64_BASE
+    from deckyfin_consts import STEAM_ID64_BASE
 
     known_id64 = 76561198000000000
     account_id = steam_id64_to_account_id(known_id64)
@@ -108,7 +108,7 @@ class TestGameConfigIO:
 
     def test_detect_game_folders(self):
         """Non-hidden subdirectories are detected as game folders."""
-        from app_config import detect_game_folders
+        from deckyfin_config import detect_game_folders
 
         folders = detect_game_folders(self.games_folder)
         assert len(folders) == 1
@@ -117,7 +117,7 @@ class TestGameConfigIO:
 
     def test_find_game_executables(self):
         """.exe files in game dir are found recursively."""
-        from app_config import find_game_executables
+        from deckyfin_config import find_game_executables
 
         exes = find_game_executables(self.game_dir)
         assert len(exes) == 1
@@ -125,7 +125,7 @@ class TestGameConfigIO:
 
     def test_get_games_config_empty(self):
         """No config file returns empty games list."""
-        from app_config import get_games_config
+        from deckyfin_config import get_games_config
 
         config = get_games_config(self.games_folder)
         assert config == {"games": []}
@@ -136,7 +136,7 @@ class TestGameConfigIO:
             {"name": "Test Game", "executable": "test/test.exe"},
         ]
         self._write_config({"games": test_games})
-        from app_config import get_games_config
+        from deckyfin_config import get_games_config
 
         config = get_games_config(self.games_folder)
         assert len(config["games"]) == 1
@@ -144,7 +144,7 @@ class TestGameConfigIO:
 
     def test_save_games_config_creates_file(self):
         """Saving config creates the file and parent dirs."""
-        from app_config import save_games_config
+        from deckyfin_config import save_games_config
 
         data = {"games": [{"name": "New Game", "executable": "new/game.exe"}]}
         save_games_config(data, self.games_folder)
@@ -152,7 +152,7 @@ class TestGameConfigIO:
 
     def test_list_game_configs(self):
         """list_game_configs returns the game list."""
-        from app_config import list_game_configs, save_games_config
+        from deckyfin_config import list_game_configs, save_games_config
 
         games = [{"name": "A", "executable": "a.exe"}, {"name": "B", "executable": "b.exe"}]
         save_games_config({"games": games}, self.games_folder)
@@ -161,7 +161,7 @@ class TestGameConfigIO:
 
     def test_add_game_config_new(self):
         """Adding a new game appends it."""
-        from app_config import add_game_config, list_game_configs
+        from deckyfin_config import add_game_config, list_game_configs
 
         game = {"name": "New Game", "executable": "new/game.exe"}
         add_game_config(game, self.games_folder)
@@ -171,7 +171,7 @@ class TestGameConfigIO:
 
     def test_add_game_config_update(self):
         """Adding a game with an existing name updates it."""
-        from app_config import add_game_config, get_game_config
+        from deckyfin_config import add_game_config, get_game_config
 
         game1 = {"name": "Game", "executable": "v1/game.exe"}
         game2 = {"name": "Game", "executable": "v2/game.exe", "proton_version": "GE-Proton10"}
@@ -183,7 +183,7 @@ class TestGameConfigIO:
 
     def test_remove_game_config(self):
         """Removing a game by name works."""
-        from app_config import add_game_config, remove_game_config, list_game_configs
+        from deckyfin_config import add_game_config, remove_game_config, list_game_configs
 
         add_game_config({"name": "Keep Me", "executable": "keep.exe"}, self.games_folder)
         add_game_config({"name": "Remove Me", "executable": "remove.exe"}, self.games_folder)
@@ -195,13 +195,13 @@ class TestGameConfigIO:
 
     def test_remove_nonexistent_game(self):
         """Removing a game that doesn't exist returns False."""
-        from app_config import remove_game_config
+        from deckyfin_config import remove_game_config
 
         assert remove_game_config("Nope", self.games_folder) is False
 
     def test_get_game_config_by_name(self):
         """get_game_config returns the right game or None."""
-        from app_config import add_game_config, get_game_config
+        from deckyfin_config import add_game_config, get_game_config
 
         add_game_config({"name": "Target", "executable": "target.exe"}, self.games_folder)
         add_game_config({"name": "Other", "executable": "other.exe"}, self.games_folder)
@@ -210,8 +210,8 @@ class TestGameConfigIO:
 
     def test_initialize_app_structure_creates_dirs(self):
         """initialize_app_structure creates .deckyfin and saves folders."""
-        from app_config import initialize_app_structure
-        from consts import APP_FOLDER, SAVES_FOLDER
+        from deckyfin_config import initialize_app_structure
+        from deckyfin_consts import APP_FOLDER, SAVES_FOLDER
 
         result = initialize_app_structure(str(self.games_folder))
         assert result["success"]
@@ -221,7 +221,7 @@ class TestGameConfigIO:
 
     def test_initialize_detects_existing_folders(self):
         """initialize_app_structure finds game subdirectories."""
-        from app_config import initialize_app_structure
+        from deckyfin_config import initialize_app_structure
 
         # Create some game folders
         (self.games_folder / "game-a").mkdir()
@@ -259,7 +259,7 @@ class TestAppConfigIO:
 
     def test_set_games_folder(self):
         """set_games_folder creates/updates the app config."""
-        from app_config import get_app_config_path
+        from deckyfin_config import get_app_config_path
 
         # Use the get_app_config_path to know where to write
         # But since it uses Path.home(), we can't redirect it easily.

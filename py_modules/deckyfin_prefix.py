@@ -8,8 +8,8 @@ from typing import Optional
 
 from steam_utils import find_steam_root
 from steam_games import convert_appid_to_unsigned_32bit
-from proton import find_proton_installation, get_proton_version_for_game, list_available_proton
-from consts import (
+from deckyfin_proton import find_proton_installation, get_proton_version_for_game, list_available_proton
+from deckyfin_consts import (
     LOGGER_PREFIX,
     STEAM_STEAMAPPS_FOLDER,
     COMPATDATA_FOLDER,
