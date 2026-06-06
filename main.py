@@ -44,12 +44,33 @@ class Plugin:
 
     async def _main(self):
         """Called when plugin is loaded by Decky."""
+        # Write debug file for troubleshooting
+        debug_file = Path(__file__).parent / "debug.log"
+        try:
+            debug_file.write_text(f"[{__import__('datetime').datetime.now()}] _main starting\n")
+        except Exception:
+            pass
+        
+        # Wait a moment for Decky to set up its logging
+        await __import__('asyncio').sleep(1)
+        
         logging.basicConfig(
             level=logging.DEBUG,
             format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+            force=True,
         )
         self.logger = logging.getLogger(APP_NAME)
+        
+        # Test logging
         self.logger.info("Deckyfin v%s loaded", APP_VERSION)
+        self.logger.info("Home: %s", Path.home())
+        self.logger.info("CWD: %s", Path.cwd())
+        
+        # Write debug
+        try:
+            debug_file.write_text(f"[{__import__('datetime').datetime.now()}] _main done\n")
+        except Exception:
+            pass
 
     async def _unload(self):
         """Called when plugin is unloaded by Decky."""
