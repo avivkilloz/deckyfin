@@ -53,6 +53,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
   const [initLoading, setInitLoading] = useState(false);
   const [initFeedback, setInitFeedback] = useState<string | null>(null);
   const [forceReinit, setForceReinit] = useState(false);
+  const [restartHint, setRestartHint] = useState(false);
   const [depsInput, setDepsInput] = useState(
     (game.proton_dependencies || []).join(", ")
   );
@@ -122,15 +123,16 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
 
   const handleSetProton = async () => {
     if (!steamInfo || !selectedProton) return;
+    setRestartHint(false);
     setProtonFeedback(`Setting Proton to ${selectedProton}...`);
     try {
       const res = await setGameProton(steamInfo.app_id, selectedProton);
       if (res.success) {
         setCurrentProton(selectedProton);
-        const msg = `✅ Proton set to ${selectedProton} — restart Steam to apply`;
-        setProtonFeedback(msg);
-        setFeedback({ ok: true, msg });
-        // Persist to Deckyfin config (non-critical — don't overwrite feedback)
+        setProtonFeedback(`✅ Proton set to ${selectedProton}`);
+        setFeedback({ ok: true, msg: `Proton set to ${selectedProton}` });
+        setRestartHint(true);
+        // Persist to Deckyfin config (non-critical — don't hide restart hint)
         try {
           await updateGameConfig(game.name, { proton_version: selectedProton });
         } catch {
@@ -266,6 +268,11 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
               <p style={{ margin: "4px 0 0 0", fontSize: "0.85em", color: protonFeedback.startsWith("✅") ? "lightgreen" : "tomato" }}>
                 {protonFeedback}
               </p>
+            )}
+            {restartHint && (
+              <div style={{ marginTop: "10px", padding: "8px 12px", background: "rgba(255,193,7,0.15)", border: "1px solid #ffc107", borderRadius: "6px", fontSize: "0.9em", fontWeight: "bold", color: "#ffc107" }}>
+                🔄 Restart Steam to apply
+              </div>
             )}
           </div>
 
