@@ -40,7 +40,7 @@ APP_CONFIG_SUBDIR = APP_NAME
 # Timeout Values (in seconds)
 API_REQUEST_TIMEOUT = 30
 API_LONG_TIMEOUT = 120
-PROTONTRICKS_TIMEOUT = 600  # 10 minutes
+PROTONTRICKS_TIMEOUT = 120  # 2 minutes per method
 PREFIX_INIT_TIMEOUT = 300   # 5 minutes
 
 # Transfer Settings

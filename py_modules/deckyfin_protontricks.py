@@ -14,21 +14,12 @@ logger = logging.getLogger(LOGGER_PROTONTRICKS)
 # These PyInstaller-bundled env vars conflict with system binaries
 _BAD_ENV_VARS = ["LD_LIBRARY_PATH", "LD_PRELOAD", "LD_AUDIT", "LD_DEBUG"]
 
+# Per-method timeout — 120s per method, then move to next
+_METHOD_TIMEOUT = 120
+
 
 def _run_with_clean_env(cmd, extra_env=None, **kwargs):
-    """Run a subprocess with PyInstaller env vars stripped.
-
-    Removes the vars from os.environ BEFORE fork so the child process
-    definitely doesn't inherit them, then restores after.
-
-    If an explicit env= dict is passed (as subprocess.run kwarg), the
-    bad vars are stripped from that dict too — this fixes the case where
-    a caller copies os.environ and passes it as `env=` to subprocess,
-    which would otherwise leak PyInstaller library paths into the child.
-
-    extra_env: optional dict of extra env vars to set for the child (e.g. STEAM_DIR)
-    """
-    # Strip bad vars from env= dict if present (before fork, no restore needed)
+    """Run a subprocess with PyInstaller env vars stripped."""
     env_arg = kwargs.get("env")
     if env_arg is not None:
         for var in _BAD_ENV_VARS:
@@ -58,9 +49,82 @@ def _run_with_clean_env(cmd, extra_env=None, **kwargs):
                 os.environ.pop(var, None)
 
 
+def _kill_wineservers():
+    """Kill any stale wineserver processes to avoid version mismatch errors.
+
+    Protontricks fails with 'wine client error:0: version mismatch' when
+    a wineserver from a different wine version is still running. Nuking
+    them before each attempt prevents this.
+    """
+    try:
+        subprocess.run(
+            ["pkill", "-9", "wineserver"],
+            capture_output=True,
+            timeout=5,
+        )
+    except Exception:
+        pass
+
+
+def _kill_xvfb():
+    """Kill any orphan Xvfb processes left behind by timed-out xvfb-run."""
+    try:
+        subprocess.run(
+            ["pkill", "-9", "Xvfb"],
+            capture_output=True,
+            timeout=5,
+        )
+    except Exception:
+        pass
+
+
+def _find_proton_wine() -> Optional[tuple[str, str]]:
+    """Find the first available Proton installation's wine+wineserver paths.
+
+    Returns (wineloader_path, wineserver_path) or None.
+    """
+    try:
+        from steam_utils import find_steam_root
+        from deckyfin_consts import (
+            STEAM_STEAMAPPS_FOLDER,
+            STEAM_COMMON_FOLDER,
+            STEAM_COMPATTOOLS_FOLDER,
+        )
+        steam_root = find_steam_root()
+        if not steam_root:
+            return None
+
+        # Search compatibilitytools.d first (GE-Proton etc.)
+        compat_dir = steam_root / STEAM_COMPATTOOLS_FOLDER
+        if compat_dir.exists():
+            for d in sorted(compat_dir.iterdir()):
+                if d.is_dir():
+                    wine = d / "dist" / "bin" / "wine64"
+                    server = d / "dist" / "bin" / "wineserver"
+                    if wine.exists() and server.exists():
+                        return (str(wine), str(server))
+
+        # Then steamapps/common (official Proton versions)
+        common_dir = steam_root / STEAM_STEAMAPPS_FOLDER / STEAM_COMMON_FOLDER
+        if common_dir.exists():
+            for d in sorted(common_dir.iterdir()):
+                if d.is_dir() and "proton" in d.name.lower():
+                    wine = d / "dist" / "bin" / "wine64"
+                    if not wine.exists():
+                        wine = d / "dist" / "bin" / "wine"
+                    server = d / "dist" / "bin" / "wineserver"
+                    if wine.exists() and server.exists():
+                        return (str(wine), str(server))
+
+        logger.warning("No Proton installation found with dist/bin/wine64")
+    except Exception as e:
+        logger.warning("Could not locate Proton wine: %s", e)
+
+    return None
+
+
 def _ensure_flatpak_protontricks() -> Optional[str]:
     """Ensure protontricks is available via flatpak. Returns method desc or None."""
-    # Check if flatpak is available
     if not shutil.which("flatpak"):
         return None
 
@@ -75,14 +139,12 @@ def _ensure_flatpak_protontricks() -> Optional[str]:
     # Not installed — try auto-install
     logger.info("Protontricks flatpak not found, attempting to install...")
 
-    # Ensure flathub remote is configured
     _run_with_clean_env(
         ["flatpak", "remote-add", "--if-not-exists",
          "flathub", "https://flathub.org/repo/flathub.flatpakrepo"],
         capture_output=True, text=True, timeout=30,
     )
 
-    # Install protontricks
     install = _run_with_clean_env(
         ["flatpak", "install", "-y", "--noninteractive",
          PROTONTRICKS_FLATPAK],
@@ -99,115 +161,23 @@ def _ensure_flatpak_protontricks() -> Optional[str]:
         return None
 
 
-def _try_winetricks(pfxid: str, prefix_dir: str, dep: str, timeout: int = 600) -> dict | None:
-    """Try installing a dep via native winetricks."""
-    winetricks = shutil.which("winetricks")
-    if not winetricks:
-        logger.info("winetricks binary not found in PATH")
-        return None
-
-    pfx_path = Path(prefix_dir) / "pfx"
-    if not pfx_path.exists():
-        logger.info("WINEPREFIX %s does not exist", pfx_path)
-        return None
-
-    logger.debug("Trying winetricks for %s in %s", dep, pfx_path)
-
-    try:
-        winetricks_env = os.environ.copy()
-        winetricks_env["WINEPREFIX"] = str(pfx_path)
-
-        # Use xvfb-run if available to give wine a virtual display
-        xvfb_run = shutil.which("xvfb-run")
-        if xvfb_run:
-            full_cmd = [xvfb_run, "--auto-servernum", winetricks, "-q", dep]
-        else:
-            logger.info("xvfb-run not found, running winetricks without virtual display")
-            full_cmd = [winetricks, "-q", dep]
-
-        logger.info("Running: %s", " ".join(str(c) for c in full_cmd))
-        proc = _run_with_clean_env(
-            full_cmd,
-            env=winetricks_env,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-        )
-        if proc.returncode == 0:
-            return {"found": True, "desc": "winetricks", "result": proc}
-        else:
-            logger.info("winetricks exited %d for %s: stderr=%s", proc.returncode, dep, proc.stderr[:2000] if proc.stderr else "(none)")
-            return None
-    except Exception as e:
-        logger.info("winetricks exception for %s: %s", dep, e)
-        return None
-
-
-def _build_try_cmds(pfxid: str, dep: str, prefix_dir: Optional[str] = None) -> list:
-    """Build ordered list of (cmd_or_args, desc, extra_env) to try for protontricks.
-
-    extra_env: optional dict of extra env vars for the call (None = no extras).
-    """
-    cmds = []
-
-    # Detect steam_root once — used by native protontricks and winetricks
-    steam_root = None
-    try:
-        from steam_utils import find_steam_root
-        steam_root = find_steam_root()
-    except Exception:
-        pass
-
-    # 1. Try native protontricks CLI (Arch/AUR or pip install)
-    native = shutil.which("protontricks")
-    if native:
-        extra_env = {}
-        if steam_root:
-            extra_env["STEAM_DIR"] = str(steam_root)
-        cmds.append((
-            [native, "--no-bwrap", pfxid, "--force", dep],
-            "native protontricks",
-            extra_env or None,
-        ))
-
-    # 2. Try native winetricks (Arch community repo)
-    if prefix_dir:
-        cmds.append((
-            ("winetricks", dep, prefix_dir),
-            "winetricks",
-            None,
-        ))
-
-    # 3. Try flatpak protontricks (auto-installs if missing)
-    # Skip if we have native Steam — flatpak sandbox can't find it
-    if not steam_root:
-        flatpak_ok = _ensure_flatpak_protontricks()
-        if flatpak_ok:
-            cmds.append((
-                [
-                    "flatpak", "run",
-                    PROTONTRICKS_FLATPAK,
-                    pfxid, "--", "--force", "--unattended", dep,
-                ],
-                flatpak_ok,
-                None,
-            ))
-
-    return cmds
-
-
 def install_protontricks_dependencies(
-    pfxid: str, dependencies: str, timeout: int = 600
+    pfxid: str, dependencies: str, timeout: int = _METHOD_TIMEOUT
 ) -> dict:
     """
     Install Windows dependencies in a Proton prefix via protontricks.
 
-    Tries: native protontricks → winetricks → flatpak protontricks (auto-install).
+    Strategy (each method has a 120s timeout):
+      1. Kill stale wineserver
+      2. Flatpak protontricks (auto-installs if missing) — preferred because it
+         correctly uses Proton's bundled wine, not system wine
+      3. Native protontricks CLI (Arch/AUR) — kill wineserver first
+      4. Proton-bundled wine + winetricks — set WINELOADER/WINESERVER directly
 
     Args:
         pfxid: Unsigned 32-bit app ID (used as prefix ID)
         dependencies: Comma-separated (e.g. "vcrun2022,d3dx9")
-        timeout: Seconds per dependency (default 600)
+        timeout: Seconds per method attempt (default 120)
 
     Returns:
         dict with 'success', 'installed', 'failed', 'output', 'errors' keys
@@ -219,25 +189,28 @@ def install_protontricks_dependencies(
     if not dep_list:
         raise ValueError("No valid dependencies specified")
 
-    # Derive prefix directory from pfxid using our Steam detection
-    # (find_steam_root uses _get_real_home() so it works when run as root)
+    # Derive prefix directory and steam_root
     prefix_dir = None
+    steam_root = None
     try:
         from steam_utils import find_steam_root
         from deckyfin_consts import STEAM_STEAMAPPS_FOLDER, COMPATDATA_FOLDER
         steam_root = find_steam_root()
-        compatdata = (
-            steam_root / STEAM_STEAMAPPS_FOLDER / COMPATDATA_FOLDER / pfxid
-        )
-        if compatdata.exists():
-            prefix_dir = str(compatdata)
-        else:
-            logger.warning(
-                "Prefix directory not found at %s — will try winetricks with derived path anyway",
-                compatdata,
+        if steam_root:
+            compatdata = (
+                steam_root / STEAM_STEAMAPPS_FOLDER / COMPATDATA_FOLDER / pfxid
             )
+            if compatdata.exists():
+                prefix_dir = str(compatdata)
+            else:
+                logger.warning("Prefix directory not found at %s", compatdata)
     except Exception as e:
         logger.warning("Could not derive prefix directory: %s", e)
+
+    pfx_path = str(Path(prefix_dir) / "pfx") if prefix_dir else None
+
+    # Find Proton wine for the manual approach
+    proton_wine = _find_proton_wine()
 
     results = {
         "success": True,
@@ -250,74 +223,164 @@ def install_protontricks_dependencies(
     for dep in dep_list:
         installed = False
         last_error = None
-        proc = None
 
-        for entry, desc, extra_env in _build_try_cmds(pfxid, dep, prefix_dir):
+        for method_name, attempt_fn in _build_methods(
+            pfxid, dep, pfx_path, proton_wine, steam_root,
+        ):
+            logger.info("Trying %s for %s in prefix %s", method_name, dep, pfxid)
+
             try:
-                # Handle winetricks specially (uses prefix path + custom env)
-                if desc == "winetricks":
-                    logger.info("Trying winetricks for %s in prefix %s", dep, pfxid)
-                    wr = _try_winetricks(pfxid, str(prefix_dir), dep, timeout=timeout) if prefix_dir else None
-                    if wr:
-                        proc = wr["result"]
-                    else:
-                        last_error = "(winetricks) Not found or failed"
-                        logger.info("winetricks failed for %s in %s: %s", dep, pfxid, last_error)
-                        continue
-                else:
-                    logger.info("Trying %s for %s in prefix %s", desc, dep, pfxid)
-                    proc = _run_with_clean_env(
-                        entry,
-                        extra_env=extra_env,
-                        capture_output=True,
-                        text=True,
-                        timeout=timeout,
-                    )
+                # Kill stale wineserver before each method
+                _kill_wineservers()
 
-                if proc and proc.returncode == 0:
+                result = attempt_fn(timeout or _METHOD_TIMEOUT)
+
+                if result and result.get("returncode") == 0:
                     results["installed"].append(dep)
                     results["output"].append(
-                        f"✓ Successfully installed {dep} (via {desc})"
+                        f"✓ Successfully installed {dep} (via {method_name})"
                     )
                     logger.info(
-                        "Protontricks installed %s in prefix %s (%s)",
-                        dep, pfxid, desc,
+                        "Installed %s in prefix %s (%s)",
+                        dep, pfxid, method_name,
                     )
                     installed = True
                     break
                 else:
-                    error_msg = proc.stderr or proc.stdout or "Unknown error"
-                    last_error = f"({desc}) {error_msg[:5000]}"
+                    err = (result.get("stderr") or result.get("stdout")
+                           or "Unknown error")[:5000] if result else "failed"
+                    last_error = f"({method_name}) {err}"
                     logger.info(
-                        "Protontricks %s failed for %s: %s",
-                        desc, dep, error_msg[:5000],
+                        "%s failed for %s: %s", method_name, dep, err,
                     )
             except subprocess.TimeoutExpired:
-                last_error = f"({desc}) Timeout after {timeout}s"
+                last_error = f"({method_name}) Timeout after {timeout}s"
+                logger.info("%s timed out after %ds", method_name, timeout)
+                _kill_xvfb()
             except FileNotFoundError:
-                last_error = f"({desc}) Command not found"
+                last_error = f"({method_name}) Command not found"
             except Exception as e:
-                last_error = f"({desc}) {str(e)}"
+                last_error = f"({method_name}) {str(e)}"
 
         if not installed:
-            # Give a helpful message about installing protontricks
-            if "not installed" in (last_error or ""):
-                help_msg = (
-                    "Protontricks is not installed. "
-                    "Run 'flatpak install com.github.Matoking.protontricks' "
-                    "or 'sudo pacman -S protontricks' to install it."
-                )
-                results["errors"].append(f"✗ Failed to install {dep}: {help_msg}")
-                results["output"].append(f"✗ Failed to install {dep}: {help_msg}")
-            else:
-                results["errors"].append(f"✗ Failed to install {dep}: {last_error}")
-                results["output"].append(f"✗ Failed to install {dep}")
-
+            errors_detail = "; ".join(
+                e for e in [last_error] if e
+            )
+            results["errors"].append(
+                f"✗ Failed to install {dep}: {errors_detail}"
+            )
+            results["output"].append(f"✗ Failed to install {dep}")
             results["success"] = False
             results["failed"].append(dep)
             logger.error(
-                "Protontricks failed for %s in prefix %s: %s",
-                dep, pfxid, last_error,
+                "All methods failed for %s in prefix %s: %s",
+                dep, pfxid, errors_detail,
             )
 
     return results
+
+
+def _build_methods(pfxid, dep, pfx_path, proton_wine, steam_root):
+    """Build ordered list of (method_name, attempt_fn) tuples."""
+    methods = []
+
+    # ── Method 1: Flatpak protontricks ──────────────────────────────────
+    # Preferred: handles Proton wine detection correctly.
+    # Auto-installs the flatpak if missing.
+    if shutil.which("flatpak"):
+        fp = _ensure_flatpak_protontricks()
+        if fp:
+            def _flatpak(t):
+                return _run_with_clean_env(
+                    [
+                        "flatpak", "run",
+                        PROTONTRICKS_FLATPAK,
+                        pfxid, "--", "--force", "--unattended", dep,
+                    ],
+                    capture_output=True, text=True, timeout=t,
+                )
+            methods.append(("flatpak protontricks", _flatpak))
+
+    # ── Method 2: Native protontricks CLI ───────────────────────────────
+    native = shutil.which("protontricks")
+    if native:
+        def _native(t):
+            extra_env = {}
+            if steam_root:
+                extra_env["STEAM_DIR"] = str(steam_root)
+            return _run_with_clean_env(
+                [native, "--no-bwrap", pfxid, "--force", dep],
+                extra_env=extra_env or None,
+                capture_output=True, text=True, timeout=t,
+            )
+        methods.append(("native protontricks", _native))
+
+    # ── Method 3: Proton wine + winetricks ──────────────────────────────
+    # Use Proton's own wine with WINELOADER/WINESERVER set, then run winetricks.
+    if proton_wine and pfx_path and shutil.which("winetricks"):
+        wine_loader, wine_server = proton_wine
+
+        def _proton_winetricks(t):
+            env = os.environ.copy()
+            env["WINEPREFIX"] = pfx_path
+            env["WINELOADER"] = wine_loader
+            env["WINESERVER"] = wine_server
+            # Clean bad vars
+            for var in _BAD_ENV_VARS:
+                env.pop(var, None)
+
+            # Try without xvfb first (Proton wine often doesn't need display for -q)
+            winetricks_bin = shutil.which("winetricks")
+            assert winetricks_bin is not None  # checked before adding method
+            logger.info(
+                "Proton wine approach: %s (WINELOADER=%s, WINESERVER=%s)",
+                winetricks_bin, wine_loader, wine_server,
+            )
+
+            winetricks_env = {k: v for k, v in env.items()}
+
+            # Try without xvfb first
+            no_xvfb = subprocess.run(
+                [winetricks_bin, "-q", dep],
+                capture_output=True, text=True, timeout=t,
+                env=winetricks_env,
+            )
+            if no_xvfb.returncode == 0:
+                return no_xvfb
+
+            # If that failed, try with xvfb-run (but with a shorter timeout)
+            logger.info("Proton wine + winetricks (no xvfb) failed, trying with xvfb-run")
+            xvfb_run = shutil.which("xvfb-run")
+            if xvfb_run:
+                return subprocess.run(
+                    [xvfb_run, "--auto-servernum", winetricks_bin, "-q", dep],
+                    capture_output=True, text=True, timeout=t,
+                    env=winetricks_env,
+                )
+            return no_xvfb
+
+        methods.append(("proton wine + winetricks", _proton_winetricks))
+
+    # ── Method 4: System winetricks (last resort) ───────────────────────
+    if pfx_path and shutil.which("winetricks"):
+        def _sys_winetricks(t):
+            winetricks_bin = shutil.which("winetricks")
+            assert winetricks_bin is not None  # checked before adding method
+            env = os.environ.copy()
+            env["WINEPREFIX"] = pfx_path
+            for var in _BAD_ENV_VARS:
+                env.pop(var, None)
+
+            xvfb_run = shutil.which("xvfb-run")
+
+            if xvfb_run:
+                full_cmd: list[str] = [xvfb_run, "--auto-servernum", winetricks_bin, "-q", dep]
+            else:
+                full_cmd = [winetricks_bin, "-q", dep]
+            return subprocess.run(
+                full_cmd, capture_output=True, text=True, timeout=t,
+                env=env,
+            )
+        methods.append(("system winetricks", _sys_winetricks))
+
+    return methods
