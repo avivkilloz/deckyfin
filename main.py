@@ -50,11 +50,6 @@ class Plugin:
 
     async def _main(self):
         _debug("_main called")
-        logging.basicConfig(
-            level=logging.DEBUG,
-            format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-            force=True,
-        )
         self.logger = logging.getLogger(APP_NAME)
         try:
             self.logger.info("Deckyfin v%s loaded", APP_VERSION)
