@@ -86,7 +86,7 @@ def init_proton_prefix(
     if compatdata_path.exists() and not reinitialize:
         raise FileExistsError(
             f"Prefix already exists at {compatdata_path}. "
-            "Set reinitialize=true to re-initialize."
+            "Enable 'Force re-init' and try again to overwrite it."
         )
 
     if compatdata_path.exists() and reinitialize:

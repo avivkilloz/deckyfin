@@ -4,27 +4,36 @@ import subprocess
 import os
 import shutil
 import logging
-from typing import List
 
 from deckyfin_consts import LOGGER_PROTONTRICKS, PROTONTRICKS_FLATPAK
 
 logger = logging.getLogger(LOGGER_PROTONTRICKS)
 
-# Minimal environment for flatpak subprocess — strip ALL PyInstaller env vars
-_FLATPAK_ENV = {
-    "HOME": os.environ.get("HOME", ""),
-    "USER": os.environ.get("USER", ""),
-    "PATH": "/usr/local/bin:/usr/bin:/bin",
-    "XDG_RUNTIME_DIR": os.environ.get("XDG_RUNTIME_DIR", "/run/user/1000"),
-    "DBUS_SESSION_BUS_ADDRESS": os.environ.get("DBUS_SESSION_BUS_ADDRESS", ""),
-    "DISPLAY": os.environ.get("DISPLAY", ":0"),
-    "LANG": os.environ.get("LANG", "en_US.UTF-8"),
-    "TZ": os.environ.get("TZ", ""),
-}
+
+# These PyInstaller-bundled env vars conflict with system binaries
+_BAD_ENV_VARS = ["LD_LIBRARY_PATH", "LD_PRELOAD", "LD_AUDIT", "LD_DEBUG"]
+
+
+def _run_with_clean_env(cmd, **kwargs):
+    """Run a subprocess with PyInstaller env vars stripped.
+
+    Removes the vars from os.environ BEFORE fork so the child process
+    definitely doesn't inherit them, then restores after.
+    """
+    backed_up = {}
+    for var in _BAD_ENV_VARS:
+        backed_up[var] = os.environ.pop(var, None)
+
+    try:
+        return subprocess.run(cmd, **kwargs)
+    finally:
+        for var, val in backed_up.items():
+            if val is not None:
+                os.environ[var] = val
 
 
 def _build_try_cmds(pfxid: str, dep: str) -> list:
-    """Build ordered list of (cmd_or_args, desc, use_shell) to try for protontricks."""
+    """Build ordered list of (cmd_or_args, desc) to try for protontricks."""
     cmds = []
 
     # 1. Try native protontricks CLI (Arch/AUR or pip install)
@@ -33,22 +42,18 @@ def _build_try_cmds(pfxid: str, dep: str) -> list:
         cmds.append((
             [native, pfxid, "--force", "--no-background-wait", dep],
             "native protontricks",
-            False,
         ))
     else:
         logger.debug("Native protontricks not found, skipping")
 
-    # 2. Try flatpak with clean room environment (strip ALL PyInstaller env)
+    # 2. Try flatpak run (env vars stripped by _run_with_clean_env)
     cmds.append((
         [
             "flatpak", "run",
-            "--env=LD_LIBRARY_PATH=",
-            "--env=LD_PRELOAD=",
             PROTONTRICKS_FLATPAK,
             pfxid, "--", "--force", "--unattended", dep,
         ],
-        "flatpak --env",
-        False,
+        "flatpak protontricks",
     ))
 
     return cmds
@@ -60,7 +65,7 @@ def install_protontricks_dependencies(
     """
     Install Windows dependencies in a Proton prefix via protontricks.
 
-    Tries: native protontricks → flatpak with explicit env cleanup.
+    Tries: native protontricks → flatpak with OS-level env cleanup.
 
     Args:
         pfxid: Unsigned 32-bit app ID (used as prefix ID)
@@ -89,25 +94,14 @@ def install_protontricks_dependencies(
         installed = False
         last_error = None
 
-        for cmd, desc, use_shell in _build_try_cmds(pfxid, dep):
+        for cmd, desc in _build_try_cmds(pfxid, dep):
             try:
-                if use_shell:
-                    proc = subprocess.run(
-                        cmd,
-                        shell=True,
-                        env=_FLATPAK_ENV,
-                        capture_output=True,
-                        text=True,
-                        timeout=timeout,
-                    )
-                else:
-                    proc = subprocess.run(
-                        cmd,
-                        env=_FLATPAK_ENV,
-                        capture_output=True,
-                        text=True,
-                        timeout=timeout,
-                    )
+                proc = _run_with_clean_env(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout,
+                )
 
                 if proc.returncode == 0:
                     results["installed"].append(dep)

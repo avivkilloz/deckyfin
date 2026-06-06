@@ -52,6 +52,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
   const [currentProton, setCurrentProton] = useState<string | null>(null);
   const [initLoading, setInitLoading] = useState(false);
   const [initFeedback, setInitFeedback] = useState<string | null>(null);
+  const [forceReinit, setForceReinit] = useState(false);
   const [depsInput, setDepsInput] = useState(
     (game.proton_dependencies || []).join(", ")
   );
@@ -142,7 +143,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
     setInitLoading(true);
     setInitFeedback("Initializing prefix (may take a minute)...");
     try {
-      const res = await initPrefix(steamInfo.app_id, selectedProton || undefined);
+      const res = await initPrefix(steamInfo.app_id, selectedProton || undefined, forceReinit);
       if (res.success) {
         setInitFeedback("✅ Prefix initialized!");
       } else {
@@ -266,6 +267,14 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
             <button onClick={handleInitPrefix} disabled={initLoading}>
               {initLoading ? "Initializing…" : "Init Prefix"}
             </button>
+            <label style={{ marginLeft: "8px", fontSize: "0.85em", cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={forceReinit}
+                onChange={(e) => setForceReinit(e.target.checked)}
+              />{" "}
+              Force re-init (deletes existing prefix)
+            </label>
             {initFeedback && (
               <p style={{ margin: "4px 0 0 0", fontSize: "0.85em", color: initFeedback.startsWith("✅") ? "lightgreen" : "tomato" }}>
                 {initFeedback}
