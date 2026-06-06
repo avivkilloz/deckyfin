@@ -79,8 +79,9 @@ def _kill_xvfb():
 
 
 def _find_proton_wine() -> Optional[tuple[str, str]]:
-    """Find the first available Proton installation's wine+wineserver paths.
+    """Find the best available Proton installation's wine+wineserver paths.
 
+    Preference order: Proton Experimental > GE-Proton > latest numbered Proton.
     Returns (wineloader_path, wineserver_path) or None.
     """
     try:
@@ -94,29 +95,52 @@ def _find_proton_wine() -> Optional[tuple[str, str]]:
         if not steam_root:
             return None
 
+        candidates = []
+
         # Search compatibilitytools.d first (GE-Proton etc.)
         compat_dir = steam_root / STEAM_COMPATTOOLS_FOLDER
         if compat_dir.exists():
-            for d in sorted(compat_dir.iterdir()):
+            for d in compat_dir.iterdir():
                 if d.is_dir():
                     wine = d / "dist" / "bin" / "wine64"
                     server = d / "dist" / "bin" / "wineserver"
                     if wine.exists() and server.exists():
-                        return (str(wine), str(server))
+                        candidates.append((d.name, str(wine), str(server)))
 
         # Then steamapps/common (official Proton versions)
         common_dir = steam_root / STEAM_STEAMAPPS_FOLDER / STEAM_COMMON_FOLDER
         if common_dir.exists():
-            for d in sorted(common_dir.iterdir()):
+            for d in common_dir.iterdir():
                 if d.is_dir() and "proton" in d.name.lower():
                     wine = d / "dist" / "bin" / "wine64"
                     if not wine.exists():
                         wine = d / "dist" / "bin" / "wine"
                     server = d / "dist" / "bin" / "wineserver"
                     if wine.exists() and server.exists():
-                        return (str(wine), str(server))
+                        candidates.append((d.name, str(wine), str(server)))
 
-        logger.warning("No Proton installation found with dist/bin/wine64")
+        if not candidates:
+            logger.warning("No Proton installation found with dist/bin/wine64")
+            return None
+
+        # Sort: Proton Experimental first, then GE-Proton (newest first),
+        # then numbered Proton (newest first; e.g. 9.0 > 8.0 > 7.0)
+        def _sort_key(c):
+            name = c[0].lower()
+            # Experimental gets highest priority
+            if name == "proton experimental":
+                return (0, "")
+            # GE-Proton gets next
+            if "ge-proton" in name:
+                return (1, name)
+            # Numbered Proton versions — extract version for numeric sort
+            return (2, name)
+
+        candidates.sort(key=_sort_key)
+        best = candidates[0]
+        logger.info("Selected Proton: %s (%s, %s)", best[0], best[1], best[2])
+        return (best[1], best[2])
+
     except Exception as e:
         logger.warning("Could not locate Proton wine: %s", e)
 
@@ -235,7 +259,7 @@ def install_protontricks_dependencies(
 
                 result = attempt_fn(timeout or _METHOD_TIMEOUT)
 
-                if result and result.get("returncode") == 0:
+                if result and result.returncode == 0:
                     results["installed"].append(dep)
                     results["output"].append(
                         f"✓ Successfully installed {dep} (via {method_name})"
@@ -247,7 +271,7 @@ def install_protontricks_dependencies(
                     installed = True
                     break
                 else:
-                    err = (result.get("stderr") or result.get("stdout")
+                    err = (result.stderr or result.stdout
                            or "Unknown error")[:5000] if result else "failed"
                     last_error = f"({method_name}) {err}"
                     logger.info(
