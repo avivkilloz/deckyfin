@@ -80,8 +80,12 @@ class Plugin:
 
     async def get_games_folder(self) -> Optional[str]:
         """Get the configured games folder path."""
-        folder = get_games_folder()
-        return str(folder) if folder else None
+        try:
+            folder = get_games_folder()
+            return str(folder) if folder else None
+        except Exception as e:
+            self.logger.error("get_games_folder failed: %s", e)
+            return None
 
     async def set_games_folder(self, path: str) -> dict:
         """Set the games folder path."""
@@ -93,20 +97,30 @@ class Plugin:
 
     async def initialize(self, games_folder: Optional[str] = None) -> dict:
         """Initialize the .deckyfin folder structure + auto-detect games."""
-        return initialize_app_structure(games_folder)
+        try:
+            return initialize_app_structure(games_folder)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
 
     # ── Games ─────────────────────────────────────────────────────────────
 
     async def get_games(self) -> list:
         """List all game configurations."""
-        return list_game_configs()
+        try:
+            return list_game_configs()
+        except Exception as e:
+            self.logger.error("get_games failed: %s", e)
+            return []
 
     async def get_game(self, name: str) -> dict:
         """Get a single game configuration by name."""
-        game = get_game_config(name)
-        if game:
-            return {"success": True, "game": game}
-        return {"success": False, "error": f"Game '{name}' not found"}
+        try:
+            game = get_game_config(name)
+            if game:
+                return {"success": True, "game": game}
+            return {"success": False, "error": f"Game '{name}' not found"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
 
     async def add_game(self, config: dict) -> dict:
         """Add or update a game configuration."""
@@ -115,11 +129,16 @@ class Plugin:
             return {"success": True, "game": result}
         except GameConfigError as e:
             return {"success": False, "error": str(e)}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
 
     async def remove_game(self, name: str) -> dict:
         """Remove a game configuration."""
-        removed = remove_game_config(name)
-        return {"success": removed, "error": None if removed else f"Game '{name}' not found"}
+        try:
+            removed = remove_game_config(name)
+            return {"success": removed, "error": None if removed else f"Game '{name}' not found"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
 
     async def list_nonsteam_games(self) -> list:
         """List games registered as Steam non-Steam shortcuts."""

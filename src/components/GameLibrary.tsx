@@ -8,7 +8,7 @@ import { GameDetail } from "../components/GameDetail";
 
 const getGames = callable<[], GameConfig[]>("get_games");
 const scanFolders = callable<[], GameFolder[]>("scan_games_folder");
-const getGamesFolder = callable<[], { games_folder: string | null }>(
+const getGamesFolder = callable<[], string | null>(
   "get_games_folder"
 );
 
@@ -35,7 +35,7 @@ export const GameLibrary: VFC = () => {
       ]);
       setGames(gamesRes || []);
       setFolders(folderRes || []);
-      setGamesFolder(infoRes?.games_folder ?? null);
+      setGamesFolder(infoRes ?? null);
     } catch (err: any) {
       setError(String(err));
     }
