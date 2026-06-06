@@ -9,8 +9,8 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from .steam import find_steam_root, get_user_id
-from .consts import (
+from steam import find_steam_root, get_user_id
+from consts import (
     LOGGER_GAMES,
     APPID_CRC32_MASK,
     APPID_CONFIG_FORMAT_MASK,

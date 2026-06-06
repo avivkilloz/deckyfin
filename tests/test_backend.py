@@ -1,8 +1,14 @@
 """Tests for the Deckyfin backend modules that don't need Steam running."""
 
 import json
+import sys
 import tempfile
 from pathlib import Path
+
+# Add py_modules to path for test imports
+_py_modules = str(Path(__file__).resolve().parent.parent / "py_modules")
+if _py_modules not in sys.path:
+    sys.path.insert(0, _py_modules)
 
 # ── App ID Calculation Tests ──────────────────────────────────────────────
 

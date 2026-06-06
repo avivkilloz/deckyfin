@@ -6,10 +6,10 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from .steam import find_steam_root
-from .games import convert_appid_to_unsigned_32bit
-from .proton import find_proton_installation, get_proton_version_for_game, list_available_proton
-from .consts import (
+from steam import find_steam_root
+from games import convert_appid_to_unsigned_32bit
+from proton import find_proton_installation, get_proton_version_for_game, list_available_proton
+from consts import (
     LOGGER_PREFIX,
     STEAM_STEAMAPPS_FOLDER,
     COMPATDATA_FOLDER,
