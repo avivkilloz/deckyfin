@@ -36,41 +36,27 @@ const updateGameConfig = callable<
 >("update_game_config");
 const scanExes = callable<[subfolder: string], string[]>("scan_game_exes");
 
-/** Popular Proton dependencies shown as checkboxes. */
+/** Popular Proton dependencies shown as toggle chips. */
 const POPULAR_DEPS = [
-  // Visual C++
-  { id: "vcrun2022", label: "VC++ 2022", group: "Visual C++" },
-  { id: "vcrun2019", label: "VC++ 2019", group: "Visual C++" },
-  { id: "vcrun2013", label: "VC++ 2013", group: "Visual C++" },
-  { id: "vcrun2010", label: "VC++ 2010", group: "Visual C++" },
-  { id: "vcrun2008", label: "VC++ 2008", group: "Visual C++" },
-  // DirectX
-  { id: "d3dx9", label: "d3dx9", group: "DirectX" },
-  { id: "d3dx10", label: "d3dx10", group: "DirectX" },
-  { id: "d3dx11", label: "d3dx11", group: "DirectX" },
-  { id: "d3dcompiler_47", label: "D3D Compiler 47", group: "DirectX" },
-  // .NET
-  { id: "dotnet48", label: ".NET 4.8", group: ".NET" },
-  { id: "dotnet40", label: ".NET 4.0", group: ".NET" },
-  { id: "dotnet35sp1", label: ".NET 3.5 SP1", group: ".NET" },
-  { id: "dotnet20", label: ".NET 2.0", group: ".NET" },
-  // Other
-  { id: "physx", label: "PhysX", group: "Other" },
-  { id: "mfplat", label: "Media Foundation", group: "Other" },
-  { id: "xna", label: "XNA Framework", group: "Other" },
-  { id: "dwrite", label: "DirectWrite", group: "Other" },
-  { id: "corefonts", label: "Core Fonts", group: "Other" },
+  { id: "vcrun2022", label: "VC++ 2022" },
+  { id: "vcrun2019", label: "VC++ 2019" },
+  { id: "vcrun2013", label: "VC++ 2013" },
+  { id: "vcrun2010", label: "VC++ 2010" },
+  { id: "vcrun2008", label: "VC++ 2008" },
+  { id: "d3dx9", label: "d3dx9" },
+  { id: "d3dx10", label: "d3dx10" },
+  { id: "d3dx11", label: "d3dx11" },
+  { id: "d3dcompiler_47", label: "D3D Compiler 47" },
+  { id: "dotnet48", label: ".NET 4.8" },
+  { id: "dotnet40", label: ".NET 4.0" },
+  { id: "dotnet35sp1", label: ".NET 3.5 SP1" },
+  { id: "dotnet20", label: ".NET 2.0" },
+  { id: "physx", label: "PhysX" },
+  { id: "mfplat", label: "Media Foundation" },
+  { id: "xna", label: "XNA Framework" },
+  { id: "dwrite", label: "DirectWrite" },
+  { id: "corefonts", label: "Core Fonts" },
 ];
-
-/** Group popular deps by category name. */
-function groupedDeps() {
-  const map: Record<string, typeof POPULAR_DEPS> = {};
-  for (const d of POPULAR_DEPS) {
-    if (!map[d.group]) map[d.group] = [];
-    map[d.group].push(d);
-  }
-  return map;
-}
 
 interface Props {
   game: GameConfig;
@@ -434,74 +420,57 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
         ))}
       </select>
 
-      {/* ── Dependencies: Checkboxes + Custom ─────────────────────────── */}
+      {/* ── Dependencies: Toggle Chips + Custom ──────────────────────── */}
       <label style={LABEL_STYLE}>
         Dependencies
         <span style={{ color: "#666", fontWeight: "normal" }}>
           {" "}
-          (popular + custom)
+          (click to select)
         </span>
       </label>
 
       <div
         style={{
-          marginBottom: "8px",
-          fontSize: "0.82em",
-          border: "1px solid #444",
-          borderRadius: "4px",
-          padding: "8px",
+          display: "flex",
+          flexWrap: "wrap",
+          gap: "6px",
+          marginBottom: "10px",
         }}
       >
-        {Object.entries(groupedDeps()).map(([group, deps]) => (
-          <div key={group} style={{ marginBottom: "6px" }}>
-            <div style={{ color: "#888", marginBottom: "2px", fontSize: "0.9em" }}>
-              {group}
-            </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 12px" }}>
-              {deps.map((dep) => (
-                <label
-                  key={dep.id}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "4px",
-                    cursor: "pointer",
-                    color: checkedDeps.includes(dep.id) ? "#e0e0e0" : "#777",
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={checkedDeps.includes(dep.id)}
-                    onChange={() => toggleCheckedDep(dep.id)}
-                    style={{ cursor: "pointer" }}
-                  />
-                  {dep.label}
-                </label>
-              ))}
-            </div>
-          </div>
-        ))}
-
-        {/* Custom dependencies */}
-        <div style={{ color: "#888", marginBottom: "2px", fontSize: "0.9em" }}>
-          Custom
-        </div>
-        <input
-          value={customDeps}
-          onChange={(e) => setCustomDeps(e.target.value)}
-          placeholder="e.g. dotnet_core,faudio"
-          style={{
-            width: "100%",
-            padding: "4px 6px",
-            boxSizing: "border-box",
-            fontSize: "0.95em",
-            border: "1px solid #555",
-            borderRadius: "3px",
-            background: "transparent",
-            color: "#e0e0e0",
-          }}
-        />
+        {POPULAR_DEPS.map((dep) => {
+          const selected = checkedDeps.includes(dep.id);
+          return (
+            <button
+              key={dep.id}
+              onClick={() => toggleCheckedDep(dep.id)}
+              style={{
+                padding: "4px 12px",
+                fontSize: "0.82em",
+                border: selected
+                  ? "1px solid #0078d4"
+                  : "1px solid #555",
+                borderRadius: "14px",
+                background: selected ? "#0078d4" : "transparent",
+                color: selected ? "white" : "#ccc",
+                cursor: "pointer",
+              }}
+            >
+              {dep.label}
+            </button>
+          );
+        })}
       </div>
+
+      {/* Custom dependencies */}
+      <label style={{ ...LABEL_STYLE, fontSize: "0.82em", color: "#888" }}>
+        Custom (comma-separated)
+      </label>
+      <input
+        value={customDeps}
+        onChange={(e) => setCustomDeps(e.target.value)}
+        placeholder="e.g. dotnet_core,faudio"
+        style={FIELD_STYLE}
+      />
 
       {/* ── Apply Config ──────────────────────────────────────────────────── */}
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "14px" }}>
