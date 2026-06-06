@@ -36,6 +36,42 @@ const updateGameConfig = callable<
 >("update_game_config");
 const scanExes = callable<[subfolder: string], string[]>("scan_game_exes");
 
+/** Popular Proton dependencies shown as checkboxes. */
+const POPULAR_DEPS = [
+  // Visual C++
+  { id: "vcrun2022", label: "VC++ 2022", group: "Visual C++" },
+  { id: "vcrun2019", label: "VC++ 2019", group: "Visual C++" },
+  { id: "vcrun2013", label: "VC++ 2013", group: "Visual C++" },
+  { id: "vcrun2010", label: "VC++ 2010", group: "Visual C++" },
+  { id: "vcrun2008", label: "VC++ 2008", group: "Visual C++" },
+  // DirectX
+  { id: "d3dx9", label: "d3dx9", group: "DirectX" },
+  { id: "d3dx10", label: "d3dx10", group: "DirectX" },
+  { id: "d3dx11", label: "d3dx11", group: "DirectX" },
+  { id: "d3dcompiler_47", label: "D3D Compiler 47", group: "DirectX" },
+  // .NET
+  { id: "dotnet48", label: ".NET 4.8", group: ".NET" },
+  { id: "dotnet40", label: ".NET 4.0", group: ".NET" },
+  { id: "dotnet35sp1", label: ".NET 3.5 SP1", group: ".NET" },
+  { id: "dotnet20", label: ".NET 2.0", group: ".NET" },
+  // Other
+  { id: "physx", label: "PhysX", group: "Other" },
+  { id: "mfplat", label: "Media Foundation", group: "Other" },
+  { id: "xna", label: "XNA Framework", group: "Other" },
+  { id: "dwrite", label: "DirectWrite", group: "Other" },
+  { id: "corefonts", label: "Core Fonts", group: "Other" },
+];
+
+/** Group popular deps by category name. */
+function groupedDeps() {
+  const map: Record<string, typeof POPULAR_DEPS> = {};
+  for (const d of POPULAR_DEPS) {
+    if (!map[d.group]) map[d.group] = [];
+    map[d.group].push(d);
+  }
+  return map;
+}
+
 interface Props {
   game: GameConfig;
   onBack: () => void;
@@ -74,9 +110,38 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
   const [protonVersion, setProtonVersion] = useState(
     game.proton_version || ""
   );
-  const [dependencies, setDependencies] = useState(
-    (game.proton_dependencies || []).join(", ")
+
+  // ── Dependencies: checkboxes + custom ────────────────────────────────────
+  const existingDeps = game.proton_dependencies || [];
+  const [checkedDeps, setCheckedDeps] = useState<string[]>(
+    existingDeps.filter((d) => POPULAR_DEPS.some((pd) => pd.id === d))
   );
+  const [customDeps, setCustomDeps] = useState<string>(
+    existingDeps
+      .filter((d) => !POPULAR_DEPS.some((pd) => pd.id === d))
+      .join(", ")
+  );
+
+  const mergedDeps = ((): string[] => {
+    const custom = customDeps
+      .split(",")
+      .map((d) => d.trim())
+      .filter(Boolean);
+    const all = [...checkedDeps, ...custom];
+    // Deduplicate preserving order (first seen wins)
+    const seen = new Set<string>();
+    return all.filter((d) => {
+      if (seen.has(d)) return false;
+      seen.add(d);
+      return true;
+    });
+  })();
+
+  const toggleCheckedDep = (id: string) => {
+    setCheckedDeps((prev) =>
+      prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]
+    );
+  };
 
   // ── Steam integration ───────────────────────────────────────────────────
   const [steamInfo, setSteamInfo] = useState<{
@@ -117,17 +182,13 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
   // ── Auto-save (none — use "Apply Config" button) ─────────────────────
 
   const handleApplyConfig = async () => {
-    const deps = dependencies
-      .split(",")
-      .map((d) => d.trim())
-      .filter(Boolean);
     try {
       const res = await updateGameConfig(storedName, {
         name,
         executable,
         start_dir: startDir || null,
         proton_version: protonVersion || null,
-        proton_dependencies: deps,
+        proton_dependencies: mergedDeps,
       });
       if (!res.success) {
         setFeedback({ ok: false, msg: "Failed to save config" });
@@ -244,13 +305,13 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
   };
 
   const handleInstallDeps = async () => {
-    if (!steamInfo || !dependencies.trim()) return;
+    if (!steamInfo || mergedDeps.length === 0) return;
     setLoading("deps");
     setFeedback(null);
     try {
       const res = await installDeps(
         String(steamInfo.unsigned_appid),
-        dependencies
+        mergedDeps.join(", ")
       );
       if (res.success) {
         const installed = (res.installed || []).join(", ");
@@ -373,19 +434,74 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
         ))}
       </select>
 
-      {/* Dependencies */}
+      {/* ── Dependencies: Checkboxes + Custom ─────────────────────────── */}
       <label style={LABEL_STYLE}>
         Dependencies
         <span style={{ color: "#666", fontWeight: "normal" }}>
           {" "}
-          (comma-separated, e.g. vcrun2022,d3dx9)
+          (popular + custom)
         </span>
       </label>
-      <input
-        value={dependencies}
-        onChange={(e) => setDependencies(e.target.value)}
-        style={FIELD_STYLE}
-      />
+
+      <div
+        style={{
+          marginBottom: "8px",
+          fontSize: "0.82em",
+          border: "1px solid #444",
+          borderRadius: "4px",
+          padding: "8px",
+        }}
+      >
+        {Object.entries(groupedDeps()).map(([group, deps]) => (
+          <div key={group} style={{ marginBottom: "6px" }}>
+            <div style={{ color: "#888", marginBottom: "2px", fontSize: "0.9em" }}>
+              {group}
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 12px" }}>
+              {deps.map((dep) => (
+                <label
+                  key={dep.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    cursor: "pointer",
+                    color: checkedDeps.includes(dep.id) ? "#e0e0e0" : "#777",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checkedDeps.includes(dep.id)}
+                    onChange={() => toggleCheckedDep(dep.id)}
+                    style={{ cursor: "pointer" }}
+                  />
+                  {dep.label}
+                </label>
+              ))}
+            </div>
+          </div>
+        ))}
+
+        {/* Custom dependencies */}
+        <div style={{ color: "#888", marginBottom: "2px", fontSize: "0.9em" }}>
+          Custom
+        </div>
+        <input
+          value={customDeps}
+          onChange={(e) => setCustomDeps(e.target.value)}
+          placeholder="e.g. dotnet_core,faudio"
+          style={{
+            width: "100%",
+            padding: "4px 6px",
+            boxSizing: "border-box",
+            fontSize: "0.95em",
+            border: "1px solid #555",
+            borderRadius: "3px",
+            background: "transparent",
+            color: "#e0e0e0",
+          }}
+        />
+      </div>
 
       {/* ── Apply Config ──────────────────────────────────────────────────── */}
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "14px" }}>
@@ -476,8 +592,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
 
         <button
           onClick={handleInstallDeps}
-          disabled={!steamInfo || !dependencies.trim() || loading === "deps"}
-          style={{ ...BTN_STYLE, opacity: !steamInfo || !dependencies.trim() || loading === "deps" ? 0.5 : 1 }}
+          disabled={!steamInfo || mergedDeps.length === 0 || loading === "deps"}
+          style={{ ...BTN_STYLE, opacity: !steamInfo || mergedDeps.length === 0 || loading === "deps" ? 0.5 : 1 }}
         >
           {loading === "deps" ? "Installing…" : "Install Deps"}
         </button>
@@ -497,23 +613,22 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
       )}
 
       {/* ── Remove Game ─────────────────────────────────────────────────── */}
-      <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.08)", margin: "20px 0 12px" }} />
-      <div style={{ display: "flex", justifyContent: "center" }}>
-        <button
-          onClick={handleRemove}
-          style={{
-            padding: "10px 24px",
-            fontSize: "0.85em",
-            cursor: "pointer",
-            borderRadius: "4px",
-            border: "1px solid #e74c3c",
-            background: "#e74c3c",
-            color: "white",
-          }}
-        >
-          ✕ Remove "{name}" from Deckyfin
-        </button>
-      </div>
+      <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.08)", margin: "24px 0 12px" }} />
+      <button
+        onClick={handleRemove}
+        style={{
+          width: "100%",
+          padding: "12px 0",
+          fontSize: "0.85em",
+          cursor: "pointer",
+          borderRadius: "4px",
+          border: "1px solid #c0392b",
+          background: "transparent",
+          color: "#e74c3c",
+        }}
+      >
+        Remove "{name}" from Deckyfin
+      </button>
     </div>
   );
 };
