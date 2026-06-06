@@ -38,24 +38,24 @@ const scanExes = callable<[subfolder: string], string[]>("scan_game_exes");
 
 /** Popular Proton dependencies shown as toggle chips. */
 const POPULAR_DEPS = [
-  { id: "vcrun2022", label: "VC++ 2022" },
-  { id: "vcrun2019", label: "VC++ 2019" },
-  { id: "vcrun2013", label: "VC++ 2013" },
-  { id: "vcrun2010", label: "VC++ 2010" },
-  { id: "vcrun2008", label: "VC++ 2008" },
-  { id: "d3dx9", label: "d3dx9" },
-  { id: "d3dx10", label: "d3dx10" },
-  { id: "d3dx11", label: "d3dx11" },
-  { id: "d3dcompiler_47", label: "D3D Compiler 47" },
-  { id: "dotnet48", label: ".NET 4.8" },
-  { id: "dotnet40", label: ".NET 4.0" },
-  { id: "dotnet35sp1", label: ".NET 3.5 SP1" },
-  { id: "dotnet20", label: ".NET 2.0" },
-  { id: "physx", label: "PhysX" },
-  { id: "mfplat", label: "Media Foundation" },
-  { id: "xna", label: "XNA Framework" },
-  { id: "dwrite", label: "DirectWrite" },
-  { id: "corefonts", label: "Core Fonts" },
+  "vcrun2022",
+  "vcrun2019",
+  "vcrun2013",
+  "vcrun2010",
+  "vcrun2008",
+  "d3dx9",
+  "d3dx10",
+  "d3dx11",
+  "d3dcompiler_47",
+  "dotnet48",
+  "dotnet40",
+  "dotnet35sp1",
+  "dotnet20",
+  "physx",
+  "mfplat",
+  "xna",
+  "dwrite",
+  "corefonts",
 ];
 
 interface Props {
@@ -100,11 +100,11 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
   // ── Dependencies: checkboxes + custom ────────────────────────────────────
   const existingDeps = game.proton_dependencies || [];
   const [checkedDeps, setCheckedDeps] = useState<string[]>(
-    existingDeps.filter((d) => POPULAR_DEPS.some((pd) => pd.id === d))
+    existingDeps.filter((d) => POPULAR_DEPS.includes(d))
   );
   const [customDeps, setCustomDeps] = useState<string>(
     existingDeps
-      .filter((d) => !POPULAR_DEPS.some((pd) => pd.id === d))
+      .filter((d) => !POPULAR_DEPS.includes(d))
       .join(", ")
   );
 
@@ -438,11 +438,11 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
         }}
       >
         {POPULAR_DEPS.map((dep) => {
-          const selected = checkedDeps.includes(dep.id);
+          const selected = checkedDeps.includes(dep);
           return (
             <button
-              key={dep.id}
-              onClick={() => toggleCheckedDep(dep.id)}
+              key={dep}
+              onClick={() => toggleCheckedDep(dep)}
               style={{
                 padding: "4px 12px",
                 fontSize: "0.82em",
@@ -455,7 +455,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
                 cursor: "pointer",
               }}
             >
-              {dep.label}
+              {dep}
             </button>
           );
         })}
