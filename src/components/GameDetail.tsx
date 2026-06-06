@@ -268,16 +268,22 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
               <button onClick={handleInitPrefix} disabled={initLoading}>
                 {initLoading ? "Initializing…" : "Init Prefix"}
               </button>
-              <label style={{ fontSize: "0.85em", cursor: "pointer", display: "flex", alignItems: "center", gap: "4px" }}>
-                <input
-                  type="checkbox"
-                  checked={forceReinit}
-                  onChange={(e) => setForceReinit(e.target.checked)}
-                />
-                <span style={{ color: forceReinit ? "#ff6666" : "#aaa" }}>
-                  Force re-init
-                </span>
-              </label>
+              <button
+                  onClick={() => setForceReinit(!forceReinit)}
+                  style={{
+                    fontSize: "0.85em",
+                    padding: "4px 8px",
+                    background: forceReinit ? "#ff6666" : "transparent",
+                    border: "1px solid",
+                    borderColor: forceReinit ? "#ff6666" : "#555",
+                    color: forceReinit ? "white" : "#aaa",
+                    cursor: "pointer",
+                    borderRadius: "4px",
+                    minWidth: "120px",
+                  }}
+                >
+                  {forceReinit ? "✓ Force re-init" : "☐ Force re-init"}
+                </button>
             </div>
             {initFeedback && (
               <p style={{ margin: "4px 0 0 0", fontSize: "0.85em", color: initFeedback.startsWith("✅") ? "lightgreen" : "tomato" }}>

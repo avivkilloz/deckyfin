@@ -15,15 +15,24 @@ logger = logging.getLogger(LOGGER_PROTONTRICKS)
 _BAD_ENV_VARS = ["LD_LIBRARY_PATH", "LD_PRELOAD", "LD_AUDIT", "LD_DEBUG"]
 
 
-def _run_with_clean_env(cmd, **kwargs):
+def _run_with_clean_env(cmd, extra_env=None, **kwargs):
     """Run a subprocess with PyInstaller env vars stripped.
 
     Removes the vars from os.environ BEFORE fork so the child process
     definitely doesn't inherit them, then restores after.
+
+    extra_env: optional dict of extra env vars to set for the child (e.g. STEAM_DIR)
     """
     backed_up = {}
     for var in _BAD_ENV_VARS:
         backed_up[var] = os.environ.pop(var, None)
+
+    extra_set = {}
+    if extra_env:
+        for var, val in extra_env.items():
+            extra_set[var] = os.environ.get(var)
+            if val is not None:
+                os.environ[var] = str(val)
 
     try:
         return subprocess.run(cmd, **kwargs)
@@ -31,6 +40,11 @@ def _run_with_clean_env(cmd, **kwargs):
         for var, val in backed_up.items():
             if val is not None:
                 os.environ[var] = val
+        for var, val in extra_set.items():
+            if val is not None:
+                os.environ[var] = val
+            else:
+                os.environ.pop(var, None)
 
 
 def _ensure_flatpak_protontricks() -> Optional[str]:
@@ -81,13 +95,14 @@ def _try_winetricks(pfxid: str, prefix_dir: str, dep: str) -> dict | None:
         return None
 
     pfx_path = Path(prefix_dir) / "pfx"
-    env = {"WINEPREFIX": str(pfx_path)}
     logger.debug("Trying winetricks for %s in %s", dep, pfx_path)
 
     try:
+        winetricks_env = os.environ.copy()
+        winetricks_env["WINEPREFIX"] = str(pfx_path)
         proc = _run_with_clean_env(
             [winetricks, "-q", dep],
-            env=env,
+            env=winetricks_env,
             capture_output=True,
             text=True,
             timeout=300,
@@ -103,15 +118,30 @@ def _try_winetricks(pfxid: str, prefix_dir: str, dep: str) -> dict | None:
 
 
 def _build_try_cmds(pfxid: str, dep: str, prefix_dir: Optional[str] = None) -> list:
-    """Build ordered list of (cmd_or_args, desc) to try for protontricks."""
+    """Build ordered list of (cmd_or_args, desc, extra_env) to try for protontricks.
+
+    extra_env: optional dict of extra env vars for the call (None = no extras).
+    """
     cmds = []
+
+    # Detect steam_root once — used by native protontricks and winetricks
+    steam_root = None
+    try:
+        from steam_utils import find_steam_root
+        steam_root = find_steam_root()
+    except Exception:
+        pass
 
     # 1. Try native protontricks CLI (Arch/AUR or pip install)
     native = shutil.which("protontricks")
     if native:
+        extra_env = {}
+        if steam_root:
+            extra_env["STEAM_DIR"] = str(steam_root)
         cmds.append((
             [native, pfxid, "--force", "--no-background-wait", dep],
             "native protontricks",
+            extra_env or None,
         ))
 
     # 2. Try native winetricks (Arch community repo)
@@ -119,19 +149,23 @@ def _build_try_cmds(pfxid: str, dep: str, prefix_dir: Optional[str] = None) -> l
         cmds.append((
             ("winetricks", dep, prefix_dir),
             "winetricks",
+            None,
         ))
 
     # 3. Try flatpak protontricks (auto-installs if missing)
-    flatpak_ok = _ensure_flatpak_protontricks()
-    if flatpak_ok:
-        cmds.append((
-            [
-                "flatpak", "run",
-                PROTONTRICKS_FLATPAK,
-                pfxid, "--", "--force", "--unattended", dep,
-            ],
-            flatpak_ok,
-        ))
+    # Skip if we have native Steam — flatpak sandbox can't find it
+    if not steam_root:
+        flatpak_ok = _ensure_flatpak_protontricks()
+        if flatpak_ok:
+            cmds.append((
+                [
+                    "flatpak", "run",
+                    PROTONTRICKS_FLATPAK,
+                    pfxid, "--", "--force", "--unattended", dep,
+                ],
+                flatpak_ok,
+                None,
+            ))
 
     return cmds
 
@@ -159,18 +193,25 @@ def install_protontricks_dependencies(
     if not dep_list:
         raise ValueError("No valid dependencies specified")
 
-    # Derive prefix directory from pfxid (Steam compatdata path)
+    # Derive prefix directory from pfxid using our Steam detection
+    # (find_steam_root uses _get_real_home() so it works when run as root)
     prefix_dir = None
     try:
-        from pathlib import Path
-        home = Path.home()
+        from steam_utils import find_steam_root
+        from deckyfin_consts import STEAM_STEAMAPPS_FOLDER, COMPATDATA_FOLDER
+        steam_root = find_steam_root()
         compatdata = (
-            home / ".local/share/Steam/steamapps/compatdata" / pfxid
+            steam_root / STEAM_STEAMAPPS_FOLDER / COMPATDATA_FOLDER / pfxid
         )
         if compatdata.exists():
             prefix_dir = str(compatdata)
-    except Exception:
-        pass
+        else:
+            logger.warning(
+                "Prefix directory not found at %s — will try winetricks with derived path anyway",
+                compatdata,
+            )
+    except Exception as e:
+        logger.warning("Could not derive prefix directory: %s", e)
 
     results = {
         "success": True,
@@ -185,7 +226,7 @@ def install_protontricks_dependencies(
         last_error = None
         proc = None
 
-        for entry, desc in _build_try_cmds(pfxid, dep, prefix_dir):
+        for entry, desc, extra_env in _build_try_cmds(pfxid, dep, prefix_dir):
             try:
                 # Handle winetricks specially (uses prefix path + custom env)
                 if desc == "winetricks":
@@ -198,6 +239,7 @@ def install_protontricks_dependencies(
                 else:
                     proc = _run_with_clean_env(
                         entry,
+                        extra_env=extra_env,
                         capture_output=True,
                         text=True,
                         timeout=timeout,
