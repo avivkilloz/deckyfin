@@ -99,7 +99,7 @@ def _ensure_flatpak_protontricks() -> Optional[str]:
         return None
 
 
-def _try_winetricks(pfxid: str, prefix_dir: str, dep: str) -> dict | None:
+def _try_winetricks(pfxid: str, prefix_dir: str, dep: str, timeout: int = 600) -> dict | None:
     """Try installing a dep via native winetricks."""
     winetricks = shutil.which("winetricks")
     if not winetricks:
@@ -131,7 +131,7 @@ def _try_winetricks(pfxid: str, prefix_dir: str, dep: str) -> dict | None:
             env=winetricks_env,
             capture_output=True,
             text=True,
-            timeout=300,
+            timeout=timeout,
         )
         if proc.returncode == 0:
             return {"found": True, "desc": "winetricks", "result": proc}
@@ -257,7 +257,7 @@ def install_protontricks_dependencies(
                 # Handle winetricks specially (uses prefix path + custom env)
                 if desc == "winetricks":
                     logger.info("Trying winetricks for %s in prefix %s", dep, pfxid)
-                    wr = _try_winetricks(pfxid, str(prefix_dir), dep) if prefix_dir else None
+                    wr = _try_winetricks(pfxid, str(prefix_dir), dep, timeout=timeout) if prefix_dir else None
                     if wr:
                         proc = wr["result"]
                     else:
@@ -287,10 +287,10 @@ def install_protontricks_dependencies(
                     break
                 else:
                     error_msg = proc.stderr or proc.stdout or "Unknown error"
-                    last_error = f"({desc}) {error_msg[:2000]}"
+                    last_error = f"({desc}) {error_msg[:5000]}"
                     logger.info(
                         "Protontricks %s failed for %s: %s",
-                        desc, dep, error_msg[:2000],
+                        desc, dep, error_msg[:5000],
                     )
             except subprocess.TimeoutExpired:
                 last_error = f"({desc}) Timeout after {timeout}s"
