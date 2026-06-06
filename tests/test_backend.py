@@ -14,7 +14,7 @@ if _py_modules not in sys.path:
 
 def test_calc_shortcut_app_id_consistency():
     """Same input always produces the same output."""
-    from games import calc_shortcut_app_id
+    from steam_games import calc_shortcut_app_id
 
     app_id = calc_shortcut_app_id("The Witcher 3", '"/home/deck/game.exe"')
     assert isinstance(app_id, int)
@@ -24,7 +24,7 @@ def test_calc_shortcut_app_id_consistency():
 
 def test_calc_shortcut_app_id_different_names():
     """Different names produce different app IDs."""
-    from games import calc_shortcut_app_id
+    from steam_games import calc_shortcut_app_id
 
     exe = '"/home/deck/game.exe"'
     id1 = calc_shortcut_app_id("Game A", exe)
@@ -34,7 +34,7 @@ def test_calc_shortcut_app_id_different_names():
 
 def test_calc_shortcut_app_id_signed():
     """App IDs should be negative (signed 32-bit with high bit set)."""
-    from games import calc_shortcut_app_id
+    from steam_games import calc_shortcut_app_id
 
     app_id = calc_shortcut_app_id("Test Game", '"/test.exe"')
     assert app_id < 0
@@ -42,7 +42,7 @@ def test_calc_shortcut_app_id_signed():
 
 def test_convert_to_unsigned_32bit():
     """Negative signed app ID becomes positive unsigned."""
-    from games import convert_appid_to_unsigned_32bit, calc_shortcut_app_id
+    from steam_games import convert_appid_to_unsigned_32bit, calc_shortcut_app_id
 
     signed = calc_shortcut_app_id("Test", '"/test.exe"')
     unsigned = convert_appid_to_unsigned_32bit(signed)
@@ -57,7 +57,7 @@ def test_convert_to_unsigned_32bit():
 
 def test_convert_to_config_format():
     """Config format app ID is a 64-bit number with the mask bit set."""
-    from games import convert_appid_to_unsigned_32bit, convert_appid_to_config_format
+    from steam_games import convert_appid_to_unsigned_32bit, convert_appid_to_config_format
     from consts import APPID_CONFIG_FORMAT_MASK
 
     unsigned = 12345
@@ -70,7 +70,7 @@ def test_convert_to_config_format():
 
 def test_steam_id64_to_account_id():
     """Account ID = Steam ID64 - base."""
-    from steam import steam_id64_to_account_id
+    from steam_utils import steam_id64_to_account_id
     from consts import STEAM_ID64_BASE
 
     known_id64 = 76561198000000000

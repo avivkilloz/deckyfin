@@ -22,14 +22,14 @@ from app_config import (
     find_game_executables,
     GameConfigError,
 )
-from games import add_nonsteam_game, list_nonsteam_games
+from steam_games import add_nonsteam_game, list_nonsteam_games
 from proton import list_available_proton, ensure_proton_available
 from proton_compat import set_proton_version
 from prefix import init_proton_prefix
 from protontricks import install_protontricks_dependencies
 from steam_control import is_steam_running, restart_steam
-from steam import get_user_id, list_steam_users, find_steam_root
-from games import convert_appid_to_unsigned_32bit, calc_shortcut_app_id
+from steam_utils import get_user_id, list_steam_users, find_steam_root
+from steam_games import convert_appid_to_unsigned_32bit, calc_shortcut_app_id
 from consts import APP_NAME, APP_VERSION
 
 

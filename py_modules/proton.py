@@ -7,7 +7,7 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from steam import find_steam_root
+from steam_utils import find_steam_root
 from consts import (
     LOGGER_PROTON,
     PROTON_SCRIPT_NAME,
@@ -71,7 +71,7 @@ def find_proton_installation(steam_root: Path, proton_name: str) -> Optional[Pat
 def get_proton_version_for_game(app_id: int, steam_root: Path, user_id: str) -> Optional[str]:
     """Get the Proton version configured for a specific game."""
     import vdf
-    from games import convert_appid_to_config_format, convert_appid_to_unsigned_32bit
+    from steam_games import convert_appid_to_config_format, convert_appid_to_unsigned_32bit
 
     config_appid = convert_appid_to_config_format(app_id)
 
