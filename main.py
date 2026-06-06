@@ -6,8 +6,14 @@ Bundles deckyfin-api utility modules for direct filesystem/Steam access.
 """
 
 import logging
+import sys
 from pathlib import Path
 from typing import Optional, List, Dict, Any
+
+# Ensure the plugin directory is on sys.path so backend/ is importable
+_plugin_dir = str(Path(__file__).resolve().parent)
+if _plugin_dir not in sys.path:
+    sys.path.insert(0, _plugin_dir)
 
 from backend.app_config import (
     get_app_config,
