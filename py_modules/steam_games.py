@@ -223,6 +223,36 @@ def add_nonsteam_game(
 
 # ── Remove Non-Steam Game ─────────────────────────────────────────────────
 
+# ── Get Shortcut Info ─────────────────────────────────────────────────────
+
+def get_steam_shortcut_info(app_name: str, user_id: Optional[str] = None) -> Optional[dict]:
+    """Look up a non-Steam game shortcut by name and return its info."""
+    steam_root = find_steam_root()
+    user_id_actual = user_id or get_user_id()
+    shortcuts_path = (
+        steam_root / STEAM_USERDATA_FOLDER / user_id_actual
+        / STEAM_CONFIG_FOLDER / SHORTCUTS_VDF
+    )
+    if not shortcuts_path.exists():
+        return None
+    shortcuts = _load_vdf_binary(shortcuts_path)
+    for idx, shortcut in shortcuts.get("shortcuts", {}).items():
+        if not idx.isdigit():
+            continue
+        if shortcut.get("AppName") == app_name:
+            exe = shortcut.get("Exe", "")
+            app_id = calc_shortcut_app_id(app_name, exe)
+            unsigned_appid = convert_appid_to_unsigned_32bit(app_id)
+            return {
+                "index": idx,
+                "name": app_name,
+                "exe": exe.strip('"'),
+                "app_id": app_id,
+                "unsigned_appid": unsigned_appid,
+            }
+    return None
+
+
 def remove_nonsteam_game(app_name: str, user_id: Optional[str] = None) -> bool:
     """Remove a non-Steam game from Steam shortcuts by name."""
     steam_root = find_steam_root()

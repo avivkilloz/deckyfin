@@ -20,7 +20,7 @@ from deckyfin_config import (
     find_game_executables,
     GameConfigError,
 )
-from steam_games import add_nonsteam_game, list_nonsteam_games, remove_nonsteam_game
+from steam_games import add_nonsteam_game, list_nonsteam_games, remove_nonsteam_game, get_steam_shortcut_info
 from deckyfin_proton import list_available_proton, ensure_proton_available, get_proton_version_for_game
 from deckyfin_proton_compat import set_proton_version
 from deckyfin_prefix import init_proton_prefix
@@ -171,6 +171,14 @@ class Plugin:
             "success": removed,
             "error": None if removed else f"'{app_name}' not found in Steam shortcuts",
         }
+
+    async def get_steam_shortcut(self, app_name: str, user_id: Optional[str] = None) -> dict:
+        """Look up a game in Steam shortcuts by name. Returns app_id if found."""
+        uid = user_id or get_user_id()
+        info = get_steam_shortcut_info(app_name, uid)
+        if info:
+            return {"success": True, **info}
+        return {"success": False, "error": f"'{app_name}' not found in Steam shortcuts"}
 
     # ── Proton ────────────────────────────────────────────────────────────
 

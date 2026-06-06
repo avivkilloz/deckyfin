@@ -9,6 +9,7 @@ from typing import Optional
 from steam_utils import find_steam_root
 from steam_games import convert_appid_to_unsigned_32bit
 from deckyfin_proton import find_proton_installation, get_proton_version_for_game, list_available_proton
+from deckyfin_proton_compat import set_proton_version
 from deckyfin_consts import (
     LOGGER_PREFIX,
     STEAM_STEAMAPPS_FOLDER,
@@ -67,6 +68,9 @@ def init_proton_prefix(
                 "No Proton version configured for this game. "
                 "Please set a Proton version first."
             )
+
+    # Ensure Steam config has this Proton version set before creating prefix
+    set_proton_version(app_id, proton_name, user_id)
 
     proton_script = find_proton_installation(steam_root, proton_name)
     if not proton_script:

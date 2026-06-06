@@ -9,6 +9,10 @@ const addSteamShortcut = callable<
   [exe_path: string, app_name: string, start_dir?: string, launch_options?: string],
   { success: boolean; app_id?: number; unsigned_appid?: number; error?: string }
 >("add_steam_shortcut");
+const getSteamShortcut = callable<
+  [app_name: string],
+  { success: boolean; app_id?: number; unsigned_appid?: number; error?: string }
+>("get_steam_shortcut");
 const removeSteamShortcut = callable<
   [app_name: string],
   { success: boolean; error?: string }
@@ -54,6 +58,15 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
   useEffect(() => {
     listProtonVersions().then(setProtonVersions).catch(() => setProtonVersions([]));
   }, []);
+
+  // Check if game is already a Steam shortcut on mount
+  useEffect(() => {
+    getSteamShortcut(game.name).then((res) => {
+      if (res.success && res.app_id && res.unsigned_appid) {
+        setSteamInfo({ app_id: res.app_id, unsigned_appid: res.unsigned_appid });
+      }
+    }).catch(() => {});
+  }, [game.name]);
 
   const handleAddToSteam = async () => {
     setAddingToSteam(true);

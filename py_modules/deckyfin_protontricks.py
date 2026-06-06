@@ -1,6 +1,7 @@
 """Protontricks dependency installation — installs Windows DLLs into Proton prefixes."""
 
 import subprocess
+import os
 import logging
 from typing import List
 
@@ -40,6 +41,11 @@ def install_protontricks_dependencies(
 
     for dep in dep_list:
         try:
+            # Strip PyInstaller bundled libs that conflict with system flatpak
+            clean_env = os.environ.copy()
+            clean_env.pop("LD_LIBRARY_PATH", None)
+            clean_env.pop("LD_PRELOAD", None)
+
             result = subprocess.run(
                 [
                     "flatpak",
@@ -51,6 +57,7 @@ def install_protontricks_dependencies(
                     "--unattended",
                     dep,
                 ],
+                env=clean_env,
                 capture_output=True,
                 text=True,
                 timeout=timeout,
