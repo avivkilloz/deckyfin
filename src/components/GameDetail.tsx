@@ -130,7 +130,6 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
       if (res.success) {
         setCurrentProton(selectedProton);
         setProtonFeedback(`✅ Proton set to ${selectedProton}`);
-        setFeedback({ ok: true, msg: `Proton set to ${selectedProton}` });
         setRestartHint(true);
         // Persist to Deckyfin config (non-critical — don't hide restart hint)
         try {
