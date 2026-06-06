@@ -31,7 +31,7 @@ export const GameLibrary: VFC<Props> = ({ serverAPI }) => {
       ]);
       if (gamesRes.success) setGames(gamesRes.result || []);
       if (folderRes.success) setFolders(folderRes.result || []);
-      if (infoRes.success) setGamesFolder(infoRes.result || null);
+      if (infoRes.success) setGamesFolder(infoRes.result?.games_folder ?? null);
     } catch (err: any) {
       setError(String(err));
     }

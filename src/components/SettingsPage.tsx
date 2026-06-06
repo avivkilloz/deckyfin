@@ -24,7 +24,7 @@ export const SettingsPage: VFC<Props> = ({ serverAPI, gamesFolder, onBack }) => 
         await serverAPI.callPluginMethod<{}, any>('initialize', {});
         setMessage('✅ Games folder saved & initialized!');
       } else {
-        setMessage(`❌ ${result.result?.error || 'Save failed'}`);
+        setMessage(`❌ ${(result.result as any)?.error || 'Save failed'}`);
       }
     } catch (err: any) {
       setMessage(`❌ ${String(err)}`);
