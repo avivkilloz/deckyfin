@@ -21,8 +21,19 @@ def _run_with_clean_env(cmd, extra_env=None, **kwargs):
     Removes the vars from os.environ BEFORE fork so the child process
     definitely doesn't inherit them, then restores after.
 
+    If an explicit env= dict is passed (as subprocess.run kwarg), the
+    bad vars are stripped from that dict too — this fixes the case where
+    a caller copies os.environ and passes it as `env=` to subprocess,
+    which would otherwise leak PyInstaller library paths into the child.
+
     extra_env: optional dict of extra env vars to set for the child (e.g. STEAM_DIR)
     """
+    # Strip bad vars from env= dict if present (before fork, no restore needed)
+    env_arg = kwargs.get("env")
+    if env_arg is not None:
+        for var in _BAD_ENV_VARS:
+            env_arg.pop(var, None)
+
     backed_up = {}
     for var in _BAD_ENV_VARS:
         backed_up[var] = os.environ.pop(var, None)
