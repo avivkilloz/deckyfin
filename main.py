@@ -39,6 +39,11 @@ def _debug(msg: str):
             f.write(f"[{__import__('datetime').datetime.now()}] {msg}\n")
     except Exception:
         pass
+    try:
+        with open("/tmp/deckyfin_diag.log", "a") as f:
+            f.write(f"[{__import__('datetime').datetime.now()}] {msg}\n")
+    except Exception:
+        pass
 
 
 _debug("MODULE LOAD START")
