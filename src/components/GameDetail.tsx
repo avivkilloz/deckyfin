@@ -1,4 +1,4 @@
-import { VFC, useState } from "react";
+import { VFC, useState, useEffect } from "react";
 import { callable } from "@decky/api";
 import { GameConfig } from "../types";
 
@@ -13,6 +13,19 @@ const removeSteamShortcut = callable<
   [app_name: string],
   { success: boolean; error?: string }
 >("remove_steam_shortcut");
+const listProtonVersions = callable<[], string[]>("list_proton_versions");
+const setGameProton = callable<
+  [app_id: number, proton_name: string],
+  { success: boolean; app_id?: number; proton_name?: string; error?: string }
+>("set_game_proton");
+const initPrefix = callable<
+  [app_id: number, proton_name?: string, reinitialize?: boolean],
+  { success: boolean; error?: string }
+>("init_prefix");
+const installDeps = callable<
+  [pfxid: string, dependencies: string],
+  { success: boolean; installed?: string[]; failed?: string[]; error?: string }
+>("install_dependencies");
 
 interface Props {
   game: GameConfig;
@@ -22,6 +35,23 @@ interface Props {
 export const GameDetail: VFC<Props> = ({ game, onBack }) => {
   const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
   const [addingToSteam, setAddingToSteam] = useState(false);
+  const [steamInfo, setSteamInfo] = useState<{ app_id: number; unsigned_appid: number } | null>(null);
+
+  // Proton panel state
+  const [protonVersions, setProtonVersions] = useState<string[]>([]);
+  const [selectedProton, setSelectedProton] = useState("");
+  const [protonFeedback, setProtonFeedback] = useState<string | null>(null);
+  const [currentProton, setCurrentProton] = useState<string | null>(null);
+  const [initLoading, setInitLoading] = useState(false);
+  const [initFeedback, setInitFeedback] = useState<string | null>(null);
+  const [depsInput, setDepsInput] = useState("");
+  const [depsLoading, setDepsLoading] = useState(false);
+  const [depsFeedback, setDepsFeedback] = useState<string | null>(null);
+
+  // Load proton versions on mount
+  useEffect(() => {
+    listProtonVersions().then(setProtonVersions).catch(() => setProtonVersions([]));
+  }, []);
 
   const handleAddToSteam = async () => {
     setAddingToSteam(true);
@@ -33,7 +63,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
         game.start_dir,
         game.launch_options || ""
       );
-      if (res.success) {
+      if (res.success && res.app_id && res.unsigned_appid) {
+        setSteamInfo({ app_id: res.app_id, unsigned_appid: res.unsigned_appid });
         setFeedback({ ok: true, msg: `Added to Steam — restart Steam to see it (App ID: ${res.unsigned_appid})` });
       } else {
         setFeedback({ ok: false, msg: res.error || "Failed to add to Steam" });
@@ -49,6 +80,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
     try {
       const res = await removeSteamShortcut(game.name);
       if (res.success) {
+        setSteamInfo(null);
         setFeedback({ ok: true, msg: "Removed from Steam — restart Steam to apply" });
       } else {
         setFeedback({ ok: false, msg: res.error || "Not found in Steam shortcuts" });
@@ -66,6 +98,57 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
     } catch (err: any) {
       setFeedback({ ok: false, msg: err?.message || "Error removing game" });
     }
+  };
+
+  const handleSetProton = async () => {
+    if (!steamInfo || !selectedProton) return;
+    setProtonFeedback(`Setting Proton to ${selectedProton}...`);
+    try {
+      const res = await setGameProton(steamInfo.app_id, selectedProton);
+      if (res.success) {
+        setCurrentProton(selectedProton);
+        setProtonFeedback(`✅ Proton set to ${selectedProton}`);
+      } else {
+        setProtonFeedback(`❌ ${res.error || "Failed to set Proton"}`);
+      }
+    } catch (err: any) {
+      setProtonFeedback(`❌ ${err?.message || "Error"}`);
+    }
+  };
+
+  const handleInitPrefix = async () => {
+    if (!steamInfo) return;
+    setInitLoading(true);
+    setInitFeedback("Initializing prefix (may take a minute)...");
+    try {
+      const res = await initPrefix(steamInfo.app_id, selectedProton || undefined);
+      if (res.success) {
+        setInitFeedback("✅ Prefix initialized!");
+      } else {
+        setInitFeedback(`❌ ${res.error || "Failed to init prefix"}`);
+      }
+    } catch (err: any) {
+      setInitFeedback(`❌ ${err?.message || "Error"}`);
+    }
+    setInitLoading(false);
+  };
+
+  const handleInstallDeps = async () => {
+    if (!steamInfo || !depsInput.trim()) return;
+    setDepsLoading(true);
+    setDepsFeedback(`Installing ${depsInput}... (may take a while)`);
+    try {
+      const res = await installDeps(String(steamInfo.unsigned_appid), depsInput);
+      if (res.success) {
+        setDepsFeedback(`✅ Installed: ${(res.installed || []).join(", ")}`);
+      } else {
+        const failed = (res.failed || []).join(", ");
+        setDepsFeedback(`❌ Failed: ${failed || res.error || "Installation failed"}`);
+      }
+    } catch (err: any) {
+      setDepsFeedback(`❌ ${err?.message || "Error"}`);
+    }
+    setDepsLoading(false);
   };
 
   return (
@@ -87,9 +170,11 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
       )}
       {game.proton_version && (
         <p>
-          <b>Proton:</b> {game.proton_version}
+          <b>Proton (config):</b> {game.proton_version}
         </p>
       )}
+
+      {/* Steam actions */}
       <div style={{ marginTop: "16px", display: "flex", gap: "8px", flexWrap: "wrap" }}>
         <button onClick={handleAddToSteam} disabled={addingToSteam}>
           {addingToSteam ? "Adding…" : "Add to Steam"}
@@ -103,6 +188,86 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
         <p style={{ marginTop: "10px", color: feedback.ok ? "lightgreen" : "tomato" }}>
           {feedback.ok ? "✅" : "❌"} {feedback.msg}
         </p>
+      )}
+
+      {/* Proton management panel — only shown after game is in Steam */}
+      {steamInfo && (
+        <div style={{ marginTop: "20px", borderTop: "1px solid rgba(255,255,255,0.15)", paddingTop: "16px" }}>
+          <h4 style={{ margin: "0 0 12px 0" }}>🔧 Proton Configuration</h4>
+
+          {/* Proton version selector */}
+          <div style={{ marginBottom: "12px" }}>
+            <label style={{ display: "block", marginBottom: "4px", fontSize: "0.9em" }}>
+              Version:
+            </label>
+            <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+              <select
+                value={selectedProton}
+                onChange={(e) => setSelectedProton(e.target.value)}
+                style={{ flex: 1, padding: "6px", boxSizing: "border-box" }}
+              >
+                <option value="">— Select Proton —</option>
+                {protonVersions.map((v) => (
+                  <option key={v} value={v}>
+                    {v}
+                  </option>
+                ))}
+              </select>
+              <button onClick={handleSetProton} disabled={!selectedProton}>
+                Set
+              </button>
+            </div>
+            {currentProton && (
+              <p style={{ margin: "4px 0 0 0", fontSize: "0.85em", color: "#aaa" }}>
+                Current: {currentProton}
+              </p>
+            )}
+            {protonFeedback && (
+              <p style={{ margin: "4px 0 0 0", fontSize: "0.85em", color: protonFeedback.startsWith("✅") ? "lightgreen" : "tomato" }}>
+                {protonFeedback}
+              </p>
+            )}
+          </div>
+
+          {/* Init prefix */}
+          <div style={{ marginBottom: "12px" }}>
+            <label style={{ display: "block", marginBottom: "4px", fontSize: "0.9em" }}>
+              Proton Prefix:
+            </label>
+            <button onClick={handleInitPrefix} disabled={initLoading}>
+              {initLoading ? "Initializing…" : "Init Prefix"}
+            </button>
+            {initFeedback && (
+              <p style={{ margin: "4px 0 0 0", fontSize: "0.85em", color: initFeedback.startsWith("✅") ? "lightgreen" : "tomato" }}>
+                {initFeedback}
+              </p>
+            )}
+          </div>
+
+          {/* Dependencies */}
+          <div style={{ marginBottom: "12px" }}>
+            <label style={{ display: "block", marginBottom: "4px", fontSize: "0.9em" }}>
+              Install Dependencies (comma-separated, e.g. vcrun2022,d3dx9):
+            </label>
+            <div style={{ display: "flex", gap: "6px" }}>
+              <input
+                type="text"
+                value={depsInput}
+                onChange={(e) => setDepsInput(e.target.value)}
+                placeholder="vcrun2022,d3dx9,xact"
+                style={{ flex: 1, padding: "6px", boxSizing: "border-box" }}
+              />
+              <button onClick={handleInstallDeps} disabled={depsLoading || !depsInput.trim()}>
+                {depsLoading ? "Installing…" : "Install"}
+              </button>
+            </div>
+            {depsFeedback && (
+              <p style={{ margin: "4px 0 0 0", fontSize: "0.85em", color: depsFeedback.startsWith("✅") ? "lightgreen" : "tomato" }}>
+                {depsFeedback}
+              </p>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

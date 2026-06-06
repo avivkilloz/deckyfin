@@ -21,7 +21,7 @@ from deckyfin_config import (
     GameConfigError,
 )
 from steam_games import add_nonsteam_game, list_nonsteam_games, remove_nonsteam_game
-from deckyfin_proton import list_available_proton, ensure_proton_available
+from deckyfin_proton import list_available_proton, ensure_proton_available, get_proton_version_for_game
 from deckyfin_proton_compat import set_proton_version
 from deckyfin_prefix import init_proton_prefix
 from deckyfin_protontricks import install_protontricks_dependencies
@@ -36,11 +36,6 @@ DEBUG_LOG = Path(__file__).parent / "debug.log"
 def _debug(msg: str):
     try:
         with open(DEBUG_LOG, "a") as f:
-            f.write(f"[{__import__('datetime').datetime.now()}] {msg}\n")
-    except Exception:
-        pass
-    try:
-        with open("/tmp/deckyfin_diag.log", "a") as f:
             f.write(f"[{__import__('datetime').datetime.now()}] {msg}\n")
     except Exception:
         pass
@@ -204,6 +199,17 @@ class Plugin:
 
     async def install_dependencies(self, pfxid: str, dependencies: str) -> dict:
         return install_protontricks_dependencies(pfxid, dependencies)
+
+    async def get_game_proton(self, app_id: int, user_id: Optional[str] = None) -> dict:
+        """Get the current Proton version configured for a Steam app."""
+        uid = user_id or get_user_id()
+        try:
+            from steam_utils import find_steam_root
+            steam_root = find_steam_root()
+            result = get_proton_version_for_game(app_id, steam_root, uid)
+            return {"success": True, "proton_name": result} if result else {"success": True, "proton_name": None}
+        except Exception as e:
+            return {"success": False, "proton_name": None, "error": str(e)}
 
 
 # ── Global error wrapper ─────────────────────────────────────────────
