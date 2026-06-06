@@ -15,6 +15,7 @@ from deckyfin_config import (
     list_game_configs,
     get_game_config,
     add_game_config,
+    update_game_config,
     remove_game_config,
     detect_game_folders,
     find_game_executables,
@@ -111,6 +112,14 @@ class Plugin:
     async def add_game(self, config: dict) -> dict:
         try:
             result = add_game_config(config)
+            return {"success": True, "game": result}
+        except GameConfigError as e:
+            return {"success": False, "error": str(e)}
+
+    async def update_game_config(self, name: str, updates: dict) -> dict:
+        """Update specific fields on an existing game config."""
+        try:
+            result = update_game_config(name, updates)
             return {"success": True, "game": result}
         except GameConfigError as e:
             return {"success": False, "error": str(e)}

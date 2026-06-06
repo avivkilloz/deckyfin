@@ -324,6 +324,26 @@ def add_game_config(game_config: Dict[str, Any], games_folder: Optional[Path] = 
     return game_config
 
 
+def update_game_config(
+    game_name: str,
+    updates: dict,
+    games_folder: Optional[Path] = None,
+) -> dict:
+    """Update specific fields on an existing game configuration."""
+    config = get_games_config(games_folder)
+    games = config.get("games", [])
+
+    for i, game in enumerate(games):
+        if game.get("name") == game_name:
+            games[i].update(updates)
+            config["games"] = games
+            save_games_config(config, games_folder)
+            logger.info("Updated game config '%s' with %s", game_name, updates)
+            return games[i]
+
+    raise GameConfigError(f"Game '{game_name}' not found in config")
+
+
 def remove_game_config(game_name: str, games_folder: Optional[Path] = None) -> bool:
     """Remove a game configuration by name."""
     config = get_games_config(games_folder)

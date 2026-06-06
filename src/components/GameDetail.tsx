@@ -30,6 +30,10 @@ const installDeps = callable<
   [pfxid: string, dependencies: string],
   { success: boolean; installed?: string[]; failed?: string[]; error?: string }
 >("install_dependencies");
+const updateGameConfig = callable<
+  [name: string, updates: Record<string, any>],
+  { success: boolean }
+>("update_game_config");
 
 interface Props {
   game: GameConfig;
@@ -123,6 +127,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
       if (res.success) {
         setCurrentProton(selectedProton);
         setProtonFeedback(`✅ Proton set to ${selectedProton}`);
+        // Persist to Deckyfin config
+        await updateGameConfig(game.name, { proton_version: selectedProton });
       } else {
         setProtonFeedback(`❌ ${res.error || "Failed to set Proton"}`);
       }
@@ -156,6 +162,9 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
       const res = await installDeps(String(steamInfo.unsigned_appid), depsInput);
       if (res.success) {
         setDepsFeedback(`✅ Installed: ${(res.installed || []).join(", ")}`);
+        // Persist deps to Deckyfin config
+        const deps = depsInput.split(",").map((d) => d.trim()).filter(Boolean);
+        await updateGameConfig(game.name, { proton_dependencies: deps });
       } else {
         const failed = (res.failed || []).join(", ");
         setDepsFeedback(`❌ Failed: ${failed || res.error || "Installation failed"}`);
