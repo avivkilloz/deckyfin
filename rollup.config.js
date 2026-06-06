@@ -13,7 +13,7 @@ export default defineConfig({
     sourcemap: true,
     exports: 'default',
   },
-  external: ['decky-frontend-lib'],
+  external: ['decky-frontend-lib', 'react', 'react-dom'],
   plugins: [
     css(),
     resolve(),
