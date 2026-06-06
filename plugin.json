@@ -2,6 +2,7 @@
   "name": "Deckyfin",
   "version": "0.1.0",
   "description": "Manage local/home server games on Steam Deck / Linux Gaming PC",
-  "author": "",
+  "author": "avivkilloz",
+  "icon": "src/assets/icon.svg",
   "flags": ["root"]
 }
