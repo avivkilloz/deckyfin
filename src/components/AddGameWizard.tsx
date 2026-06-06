@@ -81,7 +81,7 @@ export const AddGameWizard: VFC<Props> = ({ serverAPI, folders, onDone, onBack }
       setResult('✅ Game added!');
       setTimeout(() => onDone(), 1500);
     } else {
-      setResult(`❌ ${res.result?.error || 'Failed to add game'}`);
+      setResult(`❌ ${(res.result as any)?.error || 'Failed to add game'}`);
     }
     setSaving(false);
   };
