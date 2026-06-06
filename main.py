@@ -1,19 +1,18 @@
-"""
-Deckyfin — Decky Plugin Main Backend
+"""Deckyfin — Decky Plugin Main Backend
 
 Exposes game management methods to the React frontend via Decky IPC.
 Bundles deckyfin-api utility modules for direct filesystem/Steam access.
 """
 
 import logging
-import sys
+import sys as _sys
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
-# Ensure the plugin directory is on sys.path so backend/ is importable
+# Add plugin directory to path (append, not insert, to avoid shadowing)
 _plugin_dir = str(Path(__file__).resolve().parent)
-if _plugin_dir not in sys.path:
-    sys.path.insert(0, _plugin_dir)
+if _plugin_dir not in _sys.path:
+    _sys.path.append(_plugin_dir)
 
 from backend.app_config import (
     get_app_config,
