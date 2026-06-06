@@ -127,7 +127,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
       const res = await setGameProton(steamInfo.app_id, selectedProton);
       if (res.success) {
         setCurrentProton(selectedProton);
-        setProtonFeedback(`✅ Proton set to ${selectedProton}`);
+        setProtonFeedback(`✅ Proton set to ${selectedProton} — restart Steam to apply`);
         // Persist to Deckyfin config
         await updateGameConfig(game.name, { proton_version: selectedProton });
       } else {
