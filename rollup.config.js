@@ -1,6 +1,7 @@
 import commonjs from '@rollup/plugin-commonjs';
 import resolve from '@rollup/plugin-node-resolve';
 import typescript from '@rollup/plugin-typescript';
+import replace from '@rollup/plugin-replace';
 import css from 'rollup-plugin-import-css';
 import { defineConfig } from 'rollup';
 
@@ -17,6 +18,10 @@ export default defineConfig({
     css(),
     resolve(),
     commonjs(),
+    replace({
+      'process.env.NODE_ENV': JSON.stringify('production'),
+      preventAssignment: true,
+    }),
     typescript(),
   ],
 });
