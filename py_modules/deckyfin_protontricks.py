@@ -127,7 +127,7 @@ def _try_winetricks(pfxid: str, prefix_dir: str, dep: str) -> dict | None:
         if proc.returncode == 0:
             return {"found": True, "desc": "winetricks", "result": proc}
         else:
-            logger.info("winetricks exited %d for %s: stderr=%s", proc.returncode, dep, proc.stderr[:500] if proc.stderr else "(none)")
+            logger.info("winetricks exited %d for %s: stderr=%s", proc.returncode, dep, proc.stderr[:2000] if proc.stderr else "(none)")
             return None
     except Exception as e:
         logger.info("winetricks exception for %s: %s", dep, e)
@@ -278,10 +278,10 @@ def install_protontricks_dependencies(
                     break
                 else:
                     error_msg = proc.stderr or proc.stdout or "Unknown error"
-                    last_error = f"({desc}) {error_msg}"
-                    logger.debug(
+                    last_error = f"({desc}) {error_msg[:2000]}"
+                    logger.info(
                         "Protontricks %s failed for %s: %s",
-                        desc, dep, error_msg,
+                        desc, dep, error_msg[:2000],
                     )
             except subprocess.TimeoutExpired:
                 last_error = f"({desc}) Timeout after {timeout}s"
