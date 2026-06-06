@@ -123,8 +123,12 @@ class Plugin:
     # ── Games Folder ──────────────────────────────────────────────────────
 
     async def get_games_folder(self) -> Optional[str]:
-        folder = get_games_folder()
-        return str(folder) if folder else None
+        try:
+            folder = get_games_folder()
+            return str(folder) if folder else None
+        except Exception as e:
+            _debug(f"get_games_folder error: {e}\n{traceback.format_exc()}")
+            return None
 
     async def set_games_folder(self, path: str) -> dict:
         result = set_games_folder(path)
@@ -136,7 +140,11 @@ class Plugin:
     # ── Games ─────────────────────────────────────────────────────────────
 
     async def get_games(self) -> list:
-        return list_game_configs()
+        try:
+            return list_game_configs()
+        except Exception as e:
+            _debug(f"get_games error: {e}\n{traceback.format_exc()}")
+            return []
 
     async def get_game(self, name: str) -> dict:
         game = get_game_config(name)
@@ -161,16 +169,24 @@ class Plugin:
     # ── Scanning ──────────────────────────────────────────────────────────
 
     async def scan_games_folder(self) -> list:
-        games_path = get_games_folder()
-        if not games_path:
-            return [{"error": "Games folder not configured"}]
-        return detect_game_folders(Path(games_path))
+        try:
+            games_path = get_games_folder()
+            if not games_path:
+                return [{"error": "Games folder not configured"}]
+            return detect_game_folders(Path(games_path))
+        except Exception as e:
+            _debug(f"scan_games_folder error: {e}\n{traceback.format_exc()}")
+            return []
 
     async def scan_game_exes(self, subfolder: str) -> list:
-        games_path = get_games_folder()
-        if not games_path:
-            return [{"error": "Games folder not configured"}]
-        return find_game_executables(Path(games_path) / subfolder)
+        try:
+            games_path = get_games_folder()
+            if not games_path:
+                return [{"error": "Games folder not configured"}]
+            return find_game_executables(Path(games_path) / subfolder)
+        except Exception as e:
+            _debug(f"scan_game_exes error: {e}\n{traceback.format_exc()}")
+            return []
 
     # ── Steam Actions ─────────────────────────────────────────────────────
 
