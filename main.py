@@ -41,6 +41,9 @@ def _debug(msg: str):
         pass
 
 
+_debug("MODULE LOAD START")
+
+
 class Plugin:
     """Deckyfin plugin backend — methods callable from the React frontend."""
 
@@ -188,35 +191,9 @@ import inspect as _inspect
 
 _SAFE_METHODS = frozenset({"_main"})
 
+_wrapped_count = 0
+_wrapped_names = []
 
-def _wrap_method(cls, name: str, method):
-    """Replace an async method on Plugin with a logged version
-    that writes exceptions to debug.log then re-raises them."""
-
-    async def wrapper(self, *args, **kwargs):
-        _debug(f"CALL {name}(args={args}, kwargs={kwargs})")
-        try:
-            result = await method(self, *args, **kwargs)
-            _debug(f"CALL OK {name}")
-            return result
-        except Exception as e:
-            tb = traceback.format_exc()
-            _debug(f"CALL ERROR {name}: {e}\n{tb}")
-            # Also log via Decky's managed logging system
-            try:
-                log = logging.getLogger(APP_NAME)
-                log.error("ERROR %s: %s\n%s", name, e, tb)
-            except Exception:
-                pass
-            raise  # re-raise so sandbox IPC handles it
-
-    wrapper.__name__ = method.__name__
-    wrapper.__qualname__ = method.__qualname__
-    wrapper.__doc__ = method.__doc__
-    setattr(cls, name, wrapper)
-
-
-# Wrap every public async method except _main
 for _attr_name in dir(Plugin):
     if _attr_name in _SAFE_METHODS:
         continue
@@ -224,7 +201,33 @@ for _attr_name in dir(Plugin):
         continue
     _attr = getattr(Plugin, _attr_name)
     if _inspect.iscoroutinefunction(_attr):
-        _wrap_method(Plugin, _attr_name, _attr)
+        _wrapped_names.append(_attr_name)
+        # Replaces the method on the class with a wrapped version
+        _orig = _attr
+        
+        def _make_wrapper(name, orig):
+            async def wrapper(self, *args, **kwargs):
+                _debug(f"CALL {name}(args={args}, kwargs={kwargs})")
+                try:
+                    result = await orig(self, *args, **kwargs)
+                    _debug(f"CALL OK {name}")
+                    return result
+                except Exception as e:
+                    tb = traceback.format_exc()
+                    _debug(f"CALL ERROR {name}: {e}\n{tb}")
+                    try:
+                        log = logging.getLogger(APP_NAME)
+                        log.error("ERROR %s: %s\n%s", name, e, tb)
+                    except Exception:
+                        pass
+                    raise
+            wrapper.__name__ = orig.__name__
+            wrapper.__qualname__ = orig.__qualname__
+            wrapper.__doc__ = orig.__doc__
+            return wrapper
+        
+        setattr(Plugin, _attr_name, _make_wrapper(_attr_name, _attr))
+        _wrapped_count += 1
 
-# Clean up
-del _attr_name, _attr, _SAFE_METHODS, _inspect, _wrap_method
+_debug(f"WRAPPER: wrapped {_wrapped_count} methods: {_wrapped_names}")
+del _wrapped_count, _wrapped_names, _attr_name, _attr, _SAFE_METHODS, _inspect, _orig, _make_wrapper
