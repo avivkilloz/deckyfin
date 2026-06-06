@@ -116,9 +116,18 @@ def _try_winetricks(pfxid: str, prefix_dir: str, dep: str) -> dict | None:
     try:
         winetricks_env = os.environ.copy()
         winetricks_env["WINEPREFIX"] = str(pfx_path)
-        logger.info("Running: %s -q %s with WINEPREFIX=%s", winetricks, dep, pfx_path)
+
+        # Use xvfb-run if available to give wine a virtual display
+        xvfb_run = shutil.which("xvfb-run")
+        if xvfb_run:
+            full_cmd = [xvfb_run, "--auto-servernum", winetricks, "-q", dep]
+        else:
+            logger.info("xvfb-run not found, running winetricks without virtual display")
+            full_cmd = [winetricks, "-q", dep]
+
+        logger.info("Running: %s", " ".join(str(c) for c in full_cmd))
         proc = _run_with_clean_env(
-            [winetricks, "-q", dep],
+            full_cmd,
             env=winetricks_env,
             capture_output=True,
             text=True,
@@ -156,7 +165,7 @@ def _build_try_cmds(pfxid: str, dep: str, prefix_dir: Optional[str] = None) -> l
         if steam_root:
             extra_env["STEAM_DIR"] = str(steam_root)
         cmds.append((
-            [native, pfxid, "--force", dep],
+            [native, "--no-bwrap", pfxid, "--force", dep],
             "native protontricks",
             extra_env or None,
         ))
