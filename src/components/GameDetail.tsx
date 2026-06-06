@@ -44,7 +44,9 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
   const [currentProton, setCurrentProton] = useState<string | null>(null);
   const [initLoading, setInitLoading] = useState(false);
   const [initFeedback, setInitFeedback] = useState<string | null>(null);
-  const [depsInput, setDepsInput] = useState("");
+  const [depsInput, setDepsInput] = useState(
+    (game.proton_dependencies || []).join(", ")
+  );
   const [depsLoading, setDepsLoading] = useState(false);
   const [depsFeedback, setDepsFeedback] = useState<string | null>(null);
 
@@ -171,6 +173,11 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
       {game.proton_version && (
         <p>
           <b>Proton (config):</b> {game.proton_version}
+        </p>
+      )}
+      {game.proton_dependencies && game.proton_dependencies.length > 0 && (
+        <p>
+          <b>Dependencies:</b> {game.proton_dependencies.join(", ")}
         </p>
       )}
 
