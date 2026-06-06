@@ -5,6 +5,7 @@ Bundles deckyfin-api utility modules for direct filesystem/Steam access.
 """
 
 import logging
+import traceback
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
@@ -33,13 +34,18 @@ from steam_games import convert_appid_to_unsigned_32bit, calc_shortcut_app_id
 from deckyfin_consts import APP_NAME, APP_VERSION
 
 
+def _log_error(logger, method: str, exc: Exception):
+    """Log a backend method error with full traceback."""
+    logger.error("%s failed: %s\n%s", method, exc, traceback.format_exc())
+
+
 class Plugin:
     """Deckyfin plugin backend — methods callable from the React frontend."""
 
     async def _main(self):
         """Called when plugin is loaded by Decky."""
         logging.basicConfig(
-            level=logging.INFO,
+            level=logging.DEBUG,
             format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
         )
         self.logger = logging.getLogger(APP_NAME)
@@ -49,31 +55,60 @@ class Plugin:
         """Called when plugin is unloaded by Decky."""
         self.logger.info("Deckyfin unloaded")
 
+    # ── Debug ──────────────────────────────────────────────────────────────
+
+    async def debug_info(self) -> dict:
+        """Return debug info including recent error state."""
+        try:
+            steam_running = is_steam_running()
+            gf = get_games_folder()
+            return {
+                "steam_running": steam_running,
+                "games_folder": str(gf) if gf else None,
+                "home": str(Path.home()),
+                "config_path": str(Path.home() / ".config" / "deckyfin"),
+            }
+        except Exception as e:
+            return {"error": str(e), "traceback": traceback.format_exc()}
+
     # ── App Info ──────────────────────────────────────────────────────────
 
     async def get_plugin_info(self) -> dict:
         """Return plugin metadata."""
-        return {
-            "name": APP_NAME,
-            "version": APP_VERSION,
-            "games_folder": str(get_games_folder()) if get_games_folder() else None,
-        }
+        try:
+            return {
+                "name": APP_NAME,
+                "version": APP_VERSION,
+                "games_folder": str(get_games_folder()) if get_games_folder() else None,
+            }
+        except Exception as e:
+            _log_error(self.logger, "get_plugin_info", e)
+            return {"name": APP_NAME, "version": APP_VERSION, "games_folder": None}
 
     # ── Steam ─────────────────────────────────────────────────────────────
 
     async def get_steam_running(self) -> dict:
         """Check if Steam is currently running."""
-        return {"running": is_steam_running()}
+        try:
+            return {"running": is_steam_running()}
+        except Exception as e:
+            _log_error(self.logger, "get_steam_running", e)
+            return {"running": False}
 
     async def restart_steam(self) -> dict:
         """Restart Steam."""
-        return restart_steam()
+        try:
+            return restart_steam()
+        except Exception as e:
+            _log_error(self.logger, "restart_steam", e)
+            return {"success": False, "error": str(e)}
 
     async def list_steam_users(self) -> list:
         """List available Steam user profiles."""
         try:
             return list_steam_users()
         except Exception as e:
+            _log_error(self.logger, "list_steam_users", e)
             return [{"error": str(e)}]
 
     # ── Games Folder ──────────────────────────────────────────────────────
@@ -84,7 +119,7 @@ class Plugin:
             folder = get_games_folder()
             return str(folder) if folder else None
         except Exception as e:
-            self.logger.error("get_games_folder failed: %s", e)
+            _log_error(self.logger, "get_games_folder", e)
             return None
 
     async def set_games_folder(self, path: str) -> dict:
@@ -93,6 +128,7 @@ class Plugin:
             result = set_games_folder(path)
             return {"success": True, "path": str(result)}
         except Exception as e:
+            _log_error(self.logger, "set_games_folder", e)
             return {"success": False, "error": str(e)}
 
     async def initialize(self, games_folder: Optional[str] = None) -> dict:
@@ -100,6 +136,7 @@ class Plugin:
         try:
             return initialize_app_structure(games_folder)
         except Exception as e:
+            _log_error(self.logger, "initialize", e)
             return {"success": False, "error": str(e)}
 
     # ── Games ─────────────────────────────────────────────────────────────
@@ -109,7 +146,7 @@ class Plugin:
         try:
             return list_game_configs()
         except Exception as e:
-            self.logger.error("get_games failed: %s", e)
+            _log_error(self.logger, "get_games", e)
             return []
 
     async def get_game(self, name: str) -> dict:
@@ -120,6 +157,7 @@ class Plugin:
                 return {"success": True, "game": game}
             return {"success": False, "error": f"Game '{name}' not found"}
         except Exception as e:
+            _log_error(self.logger, "get_game", e)
             return {"success": False, "error": str(e)}
 
     async def add_game(self, config: dict) -> dict:
@@ -128,8 +166,10 @@ class Plugin:
             result = add_game_config(config)
             return {"success": True, "game": result}
         except GameConfigError as e:
+            _log_error(self.logger, "add_game", e)
             return {"success": False, "error": str(e)}
         except Exception as e:
+            _log_error(self.logger, "add_game", e)
             return {"success": False, "error": str(e)}
 
     async def remove_game(self, name: str) -> dict:
@@ -138,6 +178,7 @@ class Plugin:
             removed = remove_game_config(name)
             return {"success": removed, "error": None if removed else f"Game '{name}' not found"}
         except Exception as e:
+            _log_error(self.logger, "remove_game", e)
             return {"success": False, "error": str(e)}
 
     async def list_nonsteam_games(self) -> list:
@@ -145,24 +186,33 @@ class Plugin:
         try:
             return list_nonsteam_games()
         except Exception as e:
+            _log_error(self.logger, "list_nonsteam_games", e)
             return [{"error": str(e)}]
 
     # ── Scanning ──────────────────────────────────────────────────────────
 
     async def scan_games_folder(self) -> list:
         """Scan games folder for subdirectories (candidate games)."""
-        games_path = get_games_folder()
-        if not games_path:
-            return [{"error": "Games folder not configured"}]
-        return detect_game_folders(Path(games_path))
+        try:
+            games_path = get_games_folder()
+            if not games_path:
+                return [{"error": "Games folder not configured"}]
+            return detect_game_folders(Path(games_path))
+        except Exception as e:
+            _log_error(self.logger, "scan_games_folder", e)
+            return [{"error": str(e)}]
 
     async def scan_game_exes(self, subfolder: str) -> list:
         """Scan a specific subfolder for .exe files."""
-        games_path = get_games_folder()
-        if not games_path:
-            return [{"error": "Games folder not configured"}]
-        game_dir = Path(games_path) / subfolder
-        return find_game_executables(game_dir)
+        try:
+            games_path = get_games_folder()
+            if not games_path:
+                return [{"error": "Games folder not configured"}]
+            game_dir = Path(games_path) / subfolder
+            return find_game_executables(game_dir)
+        except Exception as e:
+            _log_error(self.logger, "scan_game_exes", e)
+            return [{"error": str(e)}]
 
     # ── Steam Actions ─────────────────────────────────────────────────────
 
@@ -182,6 +232,7 @@ class Plugin:
                 "unsigned_appid": convert_appid_to_unsigned_32bit(app_id),
             }
         except Exception as e:
+            _log_error(self.logger, "add_steam_shortcut", e)
             return {"success": False, "error": str(e)}
 
     # ── Proton ────────────────────────────────────────────────────────────
@@ -191,6 +242,7 @@ class Plugin:
         try:
             return list_available_proton()
         except Exception as e:
+            _log_error(self.logger, "list_proton_versions", e)
             return []
 
     async def ensure_proton(self, proton_name: str) -> dict:
@@ -199,6 +251,7 @@ class Plugin:
             ensure_proton_available(proton_name)
             return {"success": True, "proton_name": proton_name}
         except (ValueError, RuntimeError) as e:
+            _log_error(self.logger, "ensure_proton", e)
             return {"success": False, "error": str(e)}
 
     async def set_game_proton(self, app_id: int, proton_name: str, user_id: Optional[str] = None) -> dict:
@@ -208,6 +261,7 @@ class Plugin:
             set_proton_version(app_id, proton_name, uid)
             return {"success": True, "app_id": app_id, "proton_name": proton_name}
         except Exception as e:
+            _log_error(self.logger, "set_game_proton", e)
             return {"success": False, "error": str(e)}
 
     async def init_prefix(
@@ -223,6 +277,7 @@ class Plugin:
             init_proton_prefix(app_id, uid, proton_name=proton_name, reinitialize=reinitialize)
             return {"success": True, "app_id": app_id}
         except Exception as e:
+            _log_error(self.logger, "init_prefix", e)
             return {"success": False, "error": str(e)}
 
     async def install_dependencies(
@@ -232,6 +287,7 @@ class Plugin:
         try:
             return install_protontricks_dependencies(pfxid, dependencies)
         except Exception as e:
+            _log_error(self.logger, "install_dependencies", e)
             return {"success": False, "error": str(e)}
 
     # ── Full Workflow ─────────────────────────────────────────────────────
@@ -309,4 +365,5 @@ class Plugin:
             }
 
         except Exception as e:
+            _log_error(self.logger, "setup_game", e)
             return {"success": False, "error": str(e), "steps": steps}
