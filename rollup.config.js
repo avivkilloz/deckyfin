@@ -16,7 +16,7 @@ export default defineConfig({
     exports: 'default',
   },
   context: 'window',
-  external: ['@decky/ui', '@decky/api', 'react', 'react-dom', 'react/jsx-runtime'],
+  external: ['@decky/ui', 'react', 'react-dom', 'react/jsx-runtime'],
   plugins: [
     del({ targets: 'dist/*', force: true }),
     css(),
@@ -29,7 +29,6 @@ export default defineConfig({
       'react-dom': 'SP_REACTDOM',
       'react/jsx-runtime': 'SP_JSX',
       '@decky/ui': 'DFL',
-      '@decky/api': 'DFL',
     }),
     replace({
       'process.env.NODE_ENV': JSON.stringify('production'),
