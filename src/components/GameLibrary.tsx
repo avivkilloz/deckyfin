@@ -56,7 +56,7 @@ export const GameLibrary: VFC = () => {
   );
 
   if (view === "settings") {
-    return <SettingsPage gamesFolder={gamesFolder} onBack={loadData} />;
+    return <SettingsPage gamesFolder={gamesFolder} onBack={() => { loadData(); setView("library"); }} />;
   }
 
   if (view === "add-game") {

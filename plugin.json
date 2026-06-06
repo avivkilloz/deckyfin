@@ -4,5 +4,6 @@
   "description": "Manage local/home server games on Steam Deck / Linux Gaming PC",
   "author": "avivkilloz",
   "icon": "src/assets/icon.svg",
+  "api_version": 1,
   "flags": ["root"]
 }

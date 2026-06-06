@@ -257,7 +257,10 @@ def initialize_app_structure(games_folder: Optional[str] = None) -> Dict[str, An
 
 def get_games_config(games_folder: Optional[Path] = None) -> Dict[str, Any]:
     """Get the games configuration from .deckyfin/config.json."""
-    config_file = get_games_config_file(games_folder)
+    try:
+        config_file = get_games_config_file(games_folder)
+    except ValueError:
+        return {"games": []}
     if config_file.exists():
         try:
             with open(config_file, "r", encoding="utf-8") as f:
