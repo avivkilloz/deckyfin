@@ -431,46 +431,64 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
 
       <div
         style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: "6px",
-          marginBottom: "10px",
+          marginBottom: "8px",
+          border: "1px solid #444",
+          borderRadius: "4px",
+          padding: "8px",
         }}
       >
-        {POPULAR_DEPS.map((dep) => {
-          const selected = checkedDeps.includes(dep);
-          return (
-            <button
-              key={dep}
-              onClick={() => toggleCheckedDep(dep)}
-              style={{
-                padding: "4px 12px",
-                fontSize: "0.82em",
-                border: selected
-                  ? "1px solid #0078d4"
-                  : "1px solid #555",
-                borderRadius: "14px",
-                background: selected ? "#0078d4" : "transparent",
-                color: selected ? "white" : "#ccc",
-                cursor: "pointer",
-              }}
-            >
-              {dep}
-            </button>
-          );
-        })}
-      </div>
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "6px",
+            marginBottom: "10px",
+          }}
+        >
+          {POPULAR_DEPS.map((dep) => {
+            const selected = checkedDeps.includes(dep);
+            return (
+              <button
+                key={dep}
+                onClick={() => toggleCheckedDep(dep)}
+                style={{
+                  padding: "4px 12px",
+                  fontSize: "0.82em",
+                  border: selected
+                    ? "1px solid #0078d4"
+                    : "1px solid #555",
+                  borderRadius: "14px",
+                  background: selected ? "#0078d4" : "transparent",
+                  color: selected ? "white" : "#ccc",
+                  cursor: "pointer",
+                }}
+              >
+                {dep}
+              </button>
+            );
+          })}
+        </div>
 
-      {/* Custom dependencies */}
-      <label style={{ ...LABEL_STYLE, fontSize: "0.82em", color: "#888" }}>
-        Custom (comma-separated)
-      </label>
-      <input
-        value={customDeps}
-        onChange={(e) => setCustomDeps(e.target.value)}
-        placeholder="e.g. dotnet_core,faudio"
-        style={FIELD_STYLE}
-      />
+        {/* Custom dependencies */}
+        <label style={{ fontSize: "0.82em", color: "#888", display: "block", marginBottom: "2px" }}>
+          Custom (comma-separated)
+        </label>
+        <input
+          value={customDeps}
+          onChange={(e) => setCustomDeps(e.target.value)}
+          placeholder="e.g. dotnet_core,faudio"
+          style={{
+            width: "100%",
+            padding: "4px 6px",
+            boxSizing: "border-box",
+            fontSize: "0.95em",
+            border: "1px solid #555",
+            borderRadius: "3px",
+            background: "transparent",
+            color: "#e0e0e0",
+          }}
+        />
+      </div>
 
       {/* ── Apply Config ──────────────────────────────────────────────────── */}
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "14px" }}>
