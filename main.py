@@ -5,16 +5,10 @@ Bundles deckyfin-api utility modules for direct filesystem/Steam access.
 """
 
 import logging
-import sys as _sys
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
-# Add plugin directory to path (append, not insert, to avoid shadowing)
-_plugin_dir = str(Path(__file__).resolve().parent)
-if _plugin_dir not in _sys.path:
-    _sys.path.append(_plugin_dir)
-
-from backend.app_config import (
+from app_config import (
     get_app_config,
     set_app_config,
     get_games_folder,
@@ -28,18 +22,18 @@ from backend.app_config import (
     find_game_executables,
     GameConfigError,
 )
-from backend.games import add_nonsteam_game, list_nonsteam_games
-from backend.proton import list_available_proton, ensure_proton_available
-from backend.proton_compat import set_proton_version
-from backend.prefix import init_proton_prefix
-from backend.protontricks import install_protontricks_dependencies
-from backend.steam_control import is_steam_running, restart_steam
-from backend.steam import get_user_id, list_steam_users, find_steam_root
-from backend.games import convert_appid_to_unsigned_32bit, calc_shortcut_app_id
-from backend.consts import APP_NAME, APP_VERSION
+from games import add_nonsteam_game, list_nonsteam_games
+from proton import list_available_proton, ensure_proton_available
+from proton_compat import set_proton_version
+from prefix import init_proton_prefix
+from protontricks import install_protontricks_dependencies
+from steam_control import is_steam_running, restart_steam
+from steam import get_user_id, list_steam_users, find_steam_root
+from games import convert_appid_to_unsigned_32bit, calc_shortcut_app_id
+from consts import APP_NAME, APP_VERSION
 
 
-class PluginMain:
+class Plugin:
     """Deckyfin plugin backend — methods callable from the React frontend."""
 
     async def _main(self):
