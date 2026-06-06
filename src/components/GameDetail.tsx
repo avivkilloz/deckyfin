@@ -122,18 +122,17 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
   );
 
   const handleSaveName = (val: string) => {
-    if (val !== game.name) saveConfig({ name: val });
+    saveConfig({ name: val });
   };
   const handleSaveExecutable = (val: string) => {
-    if (val !== game.executable) saveConfig({ executable: val });
+    saveConfig({ executable: val });
   };
   const handleSaveStartDir = (val: string) => {
-    if (val !== game.start_dir) saveConfig({ start_dir: val });
+    saveConfig({ start_dir: val });
   };
   const handleSaveProton = (val: string) => {
     setProtonVersion(val);
-    if (val !== (game.proton_version || ""))
-      saveConfig({ proton_version: val || null });
+    saveConfig({ proton_version: val || null });
   };
   const handleSaveDeps = (val: string) => {
     const arr = val
@@ -216,7 +215,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
       const res = await setGameProton(steamInfo.app_id, protonVersion);
       if (res.success) {
         setCurrentProton(protonVersion);
-        setFeedback({ ok: true, msg: `Proton set to ${protonVersion}` });
+        setFeedback({ ok: true, msg: `Proton set to ${protonVersion} — restart Steam to apply` });
       } else {
         setFeedback({ ok: false, msg: res.error || "Failed to set Proton" });
       }
