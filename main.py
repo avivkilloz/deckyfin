@@ -60,40 +60,6 @@ class Plugin:
     async def _unload(self):
         _debug("_unload called")
 
-    # ── Global method wrapper ──────────────────────────────────────────────
-
-    def __getattr__(self, name):
-        """Catch all method calls and wrap in try/except."""
-        # Only wrap non-private methods
-        if name.startswith("_"):
-            raise AttributeError(name)
-
-        # Check if the method exists
-        cls = type(self)
-        method = None
-        for klass in cls.__mro__:
-            if name in klass.__dict__:
-                method = klass.__dict__[name]
-                break
-
-        if method is None or not callable(method):
-            raise AttributeError(f"'{cls.__name__}' object has no attribute '{name}'")
-
-        async def wrapper(*args, **kwargs):
-            _debug(f"METHOD CALL: {name}(args={args}, kwargs={kwargs})")
-            try:
-                result = await method(self, *args, **kwargs)
-                _debug(f"METHOD OK: {name} -> {str(result)[:200]}")
-                return result
-            except Exception as e:
-                tb = traceback.format_exc()
-                _debug(f"METHOD ERROR: {name}: {e}\n{tb}")
-                if self.logger:
-                    self.logger.error("Method '%s' failed: %s\n%s", name, e, tb)
-                return {"error": str(e), "_traceback": tb}
-
-        return wrapper
-
     # ── App Info ──────────────────────────────────────────────────────────
 
     async def get_plugin_info(self) -> dict:
@@ -118,12 +84,8 @@ class Plugin:
     # ── Games Folder ──────────────────────────────────────────────────────
 
     async def get_games_folder(self) -> Optional[str]:
-        try:
-            folder = get_games_folder()
-            return str(folder) if folder else None
-        except Exception as e:
-            _debug(f"get_games_folder error: {e}\n{traceback.format_exc()}")
-            return None
+        folder = get_games_folder()
+        return str(folder) if folder else None
 
     async def set_games_folder(self, path: str) -> dict:
         result = set_games_folder(path)
@@ -135,11 +97,7 @@ class Plugin:
     # ── Games ─────────────────────────────────────────────────────────────
 
     async def get_games(self) -> list:
-        try:
-            return list_game_configs()
-        except Exception as e:
-            _debug(f"get_games error: {e}\n{traceback.format_exc()}")
-            return []
+        return list_game_configs()
 
     async def get_game(self, name: str) -> dict:
         game = get_game_config(name)
@@ -164,24 +122,16 @@ class Plugin:
     # ── Scanning ──────────────────────────────────────────────────────────
 
     async def scan_games_folder(self) -> list:
-        try:
-            games_path = get_games_folder()
-            if not games_path:
-                return [{"error": "Games folder not configured"}]
-            return detect_game_folders(Path(games_path))
-        except Exception as e:
-            _debug(f"scan_games_folder error: {e}\n{traceback.format_exc()}")
-            return []
+        games_path = get_games_folder()
+        if not games_path:
+            return [{"error": "Games folder not configured"}]
+        return detect_game_folders(Path(games_path))
 
     async def scan_game_exes(self, subfolder: str) -> list:
-        try:
-            games_path = get_games_folder()
-            if not games_path:
-                return [{"error": "Games folder not configured"}]
-            return find_game_executables(Path(games_path) / subfolder)
-        except Exception as e:
-            _debug(f"scan_game_exes error: {e}\n{traceback.format_exc()}")
-            return []
+        games_path = get_games_folder()
+        if not games_path:
+            return [{"error": "Games folder not configured"}]
+        return find_game_executables(Path(games_path) / subfolder)
 
     # ── Steam Actions ─────────────────────────────────────────────────────
 
@@ -226,3 +176,44 @@ class Plugin:
 
     async def install_dependencies(self, pfxid: str, dependencies: str) -> dict:
         return install_protontricks_dependencies(pfxid, dependencies)
+
+
+# ── Global error wrapper ─────────────────────────────────────────────
+# Wrap every public async method so ALL exceptions are caught, logged to
+# debug.log, and returned as dicts (never propagated to the sandbox IPC).
+
+import inspect as _inspect
+
+_SAFE_METHODS = frozenset({"_main"})
+
+
+def _wrap_method(cls, name: str, method):
+    """Replace an async method on Plugin with a wrapped version
+    that catches all exceptions and logs them to debug.log."""
+
+    async def wrapper(self, *args, **kwargs):
+        try:
+            return await method(self, *args, **kwargs)
+        except Exception as e:
+            tb = traceback.format_exc()
+            _debug(f"ERROR {name}: {e}\n{tb}")
+            return {"error": str(e), "_traceback": tb}
+
+    wrapper.__name__ = method.__name__
+    wrapper.__qualname__ = method.__qualname__
+    wrapper.__doc__ = method.__doc__
+    setattr(cls, name, wrapper)
+
+
+# Wrap every public async method except _main
+for _attr_name in dir(Plugin):
+    if _attr_name in _SAFE_METHODS:
+        continue
+    if _attr_name.startswith("_"):
+        continue
+    _attr = getattr(Plugin, _attr_name)
+    if _inspect.iscoroutinefunction(_attr):
+        _wrap_method(Plugin, _attr_name, _attr)
+
+# Clean up
+del _attr_name, _attr, _SAFE_METHODS, _inspect, _wrap_method
