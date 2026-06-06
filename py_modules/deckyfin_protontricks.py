@@ -92,14 +92,20 @@ def _try_winetricks(pfxid: str, prefix_dir: str, dep: str) -> dict | None:
     """Try installing a dep via native winetricks."""
     winetricks = shutil.which("winetricks")
     if not winetricks:
+        logger.info("winetricks binary not found in PATH")
         return None
 
     pfx_path = Path(prefix_dir) / "pfx"
+    if not pfx_path.exists():
+        logger.info("WINEPREFIX %s does not exist", pfx_path)
+        return None
+
     logger.debug("Trying winetricks for %s in %s", dep, pfx_path)
 
     try:
         winetricks_env = os.environ.copy()
         winetricks_env["WINEPREFIX"] = str(pfx_path)
+        logger.info("Running: %s -q %s with WINEPREFIX=%s", winetricks, dep, pfx_path)
         proc = _run_with_clean_env(
             [winetricks, "-q", dep],
             env=winetricks_env,
@@ -110,10 +116,10 @@ def _try_winetricks(pfxid: str, prefix_dir: str, dep: str) -> dict | None:
         if proc.returncode == 0:
             return {"found": True, "desc": "winetricks", "result": proc}
         else:
-            logger.debug("winetricks failed for %s: %s", dep, proc.stderr)
+            logger.info("winetricks exited %d for %s: stderr=%s", proc.returncode, dep, proc.stderr[:500] if proc.stderr else "(none)")
             return None
     except Exception as e:
-        logger.debug("winetricks error for %s: %s", dep, e)
+        logger.info("winetricks exception for %s: %s", dep, e)
         return None
 
 
@@ -139,7 +145,7 @@ def _build_try_cmds(pfxid: str, dep: str, prefix_dir: Optional[str] = None) -> l
         if steam_root:
             extra_env["STEAM_DIR"] = str(steam_root)
         cmds.append((
-            [native, pfxid, "--force", "--no-background-wait", dep],
+            [native, pfxid, "--force", dep],
             "native protontricks",
             extra_env or None,
         ))
@@ -230,13 +236,16 @@ def install_protontricks_dependencies(
             try:
                 # Handle winetricks specially (uses prefix path + custom env)
                 if desc == "winetricks":
+                    logger.info("Trying winetricks for %s in prefix %s", dep, pfxid)
                     wr = _try_winetricks(pfxid, str(prefix_dir), dep) if prefix_dir else None
                     if wr:
                         proc = wr["result"]
                     else:
                         last_error = "(winetricks) Not found or failed"
+                        logger.info("winetricks failed for %s in %s: %s", dep, pfxid, last_error)
                         continue
                 else:
+                    logger.info("Trying %s for %s in prefix %s", desc, dep, pfxid)
                     proc = _run_with_clean_env(
                         entry,
                         extra_env=extra_env,
