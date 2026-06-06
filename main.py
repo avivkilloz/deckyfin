@@ -194,11 +194,20 @@ def _wrap_method(cls, name: str, method):
     that writes exceptions to debug.log then re-raises them."""
 
     async def wrapper(self, *args, **kwargs):
+        _debug(f"CALL {name}(args={args}, kwargs={kwargs})")
         try:
-            return await method(self, *args, **kwargs)
+            result = await method(self, *args, **kwargs)
+            _debug(f"CALL OK {name}")
+            return result
         except Exception as e:
             tb = traceback.format_exc()
-            _debug(f"ERROR {name}: {e}\n{tb}")
+            _debug(f"CALL ERROR {name}: {e}\n{tb}")
+            # Also log via Decky's managed logging system
+            try:
+                log = logging.getLogger(APP_NAME)
+                log.error("ERROR %s: %s\n%s", name, e, tb)
+            except Exception:
+                pass
             raise  # re-raise so sandbox IPC handles it
 
     wrapper.__name__ = method.__name__
