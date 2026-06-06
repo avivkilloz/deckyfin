@@ -1,0 +1,16 @@
+[project]
+name = "deckyfin"
+version = "0.1.0"
+description = "Decky plugin for managing local/home server games on Steam"
+requires-python = ">=3.9"
+dependencies = [
+    "vdf>=3.4",
+    "psutil>=5.9.0",
+    "requests>=2.31.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+]

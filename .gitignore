@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+dist/
+
+# Node
+node_modules/
+dist/
+
+# Build
+.DS_Store
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# Test fixtures (auto-generated)
+tests/fixtures/generated/
