@@ -182,8 +182,19 @@ class Plugin:
         launch_options: str = "",
     ) -> dict:
         """Update an existing Steam shortcut in-place. Returns error if not found."""
+        # Resolve relative paths against the configured games folder
+        exe = Path(exe_path)
+        if not exe.is_absolute():
+            games_folder = get_games_folder()
+            if games_folder:
+                exe = Path(games_folder) / exe_path
+        resolved_start = start_dir
+        if resolved_start and not Path(resolved_start).is_absolute():
+            games_folder = get_games_folder()
+            if games_folder:
+                resolved_start = str(Path(games_folder) / resolved_start)
         app_id = update_nonsteam_game(
-            app_name, exe_path, start_dir or "", launch_options
+            app_name, str(exe), resolved_start or "", launch_options
         )
         if app_id is None:
             return {
