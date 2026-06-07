@@ -472,7 +472,9 @@ def _build_methods(pfxid, dep, pfx_path, proton_wine, steam_root):
     native = shutil.which("protontricks")
     if native:
         def _native(t):
-            extra_env = {}
+            extra_env = {
+                "WINETRICKS_UNATTENDED": "1",
+            }
             if steam_root:
                 extra_env["STEAM_DIR"] = str(steam_root)
             cmd = [native, "--no-bwrap", pfxid, "--force", dep]
@@ -499,6 +501,7 @@ def _build_methods(pfxid, dep, pfx_path, proton_wine, steam_root):
                 "WINEPREFIX": pfx_path,
                 "WINELOADER": wine_loader,
                 "WINESERVER": wine_server,
+                "WINETRICKS_UNATTENDED": "1",
             }
             real_user = _get_real_user()
 
