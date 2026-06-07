@@ -246,7 +246,7 @@ class Plugin:
             return {"success": False, "error": f"Failed to init prefix: {str(e)}"}
 
     async def install_dependencies(self, pfxid: str, dependencies: str) -> dict:
-        return install_protontricks_dependencies(pfxid, dependencies)
+        return install_protontricks_dependencies(pfxid, dependencies, timeout=1200)
 
     async def get_game_proton(self, app_id: int, user_id: Optional[str] = None) -> dict:
         """Get the current Proton version configured for a Steam app."""

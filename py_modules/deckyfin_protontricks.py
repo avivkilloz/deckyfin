@@ -14,8 +14,8 @@ logger = logging.getLogger(LOGGER_PROTONTRICKS)
 # These PyInstaller-bundled env vars conflict with system binaries
 _BAD_ENV_VARS = ["LD_LIBRARY_PATH", "LD_PRELOAD", "LD_AUDIT", "LD_DEBUG"]
 
-# Per-method timeout — 120s per method, then move to next
-_METHOD_TIMEOUT = 120
+# Per-method timeout — .NET installers (dotnet40/48) can take 3-5 minutes
+_METHOD_TIMEOUT = 600
 
 
 def _run_with_clean_env(cmd, extra_env=None, **kwargs):
