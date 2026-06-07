@@ -9,6 +9,7 @@ Non-Steam game filenames:   {unsigned_appid}_p.png  (grid/box art 460x215)
 
 import logging
 import shutil
+import ssl
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -46,6 +47,32 @@ def set_api_key(key: str) -> None:
 
 # ── API helpers ──────────────────────────────────────────────────────────────
 
+def _ssl_context() -> ssl.SSLContext:
+    """Create SSL context with system CA certs for the Deckyfin sandbox.
+
+    The plugin sandbox often can't find system certs (Arch/CachyOS).
+    Tries known CA bundle paths and falls back to certifi if available.
+    """
+    paths = [
+        "/etc/ssl/certs/ca-certificates.crt",
+        "/etc/ca-certificates/extracted/tls-ca-bundle.pem",
+        "/etc/pki/tls/certs/ca-bundle.crt",
+        "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem",
+    ]
+    for p in paths:
+        if Path(p).exists():
+            ctx = ssl.create_default_context(cafile=p)
+            return ctx
+    try:
+        import certifi
+        ctx = ssl.create_default_context(cafile=certifi.where())
+        return ctx
+    except ImportError:
+        pass
+    # Nothing found — try default context (may fail, but that's informative)
+    return ssl.create_default_context()
+
+
 def _api_headers() -> dict[str, str]:
     return {
         "Authorization": f"Bearer {get_configured_api_key()}",
@@ -57,8 +84,9 @@ def _api_get(path: str) -> Optional[dict]:
     """Make a GET request to SteamGridDB API. Returns parsed JSON or None."""
     url = f"{API_BASE}{path}"
     try:
+        ctx = _ssl_context()
         req = urllib.request.Request(url, headers=_api_headers())
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with urllib.request.urlopen(req, context=ctx, timeout=15) as resp:
             return __import__("json").loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
         logger.warning("SteamGridDB HTTP %d for %s: %s", e.code, path, e.read().decode("utf-8", errors="replace")[:500])
@@ -71,8 +99,9 @@ def _api_get(path: str) -> Optional[dict]:
 def _download_file(url: str, dest: Path) -> bool:
     """Download a file from URL to destination path. Returns True on success."""
     try:
+        ctx = _ssl_context()
         req = urllib.request.Request(url, headers={"User-Agent": "Deckyfin/1.0"})
-        with urllib.request.urlopen(req, timeout=20) as src:
+        with urllib.request.urlopen(req, context=ctx, timeout=20) as src:
             dest.parent.mkdir(parents=True, exist_ok=True)
             with open(dest, "wb") as f:
                 shutil.copyfileobj(src, f)
