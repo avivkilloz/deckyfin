@@ -144,6 +144,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
   // ── Executable picker ───────────────────────────────────────────────────
   const [showExePicker, setShowExePicker] = useState(false);
   const [exeOptions, setExeOptions] = useState<string[]>([]);
+  const [scanRoot, setScanRoot] = useState(""); // subfolder scanned for exes
 
   // ── Proton versions ─────────────────────────────────────────────────────
   const [protonVersions, setProtonVersions] = useState<string[]>([]);
@@ -193,9 +194,11 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
       setShowExePicker(false);
       return;
     }
+    const root = startDir || game.name;
     try {
-      const exes = await scanExes(startDir || game.name);
+      const exes = await scanExes(root);
       setExeOptions(exes);
+      setScanRoot(root);
       setShowExePicker(true);
     } catch {
       setFeedback({ ok: false, msg: "Failed to scan executables" });
@@ -203,8 +206,11 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
   };
 
   const handleSelectExe = (exe: string) => {
-    const full = `${startDir}/${exe}`;
+    const full = scanRoot ? `${scanRoot}/${exe}` : exe;
     setExecutable(full);
+    if (!startDir && scanRoot) {
+      setStartDir(scanRoot);
+    }
     setShowExePicker(false);
   };
 
