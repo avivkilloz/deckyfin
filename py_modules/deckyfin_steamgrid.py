@@ -287,12 +287,14 @@ def apply_steam_grid(
 
     appid_str = str(unsigned_appid)
 
-    # 4. Download each art type
+    # 4. Determine capsule URL — prefer dedicated headers endpoint, fall back to grid
+    capsule_url = art["capsule"] or art["grid"]
+
     type_map = {
         "grid": (art["grid"], f"{appid_str}_p.png"),
         "hero": (art["hero"], f"{appid_str}_hero.png"),
         "logo": (art["logo"], f"{appid_str}_logo.png"),
-        "capsule": (art["capsule"], f"{appid_str}.png"),
+        "capsule": (capsule_url, f"{appid_str}.png"),
     }
 
     any_success = False
