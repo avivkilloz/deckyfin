@@ -472,13 +472,11 @@ def _build_methods(pfxid, dep, pfx_path, proton_wine, steam_root):
     native = shutil.which("protontricks")
     if native:
         def _native(t):
-            extra_env = {
-                "WINETRICKS_UNATTENDED": "1",
-            }
+            extra_env = {}
             if steam_root:
                 extra_env["STEAM_DIR"] = str(steam_root)
 
-            cmd: list[str] = [native, "--no-bwrap", "--unattended", pfxid, "--force", dep]
+            cmd: list[str] = [native, "--no-bwrap", "--unattended", pfxid, dep]
 
             real_user = _get_real_user()
             if real_user:
@@ -492,75 +490,6 @@ def _build_methods(pfxid, dep, pfx_path, proton_wine, steam_root):
                 capture_output=True, text=True, timeout=t,
             )
         methods.append(("native protontricks", _native))
-
-    # ── Method 2.5: Direct msiexec /qn for known problematic deps ─────
-    # vcrun2022 shows an interactive wizard even with winetricks' /quiet
-    # in Wine. We handle it directly: download VC_redist, extract with
-    # cabextract, install with msiexec /qn (truly silent, no UI at all).
-    if dep == "vcrun2022" and proton_wine and pfx_path:
-        def _direct_msiexec(t):
-            import tempfile, urllib.request
-            wine_loader, wine_server = proton_wine
-
-            url = "https://aka.ms/vs/17/release/vc_redist.x64.exe"
-            cabextract_bin = shutil.which("cabextract")
-
-            if not cabextract_bin:
-                logger.warning("cabextract not found, skipping direct vcrun2022 install")
-                raise FileNotFoundError("cabextract not available")
-
-            with tempfile.TemporaryDirectory(prefix="deckyfin-vcrun2022-") as tmp:
-                exe_path = os.path.join(tmp, "vc_redist.x64.exe")
-                urllib.request.urlretrieve(url, exe_path)
-
-                extract_dir = os.path.join(tmp, "extracted")
-                os.makedirs(extract_dir, exist_ok=True)
-
-                cab_result = subprocess.run(
-                    [cabextract_bin, "-d", extract_dir, exe_path],
-                    capture_output=True, text=True, timeout=30,
-                )
-                if cab_result.returncode != 0:
-                    raise RuntimeError(
-                        f"cabextract failed: {cab_result.stderr or cab_result.stdout}"
-                    )
-
-                msi_files = sorted(
-                    f for f in os.listdir(extract_dir)
-                    if f.lower().endswith(".msi")
-                )
-                if not msi_files:
-                    raise RuntimeError("No MSI files found after cabextract")
-
-                msi_path = os.path.join(extract_dir, msi_files[0])
-                msiexec_cmd = [
-                    "msiexec", "/i", msi_path,
-                    "/qn", "/norestart", "ALLUSERS=1",
-                ]
-                env = {
-                    "WINEPREFIX": pfx_path,
-                    "WINELOADER": wine_loader,
-                    "WINESERVER": wine_server,
-                    "WINETRICKS_UNATTENDED": "1",
-                }
-
-                real_user = _get_real_user()
-                if real_user:
-                    cmd = _runuser_cmd(msiexec_cmd, real_user, env)
-                    return subprocess.run(
-                        cmd, capture_output=True, text=True, timeout=t,
-                    )
-                else:
-                    proc_env = os.environ.copy()
-                    proc_env.update(env)
-                    for var in _BAD_ENV_VARS:
-                        proc_env.pop(var, None)
-                    return subprocess.run(
-                        msiexec_cmd, capture_output=True, text=True,
-                        timeout=t, env=proc_env,
-                    )
-
-        methods.append(("direct msiexec /qn", _direct_msiexec))
 
     # ── Method 3: Proton wine + winetricks ──────────────────────────────
     # Use Proton's own wine with WINELOADER/WINESERVER set, then run winetricks.
