@@ -1,26 +1,23 @@
 import { VFC, useState, useEffect, useCallback } from "react";
 import { callable } from "@decky/api";
-import { GameConfig, GameFolder } from "../types";
+import { GameConfig } from "../types";
 import { GameCard } from "../components/GameCard";
 import { SettingsPage } from "../components/SettingsPage";
-import { AddGameWizard } from "../components/AddGameWizard";
 import { GameDetail } from "../components/GameDetail";
 
 const getGames = callable<[], GameConfig[]>("get_games");
-const scanFolders = callable<[], GameFolder[]>("scan_games_folder");
 const getGamesFolder = callable<[], string | null>("get_games_folder");
 const listNonSteamGames = callable<[], { name: string }[]>("list_nonsteam_games");
 const restartSteam = callable<[], { success: boolean; message?: string }>("restart_steam");
 
 export const GameLibrary: VFC = () => {
   const [games, setGames] = useState<GameConfig[]>([]);
-  const [folders, setFolders] = useState<GameFolder[]>([]);
   const [gamesFolder, setGamesFolder] = useState<string | null>(null);
   const [steamNames, setSteamNames] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<
-    "library" | "settings" | "add-game" | "game-detail"
+    "library" | "settings" | "game-detail"
   >("library");
   const [selectedGame, setSelectedGame] = useState<GameConfig | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -40,13 +37,11 @@ export const GameLibrary: VFC = () => {
     setLoading(true);
     setError(null);
     try {
-      const [gamesRes, folderRes, infoRes] = await Promise.all([
+      const [gamesRes, infoRes] = await Promise.all([
         getGames(),
-        scanFolders(),
         getGamesFolder(),
       ]);
       setGames(gamesRes || []);
-      setFolders(folderRes || []);
       setGamesFolder(infoRes ?? null);
     } catch (err: any) {
       setError(String(err));
@@ -78,19 +73,6 @@ export const GameLibrary: VFC = () => {
     return <SettingsPage gamesFolder={gamesFolder} onBack={() => { loadData(); setView("library"); }} />;
   }
 
-  if (view === "add-game") {
-    return (
-      <AddGameWizard
-        folders={folders}
-        onDone={() => {
-          loadData();
-          setView("library");
-        }}
-        onBack={() => setView("library")}
-      />
-    );
-  }
-
   if (view === "game-detail" && selectedGame) {
     return (
       <GameDetail
@@ -116,7 +98,6 @@ export const GameLibrary: VFC = () => {
       >
         <h2 style={{ margin: 0 }}>🎮 Deckyfin</h2>
         <div style={{ display: "flex", gap: "6px" }}>
-          <button onClick={() => setView("add-game")} title="Add game to Deckyfin config">+</button>
           <button onClick={handleRestartSteam} disabled={restarting} title="Restart Steam">
             {restarting ? "…" : "↺"}
           </button>
@@ -148,7 +129,7 @@ export const GameLibrary: VFC = () => {
         </div>
       )}
       {!loading && filteredGames.length === 0 && gamesFolder && (
-        <p>No games found. Click "+ Add" to get started.</p>
+        <p>No games found. Add game folders to your games directory, then go to Settings > Rescan.</p>
       )}
       <div
         style={{

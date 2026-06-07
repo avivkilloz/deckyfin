@@ -18,9 +18,11 @@ interface Props {
 export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
   const [folderPath, setFolderPath] = useState(gamesFolder || "");
   const [message, setMessage] = useState<string | null>(null);
+  const [rescanned, setRescanned] = useState(false);
 
   const handleSave = async () => {
     setMessage(null);
+    setRescanned(false);
     try {
       const result = await setGamesFolder(folderPath);
       if (result.success) {
@@ -31,6 +33,22 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
       }
     } catch (err: any) {
       setMessage(`❌ ${err?.message || "Save failed"}`);
+    }
+  };
+
+  const handleRescan = async () => {
+    setMessage(null);
+    setRescanned(false);
+    try {
+      const result = await initialize();
+      if (result.success) {
+        setMessage(`✅ ${result.message || "Scan complete"}`);
+        setRescanned(true);
+      } else {
+        setMessage(`❌ ${result.error || "Scan failed"}`);
+      }
+    } catch (err: any) {
+      setMessage(`❌ ${err?.message || "Scan failed"}`);
     }
   };
 
@@ -52,7 +70,29 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
 
       <button onClick={handleSave}>Save</button>
 
-      {message && <p style={{ marginTop: "12px" }}>{message}</p>}
+      <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.12)", margin: "20px 0" }} />
+
+      <h4 style={{ margin: "0 0 10px 0" }}>Maintenance</h4>
+
+      <p style={{ fontSize: "0.85em", color: "#aaa", marginBottom: "10px" }}>
+        Re-discover games from the configured folder and create config entries for any new subdirectories.
+      </p>
+      <button
+        onClick={handleRescan}
+        style={{
+          padding: "8px 16px",
+          fontSize: "0.85em",
+          cursor: "pointer",
+          borderRadius: "4px",
+          border: "1px solid #f0ad4e",
+          background: "transparent",
+          color: "#f0ad4e",
+        }}
+      >
+        Rescan Games Folder
+      </button>
+
+      {message && <p style={{ marginTop: "12px", color: rescanned ? "#f0ad4e" : undefined }}>{message}</p>}
     </div>
   );
 };
