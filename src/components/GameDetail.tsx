@@ -252,9 +252,18 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
       );
       if (res.success && res.app_id && res.unsigned_appid) {
         setSteamInfo({ app_id: res.app_id, unsigned_appid: res.unsigned_appid });
+        // Also push the configured proton version if set
+        let protonMsg = "";
+        if (protonVersion) {
+          const protonRes = await setGameProton(res.app_id, protonVersion);
+          if (protonRes.success) {
+            setCurrentProton(protonVersion);
+            protonMsg = ` — Proton: ${protonVersion}`;
+          }
+        }
         setFeedback({
           ok: true,
-          msg: "Steam shortcut updated — restart Steam to apply",
+          msg: `Steam updated${protonMsg} — restart Steam to apply`,
         });
       } else {
         setFeedback({ ok: false, msg: res.error || "Failed to update Steam shortcut" });
@@ -595,7 +604,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
           disabled={!steamInfo || !protonVersion || loading === "proton"}
           style={{ ...BTN_STYLE, opacity: !steamInfo || !protonVersion || loading === "proton" ? 0.5 : 1 }}
         >
-          {loading === "proton" ? "Setting…" : "Set Proton"}
+          {loading === "proton" ? "Setting…" : "Update Proton"}
         </button>
 
         <button
