@@ -240,6 +240,31 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
     setLoading(null);
   };
 
+  const handleUpdateSteam = async () => {
+    setLoading("update");
+    setFeedback(null);
+    try {
+      const res = await addSteamShortcut(
+        executable,
+        name,
+        startDir || undefined,
+        game.launch_options || ""
+      );
+      if (res.success && res.app_id) {
+        setSteamInfo({ app_id: res.app_id, unsigned_appid: res.unsigned_appid });
+        setFeedback({
+          ok: true,
+          msg: "Steam shortcut updated — restart Steam to apply",
+        });
+      } else {
+        setFeedback({ ok: false, msg: res.error || "Failed to update Steam shortcut" });
+      }
+    } catch (err: any) {
+      setFeedback({ ok: false, msg: err?.message || "Error" });
+    }
+    setLoading(null);
+  };
+
   const handleRemoveSteam = async () => {
     setLoading("remove");
     setFeedback(null);
@@ -550,6 +575,19 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
           style={{ ...BTN_STYLE, opacity: loading === "remove" || !steamInfo ? 0.5 : 1 }}
         >
           {loading === "remove" ? "Removing…" : "Remove from Steam"}
+        </button>
+
+        <button
+          onClick={handleUpdateSteam}
+          disabled={!steamInfo || loading === "update"}
+          style={{
+            ...BTN_STYLE,
+            border: "1px solid #0078d4",
+            color: "#0078d4",
+            opacity: !steamInfo || loading === "update" ? 0.5 : 1,
+          }}
+        >
+          {loading === "update" ? "Updating…" : "Update Steam"}
         </button>
 
         <button

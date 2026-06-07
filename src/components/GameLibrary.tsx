@@ -129,7 +129,7 @@ export const GameLibrary: VFC = () => {
         </div>
       )}
       {!loading && filteredGames.length === 0 && gamesFolder && (
-        <p>No games found. Add game folders to your games directory, then go to Settings > Rescan.</p>
+        <p>No games found. Add game folders to your games directory, then go to Settings {'>'} Rescan.</p>
       )}
       <div
         style={{
