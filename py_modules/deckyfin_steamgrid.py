@@ -2,7 +2,8 @@
 
 API: https://www.steamgriddb.com/api/v2
 Grid images are stored in:  {steam_root}/userdata/{user_id}/config/grid/
-Non-Steam game filenames:   {unsigned_appid}_p.png  (grid/box art 460x215)
+Non-Steam game filenames:   {unsigned_appid}.png     (library capsule/header)
+                            {unsigned_appid}_p.png  (grid/box art 460x215)
                             {unsigned_appid}_hero.png (hero banner 1920x620)
                             {unsigned_appid}_logo.png (logo 1024x256)
 """
@@ -286,6 +287,10 @@ def apply_steam_grid(
         "logo": (art["logo"], f"{appid_str}_logo.png"),
     }
 
+    # Also save grid art as the plain capsule {appid}.png (used for library header)
+    # Reuse the grid URL — it's the same image source, just a different Steam filename
+    capsule_url = art["grid"]
+
     any_success = False
     for art_type, (url, filename) in type_map.items():
         if not url:
@@ -300,6 +305,15 @@ def apply_steam_grid(
             logger.info("Applied %s art to %s (%s)", art_type, game_name, filename)
         else:
             result["errors"].append(f"Failed to download {art_type}")
+
+    # 5. Also save grid art as capsule {appid}.png (Steam library header)
+    if capsule_url:
+        capsule_dest = grid_folder / f"{appid_str}.png"
+        if _download_file(capsule_url, capsule_dest):
+            _fix_ownership(capsule_dest)
+            result["applied"].append("capsule")
+            logger.info("Applied capsule art to %s (%s.png)", game_name, appid_str)
+            any_success = True
 
     result["success"] = any_success
     return result

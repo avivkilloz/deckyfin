@@ -293,8 +293,8 @@ class Plugin:
     async def get_game_card_art(self, game_name: str) -> dict:
         """Get downloaded art for a game as a base64 data URI (for the library card).
 
-        Checks hero first (wide capsule), then logo, then grid. Returns
-        {'data_uri': 'data:image/png;base64,...'} or {'data_uri': None}.
+        Prefers capsule ({appid}.png) then grid (_p.png) then hero (_hero.png)
+        then logo — capsule has the right aspect ratio for the card thumbnail.
         """
         import base64
         try:
@@ -313,14 +313,15 @@ class Plugin:
             grid_folder = steam_root / STEAM_USERDATA_FOLDER / uid / "config" / "grid"
 
             appid_str = str(unsigned_appid)
-            # Prefer hero (wide capsule), then logo, then grid
+            # Prefer capsule ({appid}.png) then grid then hero then logo
             candidates = [
+                grid_folder / f"{appid_str}.png",
+                grid_folder / f"{appid_str}.jpg",
+                grid_folder / f"{appid_str}_p.png",
+                grid_folder / f"{appid_str}_p.jpg",
                 grid_folder / f"{appid_str}_hero.png",
                 grid_folder / f"{appid_str}_hero.jpg",
                 grid_folder / f"{appid_str}_logo.png",
-                grid_folder / f"{appid_str}_p.png",
-                grid_folder / f"{appid_str}_p.jpg",
-                grid_folder / f"{appid_str}.png",
             ]
             for path in candidates:
                 if path.exists():
