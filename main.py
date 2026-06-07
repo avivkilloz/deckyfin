@@ -290,6 +290,50 @@ class Plugin:
         _set_steamgrid_key(key)
         return {"success": True}
 
+    async def get_game_card_art(self, game_name: str) -> dict:
+        """Get downloaded art for a game as a base64 data URI (for the library card).
+
+        Checks hero first (wide capsule), then logo, then grid. Returns
+        {'data_uri': 'data:image/png;base64,...'} or {'data_uri': None}.
+        """
+        import base64
+        try:
+            from steam_games import get_steam_shortcut_info
+            from steam_utils import get_user_id, find_steam_root
+            from deckyfin_consts import STEAM_USERDATA_FOLDER
+            uid = get_user_id()
+            info = get_steam_shortcut_info(game_name, uid)
+            if not info:
+                return {"data_uri": None}
+            unsigned_appid = info.get("unsigned_appid")
+            if not unsigned_appid:
+                return {"data_uri": None}
+
+            steam_root = find_steam_root()
+            grid_folder = steam_root / STEAM_USERDATA_FOLDER / uid / "config" / "grid"
+
+            appid_str = str(unsigned_appid)
+            # Prefer hero (wide capsule), then logo, then grid
+            candidates = [
+                grid_folder / f"{appid_str}_hero.png",
+                grid_folder / f"{appid_str}_hero.jpg",
+                grid_folder / f"{appid_str}_logo.png",
+                grid_folder / f"{appid_str}_p.png",
+                grid_folder / f"{appid_str}_p.jpg",
+                grid_folder / f"{appid_str}.png",
+            ]
+            for path in candidates:
+                if path.exists():
+                    with open(path, "rb") as f:
+                        raw = f.read()
+                    ext = path.suffix.lstrip(".")
+                    b64 = base64.b64encode(raw).decode("ascii")
+                    return {"data_uri": f"data:image/{ext};base64,{b64}"}
+            return {"data_uri": None}
+        except Exception as e:
+            logger.warning("Failed to get card art for '%s': %s", game_name, e)
+            return {"data_uri": None}
+
 
 # ── Global error wrapper ─────────────────────────────────────────────
 # Wrap every public async method so ALL exceptions are logged to

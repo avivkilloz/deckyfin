@@ -166,12 +166,17 @@ def fetch_art(game_id: int) -> dict[str, Optional[str]]:
     """
     result: dict[str, Optional[str]] = {"grid": None, "hero": None, "logo": None}
 
-    # Grid (box art, 460x215)
-    grid_data = _api_get(f"/grids/game/{game_id}?dimensions=460x215")
-    if grid_data and grid_data.get("success"):
-        result["grid"] = _pick_first_image(grid_data.get("data", []))
-        if result["grid"]:
-            logger.info("Got grid art URL for game %d", game_id)
+    # Grid (capsule / box art) — try multiple dimension options
+    for dims in ["460x215", "920x430", "600x900", ""]:
+        url = f"/grids/game/{game_id}"
+        if dims:
+            url += f"?dimensions={dims}"
+        grid_data = _api_get(url)
+        if grid_data and grid_data.get("success") and grid_data.get("data"):
+            result["grid"] = _pick_first_image(grid_data["data"])
+            if result["grid"]:
+                logger.info("Got grid art URL for game %d (dimensions=%s)", game_id, dims or "any")
+                break
 
     # Hero (header banner, 1920x620)
     hero_data = _api_get(f"/heroes/game/{game_id}")
