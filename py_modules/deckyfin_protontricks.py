@@ -213,9 +213,17 @@ def _find_proton_wine() -> Optional[tuple[str, str]]:
             # Experimental gets highest priority
             if name == "proton experimental":
                 return (0, "")
-            # GE-Proton gets next
+            # GE-Proton gets next — sort newest first (negative version tuple)
             if "ge-proton" in name:
-                return (1, name)
+                # Parse "ge-proton10-33" → (10, 33) for numeric comparison
+                rest = name.replace("ge-proton", "").lstrip("-")
+                parts = rest.split("-")
+                try:
+                    major = int(parts[0])
+                    patch = int(parts[1]) if len(parts) > 1 else 0
+                    return (1, -major, -patch)
+                except (ValueError, IndexError):
+                    return (1, 0, 0)
             # Numbered Proton versions — extract version for numeric sort
             return (2, name)
 
@@ -476,7 +484,7 @@ def _build_methods(pfxid, dep, pfx_path, proton_wine, steam_root):
             if steam_root:
                 extra_env["STEAM_DIR"] = str(steam_root)
 
-            cmd: list[str] = [native, "--no-bwrap", "--unattended", pfxid, dep]
+            cmd: list[str] = [native, "--no-bwrap", pfxid, "--unattended", dep]
 
             real_user = _get_real_user()
             if real_user:
