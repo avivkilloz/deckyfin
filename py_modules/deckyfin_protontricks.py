@@ -138,6 +138,32 @@ def _chown_prefix(prefix_dir: str, username: str) -> None:
         logger.warning("Failed to fix prefix ownership: %s", e)
 
 
+def _runuser_cmd(cmd: list[str], username: str,
+                 extra_env: Optional[dict[str, str]] = None) -> list[str]:
+    """Wrap a command to run as a specific user via runuser.
+
+    When Decky's plugin_loader runs as root, wine refuses to touch a
+    prefix owned by a different UID. Running subprocesses as the actual
+    desktop user via runuser solves this cleanly.
+
+    runuser -u <user> creates a clean env with correct HOME/USER/LOGNAME.
+    Extra env vars (WINEPREFIX, WINELOADER, etc.) are passed via `env`.
+    """
+    if not username:
+        return cmd
+
+    wrapper: list[str] = ["runuser", "-u", username, "--"]
+
+    if extra_env:
+        env_parts = ["env"]
+        for k, v in extra_env.items():
+            env_parts.append(f"{k}={v}")
+        wrapper.extend(env_parts)
+
+    wrapper.extend(cmd)
+    return wrapper
+
+
 def _find_proton_wine() -> Optional[tuple[str, str]]:
     """Find the best available Proton installation's wine+wineserver paths.
 
@@ -449,8 +475,15 @@ def _build_methods(pfxid, dep, pfx_path, proton_wine, steam_root):
             extra_env = {}
             if steam_root:
                 extra_env["STEAM_DIR"] = str(steam_root)
+            cmd = [native, "--no-bwrap", pfxid, "--force", dep]
+            real_user = _get_real_user()
+            if real_user:
+                cmd = _runuser_cmd(cmd, real_user, extra_env)
+                return _run_with_clean_env(
+                    cmd, capture_output=True, text=True, timeout=t,
+                )
             return _run_with_clean_env(
-                [native, "--no-bwrap", pfxid, "--force", dep],
+                cmd,
                 extra_env=extra_env or None,
                 capture_output=True, text=True, timeout=t,
             )
@@ -462,13 +495,12 @@ def _build_methods(pfxid, dep, pfx_path, proton_wine, steam_root):
         wine_loader, wine_server = proton_wine
 
         def _proton_winetricks(t):
-            env = os.environ.copy()
-            env["WINEPREFIX"] = pfx_path
-            env["WINELOADER"] = wine_loader
-            env["WINESERVER"] = wine_server
-            # Clean bad vars
-            for var in _BAD_ENV_VARS:
-                env.pop(var, None)
+            wine_env = {
+                "WINEPREFIX": pfx_path,
+                "WINELOADER": wine_loader,
+                "WINESERVER": wine_server,
+            }
+            real_user = _get_real_user()
 
             # Try without xvfb first (Proton wine often doesn't need display for -q)
             winetricks_bin = shutil.which("winetricks")
@@ -478,14 +510,21 @@ def _build_methods(pfxid, dep, pfx_path, proton_wine, steam_root):
                 winetricks_bin, wine_loader, wine_server,
             )
 
-            winetricks_env = {k: v for k, v in env.items()}
-
-            # Try without xvfb first
-            no_xvfb = subprocess.run(
-                [winetricks_bin, "-q", dep],
-                capture_output=True, text=True, timeout=t,
-                env=winetricks_env,
-            )
+            if real_user:
+                cmd = _runuser_cmd([winetricks_bin, "-q", dep], real_user, wine_env)
+                no_xvfb = subprocess.run(
+                    cmd, capture_output=True, text=True, timeout=t,
+                )
+            else:
+                winetricks_env = os.environ.copy()
+                winetricks_env.update(wine_env)
+                for var in _BAD_ENV_VARS:
+                    winetricks_env.pop(var, None)
+                no_xvfb = subprocess.run(
+                    [winetricks_bin, "-q", dep],
+                    capture_output=True, text=True, timeout=t,
+                    env=winetricks_env,
+                )
             if no_xvfb.returncode == 0:
                 return no_xvfb
 
@@ -493,11 +532,20 @@ def _build_methods(pfxid, dep, pfx_path, proton_wine, steam_root):
             logger.info("Proton wine + winetricks (no xvfb) failed, trying with xvfb-run")
             xvfb_run = shutil.which("xvfb-run")
             if xvfb_run:
-                return subprocess.run(
-                    [xvfb_run, "--auto-servernum", winetricks_bin, "-q", dep],
-                    capture_output=True, text=True, timeout=t,
-                    env=winetricks_env,
-                )
+                if real_user:
+                    xvfb_cmd = _runuser_cmd(
+                        [xvfb_run, "--auto-servernum", winetricks_bin, "-q", dep],
+                        real_user, wine_env,
+                    )
+                    return subprocess.run(
+                        xvfb_cmd, capture_output=True, text=True, timeout=t,
+                    )
+                else:
+                    return subprocess.run(
+                        [xvfb_run, "--auto-servernum", winetricks_bin, "-q", dep],
+                        capture_output=True, text=True, timeout=t,
+                        env=winetricks_env,
+                    )
             return no_xvfb
 
         methods.append(("proton wine + winetricks", _proton_winetricks))
@@ -507,21 +555,31 @@ def _build_methods(pfxid, dep, pfx_path, proton_wine, steam_root):
         def _sys_winetricks(t):
             winetricks_bin = shutil.which("winetricks")
             assert winetricks_bin is not None  # checked before adding method
-            env = os.environ.copy()
-            env["WINEPREFIX"] = pfx_path
-            for var in _BAD_ENV_VARS:
-                env.pop(var, None)
+
+            wine_env = {"WINEPREFIX": pfx_path}
+            real_user = _get_real_user()
 
             xvfb_run = shutil.which("xvfb-run")
 
             if xvfb_run:
-                full_cmd: list[str] = [xvfb_run, "--auto-servernum", winetricks_bin, "-q", dep]
+                cmd: list[str] = [xvfb_run, "--auto-servernum", winetricks_bin, "-q", dep]
             else:
-                full_cmd = [winetricks_bin, "-q", dep]
-            return subprocess.run(
-                full_cmd, capture_output=True, text=True, timeout=t,
-                env=env,
-            )
+                cmd = [winetricks_bin, "-q", dep]
+
+            if real_user:
+                cmd = _runuser_cmd(cmd, real_user, wine_env)
+                return subprocess.run(
+                    cmd, capture_output=True, text=True, timeout=t,
+                )
+            else:
+                env = os.environ.copy()
+                env.update(wine_env)
+                for var in _BAD_ENV_VARS:
+                    env.pop(var, None)
+                return subprocess.run(
+                    cmd, capture_output=True, text=True, timeout=t,
+                    env=env,
+                )
         methods.append(("system winetricks", _sys_winetricks))
 
     return methods
