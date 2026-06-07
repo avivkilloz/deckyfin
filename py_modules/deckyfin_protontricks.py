@@ -78,6 +78,66 @@ def _kill_xvfb():
         pass
 
 
+def _find_wine_pair(proton_dir: Path) -> tuple[Optional[Path], Optional[Path]]:
+    """Find wine64/wine and wineserver in a Proton directory.
+
+    Modern GE-Proton (10+) uses files/bin/ instead of dist/bin/.
+    Checks all known layouts: dist/bin/ first, then files/bin/.
+    """
+    # Try all known wine binary locations
+    for base in ["dist/bin", "files/bin"]:
+        wine64 = proton_dir / base / "wine64"
+        wine = proton_dir / base / "wine"
+        server = proton_dir / base / "wineserver"
+
+        if wine64.exists() and server.exists():
+            return (wine64, server)
+        if wine.exists() and server.exists():
+            return (wine, server)
+
+    return (None, None)
+
+
+def _get_real_user() -> Optional[str]:
+    """Detect the actual desktop user for file ownership fixes.
+
+    When the Decky plugin_loader runs as root (common on Arch/CachyOS),
+    subprocesses inherit UID 0 and write root-owned files into the user's
+    prefix. Steam runs as the desktop user and can't access root-owned files.
+
+    Returns the username (e.g. 'avivilloz') or None if we're already the user.
+    """
+    try:
+        if os.geteuid() != 0:
+            return None  # Already running as non-root, no fix needed
+
+        # Look for Steam installations in /home/* directories
+        for home_dir in sorted(Path("/home").iterdir()):
+            if home_dir.is_dir():
+                steam_path = home_dir / ".steam" / "steam"
+                if steam_path.exists() and steam_path.is_dir():
+                    return home_dir.name
+    except Exception:
+        pass
+    return None
+
+
+def _chown_prefix(prefix_dir: str, username: str) -> None:
+    """Chown an entire prefix directory to the real user.
+
+    Called after any root-owned subprocess modifies the prefix
+    (wineboot init, protontricks install, winetricks install).
+    """
+    try:
+        subprocess.run(
+            ["chown", "-R", f"{username}:{username}", prefix_dir],
+            capture_output=True, timeout=30,
+        )
+        logger.info("Fixed prefix ownership to %s for %s", username, prefix_dir)
+    except Exception as e:
+        logger.warning("Failed to fix prefix ownership: %s", e)
+
+
 def _find_proton_wine() -> Optional[tuple[str, str]]:
     """Find the best available Proton installation's wine+wineserver paths.
 
@@ -98,13 +158,13 @@ def _find_proton_wine() -> Optional[tuple[str, str]]:
         candidates = []
 
         # Search compatibilitytools.d first (GE-Proton etc.)
+        # Note: modern GE-Proton (10+) uses files/bin/ instead of dist/bin/
         compat_dir = steam_root / STEAM_COMPATTOOLS_FOLDER
         if compat_dir.exists():
             for d in compat_dir.iterdir():
                 if d.is_dir():
-                    wine = d / "dist" / "bin" / "wine64"
-                    server = d / "dist" / "bin" / "wineserver"
-                    if wine.exists() and server.exists():
+                    wine, server = _find_wine_pair(d)
+                    if wine and server:
                         candidates.append((d.name, str(wine), str(server)))
 
         # Then steamapps/common (official Proton versions)
@@ -112,11 +172,8 @@ def _find_proton_wine() -> Optional[tuple[str, str]]:
         if common_dir.exists():
             for d in common_dir.iterdir():
                 if d.is_dir() and "proton" in d.name.lower():
-                    wine = d / "dist" / "bin" / "wine64"
-                    if not wine.exists():
-                        wine = d / "dist" / "bin" / "wine"
-                    server = d / "dist" / "bin" / "wineserver"
-                    if wine.exists() and server.exists():
+                    wine, server = _find_wine_pair(d)
+                    if wine and server:
                         candidates.append((d.name, str(wine), str(server)))
 
         if not candidates:
@@ -226,6 +283,10 @@ def _init_prefix_for_deps(compatdata_path: Path, steam_root: Optional[Path]) -> 
     )
     if result.returncode == 0:
         logger.info("Prefix initialized at %s via wineboot", compatdata_path)
+        # Fix ownership if we ran as root
+        real_user = _get_real_user()
+        if real_user:
+            _chown_prefix(str(compatdata_path), real_user)
     else:
         raise RuntimeError(
             f"wineboot failed (exit {result.returncode}): "
@@ -320,6 +381,10 @@ def install_protontricks_dependencies(
                         "Installed %s in prefix %s (%s)",
                         dep, pfxid, method_name,
                     )
+                    # Fix ownership if we ran as root
+                    real_user = _get_real_user()
+                    if real_user and prefix_dir:
+                        _chown_prefix(prefix_dir, real_user)
                     installed = True
                     break
                 else:

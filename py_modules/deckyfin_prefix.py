@@ -20,6 +20,48 @@ from deckyfin_consts import (
 logger = logging.getLogger(LOGGER_PREFIX)
 
 
+# ── File ownership helpers ────────────────────────────────────────────
+# When the Decky plugin_loader runs as root, subprocesses write root-owned
+# files into the prefix. Steam runs as the desktop user and can't access
+# them. These helpers detect the real user and fix ownership.
+
+_REAL_USER_CACHE = None
+
+
+def _get_real_user() -> Optional[str]:
+    """Detect the actual desktop user by looking for Steam installations."""
+    global _REAL_USER_CACHE
+    if _REAL_USER_CACHE is not None:
+        return _REAL_USER_CACHE
+    try:
+        if os.geteuid() != 0:
+            _REAL_USER_CACHE = None
+            return None
+        for home_dir in sorted(Path("/home").iterdir()):
+            if home_dir.is_dir():
+                steam_path = home_dir / ".steam" / "steam"
+                if steam_path.exists() and steam_path.is_dir():
+                    _REAL_USER_CACHE = home_dir.name
+                    return _REAL_USER_CACHE
+    except Exception:
+        pass
+    _REAL_USER_CACHE = None
+    return None
+
+
+def _chown_prefix(prefix_dir: str, username: str) -> None:
+    """Recursively chown a prefix directory to the real user."""
+    try:
+        subprocess.run(
+            ["chown", "-R", f"{username}:{username}", prefix_dir],
+            capture_output=True, timeout=30,
+        )
+        logger.info("Fixed prefix ownership to %s for %s", username, prefix_dir)
+    except Exception as e:
+        logger.warning("Failed to fix prefix ownership: %s", e)
+
+
+# ── Create prefix structure ──────────────────────────────────────────
 def create_prefix_structure(compatdata_path: Path) -> None:
     """Create the basic directory structure for a Proton prefix."""
     pfx = compatdata_path / "pfx"
@@ -117,6 +159,10 @@ def init_proton_prefix(
 
         if result.returncode == 0:
             logger.info("Prefix initialized successfully at %s", compatdata_path)
+            # Fix ownership if we ran as root
+            real_user = _get_real_user()
+            if real_user:
+                _chown_prefix(str(compatdata_path), real_user)
             return True
         else:
             error_msg = result.stderr or "Unknown error"
