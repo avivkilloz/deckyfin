@@ -185,6 +185,54 @@ def _ensure_flatpak_protontricks() -> Optional[str]:
         return None
 
 
+def _init_prefix_for_deps(compatdata_path: Path, steam_root: Optional[Path]) -> None:
+    """Create a minimal Proton prefix using wineboot so protontricks can find it.
+
+    Called when install_protontricks_dependencies finds no existing compatdata
+    directory for the given non-Steam game app ID.
+    """
+    from deckyfin_consts import PREFIX_INIT_TIMEOUT
+    logger.info("Creating prefix at %s", compatdata_path)
+
+    pfx = compatdata_path / "pfx"
+    (pfx / "drive_c" / "users" / "steamuser" / "Documents").mkdir(parents=True, exist_ok=True)
+    (pfx / "drive_c" / "users" / "steamuser" / "AppData" / "Local").mkdir(parents=True, exist_ok=True)
+    (pfx / "drive_c" / "users" / "steamuser" / "AppData" / "Roaming").mkdir(parents=True, exist_ok=True)
+    (pfx / "drive_c" / "users" / "steamuser" / "Desktop").mkdir(parents=True, exist_ok=True)
+
+    pw = _find_proton_wine()
+    if not pw or not steam_root:
+        # Only created the dir structure — protontricks will still fail for some tools,
+        # but at least native protontricks can see the app ID now
+        logger.warning("No Proton wine available; created empty prefix structure only")
+        return
+
+    wine_loader_path = Path(pw[0])
+    proton_script = wine_loader_path.parent.parent.parent / "proton"
+    if not proton_script.exists():
+        logger.warning("Proton script not found at %s; created empty prefix only", proton_script)
+        return
+
+    _kill_wineservers()
+    env = os.environ.copy()
+    env["STEAM_COMPAT_DATA_PATH"] = str(compatdata_path)
+    env["STEAM_COMPAT_CLIENT_INSTALL_PATH"] = str(steam_root)
+    env["PROTON_NO_ESYNC"] = "1"
+    env["PROTON_NO_FSYNC"] = "1"
+
+    result = subprocess.run(
+        [str(proton_script), "run", "wineboot", "--init"],
+        env=env, capture_output=True, text=True, timeout=PREFIX_INIT_TIMEOUT,
+    )
+    if result.returncode == 0:
+        logger.info("Prefix initialized at %s via wineboot", compatdata_path)
+    else:
+        raise RuntimeError(
+            f"wineboot failed (exit {result.returncode}): "
+            f"{result.stderr or result.stdout or 'unknown'}"
+        )
+
+
 def install_protontricks_dependencies(
     pfxid: str, dependencies: str, timeout: int = _METHOD_TIMEOUT
 ) -> dict:
@@ -218,16 +266,20 @@ def install_protontricks_dependencies(
     steam_root = None
     try:
         from steam_utils import find_steam_root
-        from deckyfin_consts import STEAM_STEAMAPPS_FOLDER, COMPATDATA_FOLDER
+        from deckyfin_consts import STEAM_STEAMAPPS_FOLDER as _SSAF, COMPATDATA_FOLDER as _CDF
         steam_root = find_steam_root()
         if steam_root:
-            compatdata = (
-                steam_root / STEAM_STEAMAPPS_FOLDER / COMPATDATA_FOLDER / pfxid
-            )
+            compatdata = steam_root / _SSAF / _CDF / pfxid
             if compatdata.exists():
                 prefix_dir = str(compatdata)
             else:
                 logger.warning("Prefix directory not found at %s", compatdata)
+                # ── Try to create prefix so protontricks can find it ──
+                try:
+                    _init_prefix_for_deps(compatdata, steam_root)
+                    prefix_dir = str(compatdata)
+                except Exception as e2:
+                    logger.error("Failed to auto-create prefix: %s", e2)
     except Exception as e:
         logger.warning("Could not derive prefix directory: %s", e)
 

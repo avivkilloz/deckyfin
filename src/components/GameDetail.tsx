@@ -256,9 +256,16 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
       );
       if (res.success && res.app_id && res.unsigned_appid) {
         setSteamInfo({ app_id: res.app_id, unsigned_appid: res.unsigned_appid });
-        // Also push the configured proton version if set
         let protonMsg = "";
         if (protonVersion) {
+          // Create the prefix first so Steam doesn't reset the compat tool
+          // on next restart (without a compatdata dir Steam may overwrite the mapping)
+          try {
+            await initPrefix(res.app_id, protonVersion, false);
+          } catch (_) {
+            // Non-critical — prefix init is best-effort here; the user can
+            // explicitly Init Prefix or Install Deps later to create it.
+          }
           const protonRes = await setGameProton(res.app_id, protonVersion);
           if (protonRes.success) {
             setCurrentProton(protonVersion);
