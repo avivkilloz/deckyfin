@@ -250,7 +250,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
         startDir || undefined,
         game.launch_options || ""
       );
-      if (res.success && res.app_id) {
+      if (res.success && res.app_id && res.unsigned_appid) {
         setSteamInfo({ app_id: res.app_id, unsigned_appid: res.unsigned_appid });
         setFeedback({
           ok: true,
