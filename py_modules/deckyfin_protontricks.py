@@ -478,7 +478,7 @@ def _build_methods(pfxid, dep, pfx_path, proton_wine, steam_root):
             if steam_root:
                 extra_env["STEAM_DIR"] = str(steam_root)
 
-            cmd: list[str] = [native, "--no-bwrap", pfxid, "--force", dep]
+            cmd: list[str] = [native, "--no-bwrap", "--unattended", pfxid, "--force", dep]
 
             # Wrap with xvfb-run to suppress any installer GUI windows
             # (vcrun2022's VC++ redist has a stubborn GUI even with /quiet)
