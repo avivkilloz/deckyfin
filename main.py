@@ -26,6 +26,7 @@ from deckyfin_proton import list_available_proton, ensure_proton_available, get_
 from deckyfin_proton_compat import set_proton_version
 from deckyfin_prefix import init_proton_prefix
 from deckyfin_protontricks import install_protontricks_dependencies
+from deckyfin_steamgrid import apply_steam_grid as _apply_steam_grid, set_api_key as _set_steamgrid_key, get_configured_api_key as _get_steamgrid_key
 from deckyfin_steam_ctl import is_steam_running, restart_steam
 from steam_utils import get_user_id, list_steam_users
 from steam_games import convert_appid_to_unsigned_32bit
@@ -269,6 +270,25 @@ class Plugin:
             return {"success": True, "proton_name": result} if result else {"success": True, "proton_name": None}
         except Exception as e:
             return {"success": False, "proton_name": None, "error": str(e)}
+
+    # ── SteamGridDB Art ──────────────────────────────────────────────────
+
+    async def apply_steam_grid(self, game_name: str, unsigned_appid: int) -> dict:
+        """Search SteamGridDB for game art and apply it to the Steam shortcut."""
+        return _apply_steam_grid(game_name, unsigned_appid)
+
+    async def get_steamgrid_key(self) -> dict:
+        """Get the current SteamGridDB API key (shows whether a custom one is set)."""
+        key = _get_steamgrid_key()
+        from deckyfin_config import get_app_config
+        cfg = get_app_config()
+        has_override = bool(cfg.get("steamgriddb_api_key"))
+        return {"key": key, "has_override": has_override}
+
+    async def set_steamgrid_key(self, key: str) -> dict:
+        """Set a custom SteamGridDB API key override in app config."""
+        _set_steamgrid_key(key)
+        return {"success": True}
 
 
 # ── Global error wrapper ─────────────────────────────────────────────

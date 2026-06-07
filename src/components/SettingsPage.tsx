@@ -1,4 +1,4 @@
-import { VFC, useState } from "react";
+import { VFC, useState, useEffect } from "react";
 import { callable } from "@decky/api";
 
 const setGamesFolder = callable<
@@ -9,6 +9,13 @@ const initialize = callable<
   [games_folder?: string],
   { success: boolean; error?: string; message?: string }
 >("initialize");
+const getSteamGridKey = callable<[], { key: string; has_override: boolean }>(
+  "get_steamgrid_key"
+);
+const setSteamGridKey = callable<
+  [key: string],
+  { success: boolean }
+>("set_steamgrid_key");
 
 interface Props {
   gamesFolder: string | null;
@@ -19,6 +26,33 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
   const [folderPath, setFolderPath] = useState(gamesFolder || "");
   const [message, setMessage] = useState<string | null>(null);
   const [rescanned, setRescanned] = useState(false);
+
+  // ── SteamGridDB key ──────────────────────────────────────────────────
+  const [sgKey, setSgKey] = useState("");
+  const [sgHasOverride, setSgHasOverride] = useState(false);
+  const [sgMessage, setSgMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    getSteamGridKey()
+      .then((res) => {
+        setSgKey(res.has_override ? res.key : "");
+        setSgHasOverride(res.has_override);
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleSaveKey = async () => {
+    setSgMessage(null);
+    try {
+      await setSteamGridKey(sgKey);
+      setSgHasOverride(true);
+      setSgMessage("✅ API key saved");
+    } catch (err: any) {
+      setSgMessage(`❌ ${err?.message || "Failed to save"}`);
+    }
+  };
+
+  // ── End SteamGridDB ──────────────────────────────────────────────────
 
   const handleSave = async () => {
     setMessage(null);
@@ -59,6 +93,7 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
       </button>
       <h3>Settings</h3>
 
+      {/* ── Games Folder ────────────────────────────────────────────────── */}
       <label>Games Folder:</label>
       <input
         type="text"
@@ -72,6 +107,47 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
 
       <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.12)", margin: "20px 0" }} />
 
+      {/* ── SteamGridDB API Key ──────────────────────────────────────────── */}
+      <h4 style={{ margin: "0 0 10px 0" }}>SteamGridDB API Key</h4>
+
+      <p style={{ fontSize: "0.85em", color: "#aaa", marginBottom: "10px" }}>
+        A default key is bundled. Set a custom one here to override it.
+        Get your own free key at{" "}
+        <a
+          href="https://www.steamgriddb.com/profile/preferences/api"
+          target="_blank"
+          style={{ color: "#0078d4", textDecoration: "underline" }}
+        >
+          steamgriddb.com
+        </a>
+      </p>
+
+      <input
+        type="text"
+        value={sgKey}
+        onChange={(e) => setSgKey(e.target.value)}
+        placeholder="Enter your API key or leave empty for default"
+        style={{ width: "100%", marginBottom: "8px", padding: "8px", boxSizing: "border-box" }}
+      />
+
+      <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+        <button onClick={handleSaveKey}>Save Key</button>
+        {sgHasOverride && (
+          <span style={{ fontSize: "0.8em", color: "#f0ad4e" }}>
+            (custom key active)
+          </span>
+        )}
+      </div>
+
+      {sgMessage && (
+        <p style={{ marginTop: "8px", fontSize: "0.9em", color: sgMessage.startsWith("✅") ? "lightgreen" : "tomato" }}>
+          {sgMessage}
+        </p>
+      )}
+
+      <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.12)", margin: "20px 0" }} />
+
+      {/* ── Maintenance ──────────────────────────────────────────────────── */}
       <h4 style={{ margin: "0 0 10px 0" }}>Maintenance</h4>
 
       <p style={{ fontSize: "0.85em", color: "#aaa", marginBottom: "10px" }}>

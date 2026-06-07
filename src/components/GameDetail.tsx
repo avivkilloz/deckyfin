@@ -39,6 +39,10 @@ const updateGameConfig = callable<
   { success: boolean }
 >("update_game_config");
 const scanExes = callable<[subfolder: string], string[]>("scan_game_exes");
+const applySteamGrid = callable<
+  [game_name: string, unsigned_appid: number],
+  { success: boolean; applied?: string[]; errors?: string[] }
+>("apply_steam_grid");
 
 /** Popular Proton dependencies shown as toggle chips. */
 const POPULAR_DEPS = [
@@ -348,6 +352,28 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
     setLoading(null);
   };
 
+  const handleAddArt = async () => {
+    if (!steamInfo) return;
+    setLoading("art");
+    setFeedback(null);
+    try {
+      const res = await applySteamGrid(name, steamInfo.unsigned_appid);
+      if (res.success) {
+        const applied = (res.applied || []).join(", ");
+        setFeedback({
+          ok: true,
+          msg: `Applied ${applied} art — restart Steam to see it`,
+        });
+      } else {
+        const errors = (res.errors || []).join("; ");
+        setFeedback({ ok: false, msg: errors || "No art found" });
+      }
+    } catch (err: any) {
+      setFeedback({ ok: false, msg: err?.message || "Error" });
+    }
+    setLoading(null);
+  };
+
   const handleRemove = async () => {
     setFeedback(null);
     try {
@@ -618,6 +644,14 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
           style={{ ...BTN_STYLE, opacity: !steamInfo || mergedDeps.length === 0 || loading === "deps" ? 0.5 : 1 }}
         >
           {loading === "deps" ? "Installing…" : "Install Deps"}
+        </button>
+
+        <button
+          onClick={handleAddArt}
+          disabled={!steamInfo || loading === "art"}
+          style={{ ...BTN_STYLE, opacity: !steamInfo || loading === "art" ? 0.5 : 1 }}
+        >
+          {loading === "art" ? "Adding Art…" : "Add Art"}
         </button>
       </div>
 
