@@ -161,13 +161,13 @@ def _pick_first_image(data: list) -> Optional[str]:
 
 
 def fetch_art(game_id: int) -> dict[str, Optional[str]]:
-    """Fetch grid, hero, and logo URLs for a game ID.
+    """Fetch grid, hero, logo, and capsule (header) URLs for a game ID.
 
-    Returns dict with keys 'grid', 'hero', 'logo' — each is a URL string or None.
+    Returns dict with keys 'grid', 'hero', 'logo', 'capsule' — each is a URL string or None.
     """
-    result: dict[str, Optional[str]] = {"grid": None, "hero": None, "logo": None}
+    result: dict[str, Optional[str]] = {"grid": None, "hero": None, "logo": None, "capsule": None}
 
-    # Grid (capsule / box art) — try multiple dimension options
+    # Grid (grid/box art for _p.png) — try multiple dimension options
     for dims in ["460x215", "920x430", "600x900", ""]:
         url = f"/grids/game/{game_id}"
         if dims:
@@ -178,6 +178,13 @@ def fetch_art(game_id: int) -> dict[str, Optional[str]]:
             if result["grid"]:
                 logger.info("Got grid art URL for game %d (dimensions=%s)", game_id, dims or "any")
                 break
+
+    # Capsule (library header, saved as {appid}.png) — headers endpoint
+    capsule_data = _api_get(f"/headers/game/{game_id}")
+    if capsule_data and capsule_data.get("success"):
+        result["capsule"] = _pick_first_image(capsule_data.get("data", []))
+        if result["capsule"]:
+            logger.info("Got capsule header URL for game %d", game_id)
 
     # Hero (header banner, 1920x620)
     hero_data = _api_get(f"/heroes/game/{game_id}")
@@ -285,11 +292,8 @@ def apply_steam_grid(
         "grid": (art["grid"], f"{appid_str}_p.png"),
         "hero": (art["hero"], f"{appid_str}_hero.png"),
         "logo": (art["logo"], f"{appid_str}_logo.png"),
+        "capsule": (art["capsule"], f"{appid_str}.png"),
     }
-
-    # Also save grid art as the plain capsule {appid}.png (used for library header)
-    # Reuse the grid URL — it's the same image source, just a different Steam filename
-    capsule_url = art["grid"]
 
     any_success = False
     for art_type, (url, filename) in type_map.items():
@@ -305,15 +309,6 @@ def apply_steam_grid(
             logger.info("Applied %s art to %s (%s)", art_type, game_name, filename)
         else:
             result["errors"].append(f"Failed to download {art_type}")
-
-    # 5. Also save grid art as capsule {appid}.png (Steam library header)
-    if capsule_url:
-        capsule_dest = grid_folder / f"{appid_str}.png"
-        if _download_file(capsule_url, capsule_dest):
-            _fix_ownership(capsule_dest)
-            result["applied"].append("capsule")
-            logger.info("Applied capsule art to %s (%s.png)", game_name, appid_str)
-            any_success = True
 
     result["success"] = any_success
     return result
