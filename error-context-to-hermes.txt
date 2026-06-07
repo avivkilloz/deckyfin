@@ -1,261 +1,63 @@
-[2026-06-07 22:27:27,692][INFO]: Deckyfin v1.0.0 loaded
-[2026-06-07 22:27:39,500][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-07 22:27:39,504][INFO]: Found 15 non-Steam games for user 808327172
-[2026-06-07 22:28:56,056][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-07 22:28:56,058][INFO]: Found 15 non-Steam games for user 808327172
-[2026-06-07 22:28:59,674][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-07 22:29:03,831][INFO]: Updated game config 'Gothic 1' with {'name': 'Gothic 1', 'executable': 'Gothic 1/G1R-Win64-Shipping.exe', 'start_dir': 'Gothic 1', 'proton_version': 'GE-Proton10-33', 'proton_dependencies': ['vcrun2022', 'd3dx9']}
-[2026-06-07 22:29:07,325][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-07 22:29:07,326][INFO]: Updated non-Steam game 'Gothic 1' (app_id=-1909850928) exe=/home/avivilloz/.mnt/games/Gothic 1/G1R-Win64-Shipping.exe
-[2026-06-07 22:29:07,327][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-07 22:29:07,327][INFO]: Initializing Proton prefix app_id=-1909850928 user_id=808327172 proton=GE-Proton10-33 reinit=False
-[2026-06-07 22:29:07,327][INFO]: Updated compat.vdf for app_id=-1909850928 user_id=808327172
-[2026-06-07 22:29:07,330][INFO]: Updated local config for user=808327172 app=-1909850928
-[2026-06-07 22:29:07,336][INFO]: Updated global config for app 2385116368 proton=GE-Proton10-33
-[2026-06-07 22:29:07,336][INFO]: Set Proton version for app_id=-1909850928 unsigned=2385116368 to GE-Proton10-33 (user=808327172)
-[2026-06-07 22:29:07,337][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-07 22:29:07,337][INFO]: Updated compat.vdf for app_id=-1909850928 user_id=808327172
-[2026-06-07 22:29:07,340][INFO]: Updated local config for user=808327172 app=-1909850928
-[2026-06-07 22:29:07,346][INFO]: Updated global config for app 2385116368 proton=GE-Proton10-33
-[2026-06-07 22:29:07,346][INFO]: Set Proton version for app_id=-1909850928 unsigned=2385116368 to GE-Proton10-33 (user=808327172)
-[2026-06-07 22:29:14,624][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-07 22:29:14,624][INFO]: Initializing Proton prefix app_id=-1909850928 user_id=808327172 proton=GE-Proton10-33 reinit=True
-[2026-06-07 22:29:14,624][INFO]: Updated compat.vdf for app_id=-1909850928 user_id=808327172
-[2026-06-07 22:29:14,627][INFO]: Updated local config for user=808327172 app=-1909850928
-[2026-06-07 22:29:14,633][INFO]: Updated global config for app 2385116368 proton=GE-Proton10-33
-[2026-06-07 22:29:14,633][INFO]: Set Proton version for app_id=-1909850928 unsigned=2385116368 to GE-Proton10-33 (user=808327172)
-[2026-06-07 22:29:14,727][INFO]: Removed existing prefix at /home/avivilloz/.local/share/Steam/steamapps/compatdata/2385116368
-[2026-06-07 22:29:16,931][INFO]: Prefix initialized successfully at /home/avivilloz/.local/share/Steam/steamapps/compatdata/2385116368
-[2026-06-07 22:29:16,939][INFO]: Fixed prefix ownership to avivilloz for /home/avivilloz/.local/share/Steam/steamapps/compatdata/2385116368
-[2026-06-07 22:29:19,709][INFO]: Selected Proton: GE-Proton10-25 (/home/avivilloz/.local/share/Steam/compatibilitytools.d/GE-Proton10-25/files/bin/wine64, /home/avivilloz/.local/share/Steam/compatibilitytools.d/GE-Proton10-25/files/bin/wineserver)
-[2026-06-07 22:29:19,719][INFO]: Trying flatpak protontricks for vcrun2022 in prefix 2385116368
-[2026-06-07 22:29:19,833][INFO]: flatpak protontricks failed for vcrun2022: Steam installation directory could not be found.
+[2026-06-07 22:41:23,225][INFO]: Deckyfin v1.0.0 loaded
+[2026-06-07 22:41:34,857][INFO]: Auto-detected logged in Steam user 808327172
+[2026-06-07 22:41:34,861][INFO]: Found 15 non-Steam games for user 808327172
+[2026-06-07 22:41:38,092][INFO]: Auto-detected logged in Steam user 808327172
+[2026-06-07 22:41:41,466][INFO]: Updated game config 'Gothic 1' with {'name': 'Gothic 1', 'executable': 'Gothic 1/G1R-Win64-Shipping.exe', 'start_dir': 'Gothic 1', 'proton_version': 'GE-Proton10-33', 'proton_dependencies': ['vcrun2022', 'd3dx9']}
+[2026-06-07 22:41:43,340][INFO]: Auto-detected logged in Steam user 808327172
+[2026-06-07 22:41:43,341][INFO]: Updated non-Steam game 'Gothic 1' (app_id=-1909850928) exe=/home/avivilloz/.mnt/games/Gothic 1/G1R-Win64-Shipping.exe
+[2026-06-07 22:41:43,342][INFO]: Auto-detected logged in Steam user 808327172
+[2026-06-07 22:41:43,342][INFO]: Initializing Proton prefix app_id=-1909850928 user_id=808327172 proton=GE-Proton10-33 reinit=False
+[2026-06-07 22:41:43,342][INFO]: Updated compat.vdf for app_id=-1909850928 user_id=808327172
+[2026-06-07 22:41:43,345][INFO]: Updated local config for user=808327172 app=-1909850928
+[2026-06-07 22:41:43,352][INFO]: Updated global config for app 2385116368 proton=GE-Proton10-33
+[2026-06-07 22:41:43,352][INFO]: Set Proton version for app_id=-1909850928 unsigned=2385116368 to GE-Proton10-33 (user=808327172)
+[2026-06-07 22:41:43,353][INFO]: Auto-detected logged in Steam user 808327172
+[2026-06-07 22:41:43,353][INFO]: Updated compat.vdf for app_id=-1909850928 user_id=808327172
+[2026-06-07 22:41:43,355][INFO]: Updated local config for user=808327172 app=-1909850928
+[2026-06-07 22:41:43,362][INFO]: Updated global config for app 2385116368 proton=GE-Proton10-33
+[2026-06-07 22:41:43,362][INFO]: Set Proton version for app_id=-1909850928 unsigned=2385116368 to GE-Proton10-33 (user=808327172)
+[2026-06-07 22:41:45,524][INFO]: Auto-detected logged in Steam user 808327172
+[2026-06-07 22:41:45,524][INFO]: Initializing Proton prefix app_id=-1909850928 user_id=808327172 proton=GE-Proton10-33 reinit=True
+[2026-06-07 22:41:45,525][INFO]: Updated compat.vdf for app_id=-1909850928 user_id=808327172
+[2026-06-07 22:41:45,527][INFO]: Updated local config for user=808327172 app=-1909850928
+[2026-06-07 22:41:45,534][INFO]: Updated global config for app 2385116368 proton=GE-Proton10-33
+[2026-06-07 22:41:45,534][INFO]: Set Proton version for app_id=-1909850928 unsigned=2385116368 to GE-Proton10-33 (user=808327172)
+[2026-06-07 22:41:45,573][INFO]: Removed existing prefix at /home/avivilloz/.local/share/Steam/steamapps/compatdata/2385116368
+[2026-06-07 22:41:47,650][INFO]: Prefix initialized successfully at /home/avivilloz/.local/share/Steam/steamapps/compatdata/2385116368
+[2026-06-07 22:41:47,657][INFO]: Fixed prefix ownership to avivilloz for /home/avivilloz/.local/share/Steam/steamapps/compatdata/2385116368
+[2026-06-07 22:41:55,650][INFO]: Selected Proton: GE-Proton10-25 (/home/avivilloz/.local/share/Steam/compatibilitytools.d/GE-Proton10-25/files/bin/wine64, /home/avivilloz/.local/share/Steam/compatibilitytools.d/GE-Proton10-25/files/bin/wineserver)
+[2026-06-07 22:41:55,660][INFO]: Trying flatpak protontricks for vcrun2022 in prefix 2385116368
+[2026-06-07 22:41:55,768][INFO]: flatpak protontricks failed for vcrun2022: Steam installation directory could not be found.
 
-[2026-06-07 22:29:19,833][INFO]: Trying native protontricks for vcrun2022 in prefix 2385116368
-[2026-06-07 22:29:20,490][INFO]: native protontricks failed for vcrun2022: Executing cd /usr/bin
-------------------------------------------------------
-warning: Running Wine/winetricks as root is highly discouraged. See https://wiki.winehq.org/FAQ#Should_I_run_Wine_as_root.3F
-------------------------------------------------------
-------------------------------------------------------
-warning: You are using a 64-bit WINEPREFIX. Note that many verbs only install 32-bit versions of packages. If you encounter problems, please retest in a clean 32-bit WINEPREFIX before reporting a bug.
-------------------------------------------------------
-------------------------------------------------------
-WINEPREFIX INFO:
-Drive C: total 0
-drwxr-xr-x 1 avivilloz avivilloz 138 Jun  7 22:29 .
-drwxr-xr-x 1 avivilloz avivilloz 192 Jun  7 22:29 ..
-drwxr-xr-x 1 avivilloz avivilloz  34 Jun  7 22:29 openxr
-drwxr-xr-x 1 avivilloz avivilloz  18 Jun  7 22:29 ProgramData
-drwxr-xr-x 1 avivilloz avivilloz 118 Jun  7 22:29 Program Files
-drwxr-xr-x 1 avivilloz avivilloz 128 Jun  7 22:29 Program Files (x86)
-drwxr-xr-x 1 avivilloz avivilloz  30 Jun  7 22:29 users
-drwxr-xr-x 1 avivilloz avivilloz   6 Jun  7 22:29 vrclient
-drwxr-xr-x 1 avivilloz avivilloz 500 Jun  7 22:29 windows
+[2026-06-07 22:41:55,768][INFO]: Trying native protontricks for vcrun2022 in prefix 2385116368
+[2026-06-07 22:42:15,353][INFO]: Installed vcrun2022 in prefix 2385116368 (native protontricks)
+[2026-06-07 22:42:15,361][INFO]: Fixed prefix ownership to avivilloz for /home/avivilloz/.local/share/Steam/steamapps/compatdata/2385116368
+[2026-06-07 22:42:15,370][INFO]: Trying flatpak protontricks for d3dx9 in prefix 2385116368
+[2026-06-07 22:42:15,483][INFO]: flatpak protontricks failed for d3dx9: Steam installation directory could not be found.
 
-Registry info:
-/home/avivilloz/.local/share/Steam/steamapps/compatdata/2385116368/pfx/system.reg:#arch=win64
-/home/avivilloz/.local/share/Steam/steamapps/compatdata/2385116368/pfx/userdef.reg:#arch=win64
-/home/avivilloz/.local/share/Steam/steamapps/compatdata/2385116368/pfx/user.reg:#arch=win64
-------------------------------------------------------
-------------------------------------------------------
-warning: /root/.cache/protontricks/proton/GE-Proton10-33/bin/wine cmd.exe /c echo '%AppData%' returned empty string, error message "wine: '/home/avivilloz/.local/share/Steam/steamapps/compatdata/2385116368/pfx' is not owned by you" 
-------------------------------------------------------
-
-[2026-06-07 22:29:20,490][INFO]: Trying proton wine + winetricks for vcrun2022 in prefix 2385116368
-[2026-06-07 22:29:20,507][INFO]: Proton wine approach: /usr/bin/winetricks (WINELOADER=/home/avivilloz/.local/share/Steam/compatibilitytools.d/GE-Proton10-25/files/bin/wine64, WINESERVER=/home/avivilloz/.local/share/Steam/compatibilitytools.d/GE-Proton10-25/files/bin/wineserver)
-[2026-06-07 22:29:20,784][INFO]: Proton wine + winetricks (no xvfb) failed, trying with xvfb-run
-[2026-06-07 22:29:24,075][INFO]: proton wine + winetricks failed for vcrun2022: Executing cd /usr/bin
-------------------------------------------------------
-warning: Running Wine/winetricks as root is highly discouraged. See https://wiki.winehq.org/FAQ#Should_I_run_Wine_as_root.3F
-------------------------------------------------------
-------------------------------------------------------
-WINEPREFIX INFO:
-Drive C: total 0
-drwxr-xr-x 1 avivilloz avivilloz 138 Jun  7 22:29 .
-drwxr-xr-x 1 avivilloz avivilloz 192 Jun  7 22:29 ..
-drwxr-xr-x 1 avivilloz avivilloz  34 Jun  7 22:29 openxr
-drwxr-xr-x 1 avivilloz avivilloz  18 Jun  7 22:29 ProgramData
-drwxr-xr-x 1 avivilloz avivilloz 118 Jun  7 22:29 Program Files
-drwxr-xr-x 1 avivilloz avivilloz 128 Jun  7 22:29 Program Files (x86)
-drwxr-xr-x 1 avivilloz avivilloz  30 Jun  7 22:29 users
-drwxr-xr-x 1 avivilloz avivilloz   6 Jun  7 22:29 vrclient
-drwxr-xr-x 1 avivilloz avivilloz 500 Jun  7 22:29 windows
-
-Registry info:
-/home/avivilloz/.local/share/Steam/steamapps/compatdata/2385116368/pfx/system.reg:#arch=win64
-/home/avivilloz/.local/share/Steam/steamapps/compatdata/2385116368/pfx/userdef.reg:#arch=win64
-/home/avivilloz/.local/share/Steam/steamapps/compatdata/2385116368/pfx/user.reg:#arch=win64
-------------------------------------------------------
-------------------------------------------------------
-warning: wine cmd.exe /c echo '%AppData%' returned empty string, error message "wine: '/home/avivilloz/.local/share/Steam/steamapps/compatdata/2385116368/pfx' is not owned by you" 
-------------------------------------------------------
-
-[2026-06-07 22:29:24,075][INFO]: Trying system winetricks for vcrun2022 in prefix 2385116368
-[2026-06-07 22:29:27,386][INFO]: system winetricks failed for vcrun2022: Executing cd /usr/bin
-------------------------------------------------------
-warning: Running Wine/winetricks as root is highly discouraged. See https://wiki.winehq.org/FAQ#Should_I_run_Wine_as_root.3F
-------------------------------------------------------
-------------------------------------------------------
-WINEPREFIX INFO:
-Drive C: total 0
-drwxr-xr-x 1 avivilloz avivilloz 138 Jun  7 22:29 .
-drwxr-xr-x 1 avivilloz avivilloz 192 Jun  7 22:29 ..
-drwxr-xr-x 1 avivilloz avivilloz  34 Jun  7 22:29 openxr
-drwxr-xr-x 1 avivilloz avivilloz  18 Jun  7 22:29 ProgramData
-drwxr-xr-x 1 avivilloz avivilloz 118 Jun  7 22:29 Program Files
-drwxr-xr-x 1 avivilloz avivilloz 128 Jun  7 22:29 Program Files (x86)
-drwxr-xr-x 1 avivilloz avivilloz  30 Jun  7 22:29 users
-drwxr-xr-x 1 avivilloz avivilloz   6 Jun  7 22:29 vrclient
-drwxr-xr-x 1 avivilloz avivilloz 500 Jun  7 22:29 windows
-
-Registry info:
-/home/avivilloz/.local/share/Steam/steamapps/compatdata/2385116368/pfx/system.reg:#arch=win64
-/home/avivilloz/.local/share/Steam/steamapps/compatdata/2385116368/pfx/userdef.reg:#arch=win64
-/home/avivilloz/.local/share/Steam/steamapps/compatdata/2385116368/pfx/user.reg:#arch=win64
-------------------------------------------------------
-------------------------------------------------------
-warning: wine cmd.exe /c echo '%AppData%' returned empty string, error message "wine: '/home/avivilloz/.local/share/Steam/steamapps/compatdata/2385116368/pfx' is not owned by you" 
-------------------------------------------------------
-
-[2026-06-07 22:29:27,386][ERROR]: All methods failed for vcrun2022 in prefix 2385116368: (system winetricks) Executing cd /usr/bin
-------------------------------------------------------
-warning: Running Wine/winetricks as root is highly discouraged. See https://wiki.winehq.org/FAQ#Should_I_run_Wine_as_root.3F
-------------------------------------------------------
-------------------------------------------------------
-WINEPREFIX INFO:
-Drive C: total 0
-drwxr-xr-x 1 avivilloz avivilloz 138 Jun  7 22:29 .
-drwxr-xr-x 1 avivilloz avivilloz 192 Jun  7 22:29 ..
-drwxr-xr-x 1 avivilloz avivilloz  34 Jun  7 22:29 openxr
-drwxr-xr-x 1 avivilloz avivilloz  18 Jun  7 22:29 ProgramData
-drwxr-xr-x 1 avivilloz avivilloz 118 Jun  7 22:29 Program Files
-drwxr-xr-x 1 avivilloz avivilloz 128 Jun  7 22:29 Program Files (x86)
-drwxr-xr-x 1 avivilloz avivilloz  30 Jun  7 22:29 users
-drwxr-xr-x 1 avivilloz avivilloz   6 Jun  7 22:29 vrclient
-drwxr-xr-x 1 avivilloz avivilloz 500 Jun  7 22:29 windows
-
-Registry info:
-/home/avivilloz/.local/share/Steam/steamapps/compatdata/2385116368/pfx/system.reg:#arch=win64
-/home/avivilloz/.local/share/Steam/steamapps/compatdata/2385116368/pfx/userdef.reg:#arch=win64
-/home/avivilloz/.local/share/Steam/steamapps/compatdata/2385116368/pfx/user.reg:#arch=win64
-------------------------------------------------------
-------------------------------------------------------
-warning: wine cmd.exe /c echo '%AppData%' returned empty string, error message "wine: '/home/avivilloz/.local/share/Steam/steamapps/compatdata/2385116368/pfx' is not owned by you" 
-------------------------------------------------------
-
-[2026-06-07 22:29:27,395][INFO]: Trying flatpak protontricks for d3dx9 in prefix 2385116368
-[2026-06-07 22:29:27,506][INFO]: flatpak protontricks failed for d3dx9: Steam installation directory could not be found.
-
-[2026-06-07 22:29:27,506][INFO]: Trying native protontricks for d3dx9 in prefix 2385116368
-[2026-06-07 22:29:28,169][INFO]: native protontricks failed for d3dx9: Executing cd /usr/bin
-------------------------------------------------------
-warning: Running Wine/winetricks as root is highly discouraged. See https://wiki.winehq.org/FAQ#Should_I_run_Wine_as_root.3F
-------------------------------------------------------
-------------------------------------------------------
-warning: You are using a 64-bit WINEPREFIX. Note that many verbs only install 32-bit versions of packages. If you encounter problems, please retest in a clean 32-bit WINEPREFIX before reporting a bug.
-------------------------------------------------------
-------------------------------------------------------
-WINEPREFIX INFO:
-Drive C: total 0
-drwxr-xr-x 1 avivilloz avivilloz 138 Jun  7 22:29 .
-drwxr-xr-x 1 avivilloz avivilloz 192 Jun  7 22:29 ..
-drwxr-xr-x 1 avivilloz avivilloz  34 Jun  7 22:29 openxr
-drwxr-xr-x 1 avivilloz avivilloz  18 Jun  7 22:29 ProgramData
-drwxr-xr-x 1 avivilloz avivilloz 118 Jun  7 22:29 Program Files
-drwxr-xr-x 1 avivilloz avivilloz 128 Jun  7 22:29 Program Files (x86)
-drwxr-xr-x 1 avivilloz avivilloz  30 Jun  7 22:29 users
-drwxr-xr-x 1 avivilloz avivilloz   6 Jun  7 22:29 vrclient
-drwxr-xr-x 1 avivilloz avivilloz 500 Jun  7 22:29 windows
-
-Registry info:
-/home/avivilloz/.local/share/Steam/steamapps/compatdata/2385116368/pfx/system.reg:#arch=win64
-/home/avivilloz/.local/share/Steam/steamapps/compatdata/2385116368/pfx/userdef.reg:#arch=win64
-/home/avivilloz/.local/share/Steam/steamapps/compatdata/2385116368/pfx/user.reg:#arch=win64
-------------------------------------------------------
-------------------------------------------------------
-warning: /root/.cache/protontricks/proton/GE-Proton10-33/bin/wine cmd.exe /c echo '%AppData%' returned empty string, error message "wine: '/home/avivilloz/.local/share/Steam/steamapps/compatdata/2385116368/pfx' is not owned by you" 
-------------------------------------------------------
-
-[2026-06-07 22:29:28,169][INFO]: Trying proton wine + winetricks for d3dx9 in prefix 2385116368
-[2026-06-07 22:29:28,186][INFO]: Proton wine approach: /usr/bin/winetricks (WINELOADER=/home/avivilloz/.local/share/Steam/compatibilitytools.d/GE-Proton10-25/files/bin/wine64, WINESERVER=/home/avivilloz/.local/share/Steam/compatibilitytools.d/GE-Proton10-25/files/bin/wineserver)
-[2026-06-07 22:29:28,468][INFO]: Proton wine + winetricks (no xvfb) failed, trying with xvfb-run
-[2026-06-07 22:29:31,760][INFO]: proton wine + winetricks failed for d3dx9: Executing cd /usr/bin
-------------------------------------------------------
-warning: Running Wine/winetricks as root is highly discouraged. See https://wiki.winehq.org/FAQ#Should_I_run_Wine_as_root.3F
-------------------------------------------------------
-------------------------------------------------------
-WINEPREFIX INFO:
-Drive C: total 0
-drwxr-xr-x 1 avivilloz avivilloz 138 Jun  7 22:29 .
-drwxr-xr-x 1 avivilloz avivilloz 192 Jun  7 22:29 ..
-drwxr-xr-x 1 avivilloz avivilloz  34 Jun  7 22:29 openxr
-drwxr-xr-x 1 avivilloz avivilloz  18 Jun  7 22:29 ProgramData
-drwxr-xr-x 1 avivilloz avivilloz 118 Jun  7 22:29 Program Files
-drwxr-xr-x 1 avivilloz avivilloz 128 Jun  7 22:29 Program Files (x86)
-drwxr-xr-x 1 avivilloz avivilloz  30 Jun  7 22:29 users
-drwxr-xr-x 1 avivilloz avivilloz   6 Jun  7 22:29 vrclient
-drwxr-xr-x 1 avivilloz avivilloz 500 Jun  7 22:29 windows
-
-Registry info:
-/home/avivilloz/.local/share/Steam/steamapps/compatdata/2385116368/pfx/system.reg:#arch=win64
-/home/avivilloz/.local/share/Steam/steamapps/compatdata/2385116368/pfx/userdef.reg:#arch=win64
-/home/avivilloz/.local/share/Steam/steamapps/compatdata/2385116368/pfx/user.reg:#arch=win64
-------------------------------------------------------
-------------------------------------------------------
-warning: wine cmd.exe /c echo '%AppData%' returned empty string, error message "wine: '/home/avivilloz/.local/share/Steam/steamapps/compatdata/2385116368/pfx' is not owned by you" 
-------------------------------------------------------
-
-[2026-06-07 22:29:31,760][INFO]: Trying system winetricks for d3dx9 in prefix 2385116368
-[2026-06-07 22:29:35,062][INFO]: system winetricks failed for d3dx9: Executing cd /usr/bin
-------------------------------------------------------
-warning: Running Wine/winetricks as root is highly discouraged. See https://wiki.winehq.org/FAQ#Should_I_run_Wine_as_root.3F
-------------------------------------------------------
-------------------------------------------------------
-WINEPREFIX INFO:
-Drive C: total 0
-drwxr-xr-x 1 avivilloz avivilloz 138 Jun  7 22:29 .
-drwxr-xr-x 1 avivilloz avivilloz 192 Jun  7 22:29 ..
-drwxr-xr-x 1 avivilloz avivilloz  34 Jun  7 22:29 openxr
-drwxr-xr-x 1 avivilloz avivilloz  18 Jun  7 22:29 ProgramData
-drwxr-xr-x 1 avivilloz avivilloz 118 Jun  7 22:29 Program Files
-drwxr-xr-x 1 avivilloz avivilloz 128 Jun  7 22:29 Program Files (x86)
-drwxr-xr-x 1 avivilloz avivilloz  30 Jun  7 22:29 users
-drwxr-xr-x 1 avivilloz avivilloz   6 Jun  7 22:29 vrclient
-drwxr-xr-x 1 avivilloz avivilloz 500 Jun  7 22:29 windows
-
-Registry info:
-/home/avivilloz/.local/share/Steam/steamapps/compatdata/2385116368/pfx/system.reg:#arch=win64
-/home/avivilloz/.local/share/Steam/steamapps/compatdata/2385116368/pfx/userdef.reg:#arch=win64
-/home/avivilloz/.local/share/Steam/steamapps/compatdata/2385116368/pfx/user.reg:#arch=win64
-------------------------------------------------------
-------------------------------------------------------
-warning: wine cmd.exe /c echo '%AppData%' returned empty string, error message "wine: '/home/avivilloz/.local/share/Steam/steamapps/compatdata/2385116368/pfx' is not owned by you" 
-------------------------------------------------------
-
-[2026-06-07 22:29:35,062][ERROR]: All methods failed for d3dx9 in prefix 2385116368: (system winetricks) Executing cd /usr/bin
-------------------------------------------------------
-warning: Running Wine/winetricks as root is highly discouraged. See https://wiki.winehq.org/FAQ#Should_I_run_Wine_as_root.3F
-------------------------------------------------------
-------------------------------------------------------
-WINEPREFIX INFO:
-Drive C: total 0
-drwxr-xr-x 1 avivilloz avivilloz 138 Jun  7 22:29 .
-drwxr-xr-x 1 avivilloz avivilloz 192 Jun  7 22:29 ..
-drwxr-xr-x 1 avivilloz avivilloz  34 Jun  7 22:29 openxr
-drwxr-xr-x 1 avivilloz avivilloz  18 Jun  7 22:29 ProgramData
-drwxr-xr-x 1 avivilloz avivilloz 118 Jun  7 22:29 Program Files
-drwxr-xr-x 1 avivilloz avivilloz 128 Jun  7 22:29 Program Files (x86)
-drwxr-xr-x 1 avivilloz avivilloz  30 Jun  7 22:29 users
-drwxr-xr-x 1 avivilloz avivilloz   6 Jun  7 22:29 vrclient
-drwxr-xr-x 1 avivilloz avivilloz 500 Jun  7 22:29 windows
-
-Registry info:
-/home/avivilloz/.local/share/Steam/steamapps/compatdata/2385116368/pfx/system.reg:#arch=win64
-/home/avivilloz/.local/share/Steam/steamapps/compatdata/2385116368/pfx/userdef.reg:#arch=win64
-/home/avivilloz/.local/share/Steam/steamapps/compatdata/2385116368/pfx/user.reg:#arch=win64
-------------------------------------------------------
-------------------------------------------------------
-warning: wine cmd.exe /c echo '%AppData%' returned empty string, error message "wine: '/home/avivilloz/.local/share/Steam/steamapps/compatdata/2385116368/pfx' is not owned by you" 
-------------------------------------------------------
-
+[2026-06-07 22:42:15,483][INFO]: Trying native protontricks for d3dx9 in prefix 2385116368
+[2026-06-07 22:42:23,385][INFO]: Installed d3dx9 in prefix 2385116368 (native protontricks)
+[2026-06-07 22:42:23,394][INFO]: Fixed prefix ownership to avivilloz for /home/avivilloz/.local/share/Steam/steamapps/compatdata/2385116368
+[2026-06-07 22:42:29,190][INFO]: Auto-detected logged in Steam user 808327172
+[2026-06-07 22:42:29,192][INFO]: Found 15 non-Steam games for user 808327172
+[2026-06-07 22:42:30,051][INFO]: No gamescope found — using -bigpicture
+[2026-06-07 22:42:30,051][INFO]: Detected Steam mode flags: ['-bigpicture']  display_env keys: ['XDG_SESSION_TYPE', 'XAUTHORITY', 'HOME', 'WAYLAND_DISPLAY', 'USER', 'DISPLAY', 'XDG_RUNTIME_DIR', 'DBUS_SESSION_BUS_ADDRESS']
+[2026-06-07 22:42:30,051][INFO]: Killed Steam process pid=15915 name=srt-logger
+[2026-06-07 22:42:30,052][INFO]: Killed Steam process pid=16010 name=steam
+[2026-06-07 22:42:30,052][INFO]: Killed Steam process pid=16392 name=steam-runtime-launcher-service
+[2026-06-07 22:42:30,052][INFO]: Killed Steam process pid=26334 name=srt-bwrap
+[2026-06-07 22:42:30,052][INFO]: Killed Steam process pid=26345 name=srt-logger
+[2026-06-07 22:42:30,052][INFO]: Killed Steam process pid=26442 name=steamwebhelper
+[2026-06-07 22:42:30,052][INFO]: Killed Steam process pid=26445 name=steamwebhelper
+[2026-06-07 22:42:30,052][INFO]: Killed Steam process pid=26450 name=steamwebhelper
+[2026-06-07 22:42:30,052][INFO]: Killed Steam process pid=26451 name=steamwebhelper
+[2026-06-07 22:42:30,052][INFO]: Killed Steam process pid=26453 name=steamwebhelper
+[2026-06-07 22:42:30,052][INFO]: Killed Steam process pid=26471 name=steamwebhelper
+[2026-06-07 22:42:30,052][INFO]: Killed Steam process pid=26517 name=steamwebhelper
+[2026-06-07 22:42:30,052][INFO]: Killed Steam process pid=26519 name=steamwebhelper
+[2026-06-07 22:42:30,052][INFO]: Killed Steam process pid=26540 name=steamwebhelper
+[2026-06-07 22:42:30,053][INFO]: Killed Steam process pid=26612 name=steamwebhelper
+[2026-06-07 22:42:32,053][INFO]: Steam relaunch: machinectl shell
+[2026-06-07 22:42:33,053][INFO]: Steam relaunch output (if any): check /tmp/deckyfin_steam_launch.log
+[2026-06-07 22:42:33,053][INFO]: Steam restarted successfully with flags: ['-bigpicture']
 deckyfin $ 
