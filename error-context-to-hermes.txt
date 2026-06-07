@@ -1,0 +1,103 @@
+
+[2026-06-07 21:48:37,980][INFO]: Set Proton version for app_id=-1909850928 unsigned=2385116368 to GE-Proton10-33 (user=808327172)
+[2026-06-07 21:48:38,022][INFO]: Removed existing prefix at /home/avivilloz/.local/share/Steam/steamapps/compatdata/2385116368
+[2026-06-07 21:48:40,241][INFO]: Prefix initialized successfully at /home/avivilloz/.local/share/Steam/steamapps/compatdata/2385116368
+[2026-06-07 21:49:35,925][INFO]: Selected Proton: Proton 7.0 (/home/avivilloz/.local/share/Steam/steamapps/common/Proton 7.0/dist/bin/wine64, /home/avivilloz/.local/share/Steam/steamapps/common/Proton 7.0/dist/bin/wineserver)
+[2026-06-07 21:49:35,937][INFO]: Trying flatpak protontricks for vcrun2022 in prefix 2385116368
+[2026-06-07 21:49:36,170][INFO]: flatpak protontricks failed for vcrun2022: Steam installation directory could not be found.
+
+[2026-06-07 21:49:36,170][INFO]: Trying native protontricks for vcrun2022 in prefix 2385116368
+[2026-06-07 21:49:46,195][INFO]: native protontricks failed for vcrun2022: Executing cd /usr/bin
+------------------------------------------------------
+warning: Running Wine/winetricks as root is highly discouraged. See https://wiki.winehq.org/FAQ#Should_I_run_Wine_as_root.3F
+------------------------------------------------------
+------------------------------------------------------
+warning: You are using a 64-bit WINEPREFIX. Note that many verbs only install 32-bit versions of packages. If you encounter problems, please retest in a clean 32-bit WINEPREFIX before reporting a bug.
+------------------------------------------------------
+Executing w_do_call vcrun2022
+Executing load_vcrun2022 
+Executing /root/.cache/protontricks/proton/GE-Proton10-33/bin/wine C:\windows\syswow64\regedit.exe C:\windows\Temp\_vcrun2022\override-dll.reg
+fsync: up and running.
+002c:fixme:winediag:loader_init wine-staging 10.0 is a testing version containing experimental patches.
+002c:fixme:winediag:loader_init Please mention your exact version when filing bug reports on winehq.org.
+0040:fixme:ntoskrnl:driver_stub 0000000000249B10 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\pci" stub!
+0040:fixme:ntoskrnl:driver_stub 0000000000249D60 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\hidusb" stub!
+0040:fixme:ntoskrnl:driver_stub 000000000024A8E0 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\Disk" stub!
+0050:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+0098:fixme:ntoskrnl:driver_stub 0000000000249B10 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\pci" stub!
+0098:fixme:ntoskrnl:driver_stub 0000000000249D60 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\hidusb" stub!
+0098:fixme:ntoskrnl:driver_stub 000000000024A8E0 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\Disk" stub!
+00a4:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+00d8:fixme:winebth:pdo_pnp Unhandled minor function IRP_MN_QUERY_DEVICE_TEXT.
+00d4:fixme:wineusb:add_usb_device Interface 1 has 7 alternate settings; using the first one.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+
+Executing /root/.cache/protontricks/proton/GE-Proton10-33/bin/wine64 C:\windows\regedit.exe C:\windows\Temp\_vcrun2022\override-dll.reg
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+esync: up and running.
+002c:fixme:winediag:loader_init wine-staging 10.0 is a testing version containing experimental patches.
+002c:fixme:winediag:loader_init Please mention your exact version when filing bug reports on winehq.org.
+0040:fixme:ntoskrnl:driver_stub 0000000000249B10 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\pci" stub!
+0040:fixme:ntoskrnl:driver_stub 0000000000249D60 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\hidusb" stub!
+0040:fixme:ntoskrnl:driver_stub 000000000024A8E0 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\Disk" stub!
+0050:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+0098:fixme:ntoskrnl:driver_stub 0000000000249B10 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\pci" stub!
+0098:fixme:ntoskrnl:driver_stub 0000000000249D60 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\hidusb" stub!
+0098:fixme:ntoskrnl:driver_stub 000000000024A8E0 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\Disk" stub!
+00a4:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+00d8:fixme:winebth:pdo_pnp Unhandled minor function IRP_MN_QUERY_DEVICE_TEXT.
+00d4:fixme:wineusb:add_usb_device Interface 1 has 7 alternate settings; using the first one.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+
+00d4:fixme:wineusb:query_id Unhandled
+[2026-06-07 21:49:46,195][INFO]: Trying proton wine + winetricks for vcrun2022 in prefix 2385116368
+[2026-06-07 21:49:46,209][INFO]: Proton wine approach: /usr/bin/winetricks (WINELOADER=/home/avivilloz/.local/share/Steam/steamapps/common/Proton 7.0/dist/bin/wine64, WINESERVER=/home/avivilloz/.local/share/Steam/steamapps/common/Proton 7.0/dist/bin/wineserver)
+[2026-06-07 21:49:53,981][INFO]: Proton wine + winetricks (no xvfb) failed, trying with xvfb-run
+[2026-06-07 21:49:59,869][INFO]: Installed vcrun2022 in prefix 2385116368 (proton wine + winetricks)
+[2026-06-07 21:49:59,878][INFO]: Trying flatpak protontricks for d3dx9 in prefix 2385116368
+[2026-06-07 21:49:59,977][INFO]: flatpak protontricks failed for d3dx9: Steam installation directory could not be found.
+
+[2026-06-07 21:49:59,977][INFO]: Trying native protontricks for d3dx9 in prefix 2385116368
+[2026-06-07 21:50:16,930][INFO]: Installed d3dx9 in prefix 2385116368 (native protontricks)
+[2026-06-07 21:50:16,933][INFO]: Auto-detected logged in Steam user 808327172
+[2026-06-07 21:50:16,935][INFO]: Found 15 non-Steam games for user 808327172
+[2026-06-07 21:50:22,592][INFO]: Auto-detected logged in Steam user 808327172
+[2026-06-07 21:50:46,742][INFO]: Auto-detected logged in Steam user 808327172
+[2026-06-07 21:50:46,745][INFO]: Found 15 non-Steam games for user 808327172
+[2026-06-07 21:50:47,968][INFO]: No gamescope found — using -bigpicture
+[2026-06-07 21:50:47,968][INFO]: Detected Steam mode flags: ['-bigpicture']  display_env keys: ['XDG_SESSION_TYPE', 'XAUTHORITY', 'HOME', 'WAYLAND_DISPLAY', 'USER', 'DISPLAY', 'XDG_RUNTIME_DIR', 'DBUS_SESSION_BUS_ADDRESS']
+[2026-06-07 21:50:47,968][INFO]: Killed Steam process pid=4473 name=srt-logger
+[2026-06-07 21:50:47,968][INFO]: Killed Steam process pid=4571 name=steam
+[2026-06-07 21:50:47,968][INFO]: Killed Steam process pid=4617 name=srt-bwrap
+[2026-06-07 21:50:47,968][INFO]: Killed Steam process pid=4629 name=srt-logger
+[2026-06-07 21:50:47,968][INFO]: Killed Steam process pid=4830 name=steamwebhelper
+[2026-06-07 21:50:47,968][INFO]: Killed Steam process pid=4926 name=steam-runtime-launcher-service
+[2026-06-07 21:50:47,969][INFO]: Killed Steam process pid=4932 name=steamwebhelper
+[2026-06-07 21:50:47,969][INFO]: Killed Steam process pid=7856 name=steamwebhelper
+[2026-06-07 21:50:49,976][INFO]: Steam relaunch: machinectl shell
+[2026-06-07 21:50:50,976][INFO]: Steam relaunch output (if any): check /tmp/deckyfin_steam_launch.log
+[2026-06-07 21:50:50,976][INFO]: Steam restarted successfully with flags: ['-bigpicture']
+deckyfin $ 
+
+deckyfin $ cd /home/avivilloz/.local/share/Steam/steamapps/compatdata/2385116368
+2385116368 $ ls
+config_info  pfx  pfx.lock  tracked_files  version
+
+2385116368 $ cat version 
+GE-Proton10-33
+2385116368 $ cat config_info 
+GE-Proton10-33
+/home/avivilloz/.local/share/Steam/compatibilitytools.d/GE-Proton10-33/files/share/fonts/
+/home/avivilloz/.local/share/Steam/compatibilitytools.d/GE-Proton10-33/files/lib/
+/home/avivilloz/.local/share/Steam
+1780355502.0
+1780355510.0
+1516738214.0
+/home/avivilloz/.local/share/Steam/compatibilitytools.d/GE-Proton10-33/files/share/default_pfx/
+1773793918.0
+False
+True
+*
+True
+False
