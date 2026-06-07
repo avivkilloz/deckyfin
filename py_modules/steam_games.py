@@ -221,6 +221,66 @@ def add_nonsteam_game(
     return app_id
 
 
+# ── Update Non-Steam Game (in-place) ──────────────────────────────────────
+
+def update_nonsteam_game(
+    app_name: str,
+    exe_path: str,
+    start_dir: str = "",
+    launch_options: str = "",
+    user_id: Optional[str] = None,
+) -> Optional[int]:
+    """Update an existing non-Steam game shortcut in-place by AppName.
+    Returns the app_id of the updated shortcut, or None if not found.
+    """
+    steam_root = find_steam_root()
+    user_id_actual = user_id or get_user_id()
+    shortcuts_path = (
+        steam_root / STEAM_USERDATA_FOLDER / user_id_actual
+        / STEAM_CONFIG_FOLDER / SHORTCUTS_VDF
+    )
+
+    if not shortcuts_path.exists():
+        return None
+
+    try:
+        shortcuts = _load_vdf_binary(shortcuts_path)
+    except Exception:
+        return None
+
+    shortcuts_dict = shortcuts.get("shortcuts", {})
+    target_idx = None
+    for idx, shortcut in shortcuts_dict.items():
+        if not idx.isdigit():
+            continue
+        if shortcut.get("AppName") == app_name:
+            target_idx = idx
+            break
+
+    if target_idx is None:
+        return None
+
+    if not start_dir:
+        start_dir = str(Path(exe_path).parent)
+
+    exe_formatted = f'"{exe_path}"'
+    app_id = calc_shortcut_app_id(app_name, exe_formatted)
+
+    shortcuts_dict[target_idx]["Exe"] = exe_formatted
+    shortcuts_dict[target_idx]["StartDir"] = start_dir
+    shortcuts_dict[target_idx]["LaunchOptions"] = launch_options
+    shortcuts_dict[target_idx]["appid"] = app_id
+
+    shortcuts["shortcuts"] = shortcuts_dict
+    _save_vdf_binary(shortcuts, shortcuts_path)
+
+    logger.info(
+        "Updated non-Steam game '%s' (app_id=%s) exe=%s",
+        app_name, app_id, exe_path,
+    )
+    return app_id
+
+
 # ── Remove Non-Steam Game ─────────────────────────────────────────────────
 
 # ── Get Shortcut Info ─────────────────────────────────────────────────────

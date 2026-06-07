@@ -174,6 +174,29 @@ class Plugin:
             "unsigned_appid": convert_appid_to_unsigned_32bit(app_id),
         }
 
+    async def update_steam_shortcut(
+        self,
+        app_name: str,
+        exe_path: str,
+        start_dir: Optional[str] = None,
+        launch_options: str = "",
+    ) -> dict:
+        """Update an existing Steam shortcut in-place. Returns error if not found."""
+        from py_modules.steam_games import update_nonsteam_game
+        app_id = update_nonsteam_game(
+            app_name, exe_path, start_dir or "", launch_options
+        )
+        if app_id is None:
+            return {
+                "success": False,
+                "error": f"'{app_name}' not found in Steam shortcuts — add it first",
+            }
+        return {
+            "success": True,
+            "app_id": app_id,
+            "unsigned_appid": convert_appid_to_unsigned_32bit(app_id),
+        }
+
     async def remove_steam_shortcut(self, app_name: str, user_id: Optional[str] = None) -> dict:
         removed = remove_nonsteam_game(app_name, user_id)
         return {

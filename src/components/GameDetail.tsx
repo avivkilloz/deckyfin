@@ -17,6 +17,10 @@ const removeSteamShortcut = callable<
   [app_name: string],
   { success: boolean; error?: string }
 >("remove_steam_shortcut");
+const updateSteamShortcut = callable<
+  [app_name: string, exe_path: string, start_dir?: string, launch_options?: string],
+  { success: boolean; app_id?: number; unsigned_appid?: number; error?: string }
+>("update_steam_shortcut");
 const listProtonVersions = callable<[], string[]>("list_proton_versions");
 const setGameProton = callable<
   [app_id: number, proton_name: string],
@@ -244,9 +248,9 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
     setLoading("update");
     setFeedback(null);
     try {
-      const res = await addSteamShortcut(
-        executable,
+      const res = await updateSteamShortcut(
         name,
+        executable,
         startDir || undefined,
         game.launch_options || ""
       );
@@ -284,24 +288,6 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
         setFeedback({ ok: true, msg: "Removed from Steam — restart Steam to apply" });
       } else {
         setFeedback({ ok: false, msg: res.error || "Not found in Steam shortcuts" });
-      }
-    } catch (err: any) {
-      setFeedback({ ok: false, msg: err?.message || "Error" });
-    }
-    setLoading(null);
-  };
-
-  const handleSetProton = async () => {
-    if (!steamInfo || !protonVersion) return;
-    setLoading("proton");
-    setFeedback(null);
-    try {
-      const res = await setGameProton(steamInfo.app_id, protonVersion);
-      if (res.success) {
-        setCurrentProton(protonVersion);
-        setFeedback({ ok: true, msg: `Proton set to ${protonVersion} — restart Steam to apply` });
-      } else {
-        setFeedback({ ok: false, msg: res.error || "Failed to set Proton" });
       }
     } catch (err: any) {
       setFeedback({ ok: false, msg: err?.message || "Error" });
@@ -597,14 +583,6 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
           }}
         >
           {loading === "update" ? "Updating…" : "Update Steam"}
-        </button>
-
-        <button
-          onClick={handleSetProton}
-          disabled={!steamInfo || !protonVersion || loading === "proton"}
-          style={{ ...BTN_STYLE, opacity: !steamInfo || !protonVersion || loading === "proton" ? 0.5 : 1 }}
-        >
-          {loading === "proton" ? "Setting…" : "Update Proton"}
         </button>
 
         <button
