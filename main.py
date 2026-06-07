@@ -21,7 +21,7 @@ from deckyfin_config import (
     find_game_executables,
     GameConfigError,
 )
-from steam_games import add_nonsteam_game, list_nonsteam_games, remove_nonsteam_game, get_steam_shortcut_info
+from steam_games import add_nonsteam_game, list_nonsteam_games, remove_nonsteam_game, get_steam_shortcut_info, update_nonsteam_game
 from deckyfin_proton import list_available_proton, ensure_proton_available, get_proton_version_for_game
 from deckyfin_proton_compat import set_proton_version
 from deckyfin_prefix import init_proton_prefix
@@ -182,7 +182,6 @@ class Plugin:
         launch_options: str = "",
     ) -> dict:
         """Update an existing Steam shortcut in-place. Returns error if not found."""
-        from py_modules.steam_games import update_nonsteam_game
         app_id = update_nonsteam_game(
             app_name, exe_path, start_dir or "", launch_options
         )
