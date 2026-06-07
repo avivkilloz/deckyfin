@@ -73,10 +73,14 @@ def _ssl_context() -> ssl.SSLContext:
     return ssl.create_default_context()
 
 
+_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+
+
 def _api_headers() -> dict[str, str]:
     return {
         "Authorization": f"Bearer {get_configured_api_key()}",
         "Accept": "application/json",
+        "User-Agent": _UA,
     }
 
 
@@ -100,7 +104,7 @@ def _download_file(url: str, dest: Path) -> bool:
     """Download a file from URL to destination path. Returns True on success."""
     try:
         ctx = _ssl_context()
-        req = urllib.request.Request(url, headers={"User-Agent": "Deckyfin/1.0"})
+        req = urllib.request.Request(url, headers={"User-Agent": _UA})
         with urllib.request.urlopen(req, context=ctx, timeout=20) as src:
             dest.parent.mkdir(parents=True, exist_ok=True)
             with open(dest, "wb") as f:
