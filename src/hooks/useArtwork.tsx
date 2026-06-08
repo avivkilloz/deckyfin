@@ -45,7 +45,7 @@ const downloadAsBase64 = callable<[url: string], string>(
  */
 async function initDefaultLogoPosition(appOverview: any): Promise<void> {
   try {
-    await window.appDetailsStore.SaveCustomLogoPosition(appOverview, {
+    await (window as any).appDetailsStore.SaveCustomLogoPosition(appOverview, {
       pinnedPosition: "BottomLeft",
       nWidthPct: 50,
       nHeightPct: 50,

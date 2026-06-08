@@ -74,15 +74,6 @@ declare global {
   }
 
   var SteamClient: SteamClient;
-
-  interface AppDetailsStore {
-    SaveCustomLogoPosition(appOverview: any, position: LogoPosition): Promise<void>;
-  }
-
-  interface Window {
-    appDetailsStore: AppDetailsStore;
-    appStore: any;
-  }
 }
 
 /** SteamGridDB art URLs response from backend. */
