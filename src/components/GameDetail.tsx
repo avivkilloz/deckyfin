@@ -571,7 +571,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
         <code style={{ fontSize: "0.9em", background: "rgba(255,255,255,0.08)", padding: "1px 4px", borderRadius: "3px" }}>vcrun2022</code>
         ,{" "}
         <code style={{ fontSize: "0.9em", background: "rgba(255,255,255,0.08)", padding: "1px 4px", borderRadius: "3px" }}>d3dx9</code>
-        {" "}under "Required Items"
+        {" "}under Depots → Redistributables
       </div>
 
       {/* ── Separator ──────────────────────────────────────────────────── */}
