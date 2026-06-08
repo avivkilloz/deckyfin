@@ -4,6 +4,7 @@ Exposes game management methods to the React frontend via Decky IPC.
 """
 
 import logging
+import ssl
 import traceback
 from pathlib import Path
 from typing import Optional
@@ -26,7 +27,7 @@ from deckyfin_proton import list_available_proton, ensure_proton_available, get_
 from deckyfin_proton_compat import set_proton_version
 from deckyfin_prefix import init_proton_prefix
 from deckyfin_protontricks import install_protontricks_dependencies
-from deckyfin_steamgrid import apply_steam_grid as _apply_steam_grid, set_api_key as _set_steamgrid_key, get_configured_api_key as _get_steamgrid_key
+from deckyfin_steamgrid import apply_steam_grid as _apply_steam_grid, set_api_key as _set_steamgrid_key, get_configured_api_key as _get_steamgrid_key, fetch_steamgrid_art_urls as _fetch_steamgrid_art_urls
 from deckyfin_steam_ctl import is_steam_running, restart_steam
 from steam_utils import get_user_id, list_steam_users
 from steam_games import convert_appid_to_unsigned_32bit
@@ -272,6 +273,34 @@ class Plugin:
             return {"success": False, "proton_name": None, "error": str(e)}
 
     # ── SteamGridDB Art ──────────────────────────────────────────────────
+
+    async def download_as_base64(self, url: str) -> str:
+        """Download a file from URL and return as base64 string."""
+        import base64
+        from urllib.request import Request, urlopen
+        try:
+            from deckyfin_steamgrid import _ssl_context as _sgdb_ssl
+            ctx = _sgdb_ssl()
+        except Exception:
+            ctx = ssl.create_default_context()
+        req = Request(url, headers={"User-Agent": "deckyfin backend"})
+        content = urlopen(req, context=ctx).read()
+        return base64.b64encode(content).decode("utf-8")
+
+    async def read_file_as_base64(self, path: str) -> str:
+        """Read a local file and return as base64 string."""
+        import base64
+        with open(path, "rb") as f:
+            return base64.b64encode(f.read()).decode("utf-8")
+
+    async def fetch_steamgrid_art_urls(self, game_name: str) -> dict:
+        """Search SteamGridDB and return art URLs for a game name (no download).
+
+        Returns dict with keys: success, error, game_id, game_name,
+        grid_p (eAssetType 0), hero (eAssetType 1), logo (eAssetType 2),
+        wide (eAssetType 3).
+        """
+        return _fetch_steamgrid_art_urls(game_name)
 
     async def apply_steam_grid(self, game_name: str, unsigned_appid: int) -> dict:
         """Search SteamGridDB for game art and apply it to the Steam shortcut."""

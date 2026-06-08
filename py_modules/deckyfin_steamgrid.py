@@ -160,45 +160,83 @@ def _pick_first_image(data: list) -> Optional[str]:
     return first.get("url") or None
 
 
-def fetch_art(game_id: int) -> dict[str, Optional[str]]:
-    """Fetch grid, hero, logo, and capsule (header) URLs for a game ID.
+def fetch_steamgrid_art_urls(game_name: str) -> dict:
+    """One-step: search game by name → fetch art URLs.
 
-    Returns dict with keys 'grid', 'hero', 'logo', 'capsule' — each is a URL string or None.
+    Returns dict with keys:
+      success (bool), error (str|None),
+      game_id (int|None), game_name (str|None),
+      grid_p (str|None), hero (str|None), logo (str|None), wide (str|None)
+
+    Art type mapping to Steam eAssetType:
+      grid_p = 0 (portrait capsule)
+      wide   = 3 (landscape wide capsule)
+      hero   = 1 (hero banner)
+      logo   = 2 (logo)
     """
-    result: dict[str, Optional[str]] = {"grid": None, "hero": None, "logo": None, "capsule": None}
+    result = {
+        "success": False,
+        "error": None,
+        "game_id": None,
+        "game_name": None,
+        "grid_p": None,
+        "hero": None,
+        "logo": None,
+        "wide": None,
+    }
 
-    # Grid (grid/box art for _p.png) — try multiple dimension options
-    for dims in ["460x215", "920x430", "600x900", ""]:
+    game_id = search_game(game_name)
+    if not game_id:
+        result["error"] = f"No SteamGridDB result for '{game_name}'"
+        return result
+
+    # Get SGDB game data for the name info
+    game_data = _api_get(f"/games/id/{game_id}")
+    if game_data and game_data.get("success") and game_data.get("data"):
+        first = game_data["data"]
+        if isinstance(first, list):
+            first = first[0]
+        result["game_name"] = first.get("name") or game_name
+    else:
+        result["game_name"] = game_name
+
+    result["game_id"] = game_id
+
+    # Grid (portrait — eAssetType 0 / grid_p)
+    for dims in ["600x900", "342x482", "660x930", ""]:
         url = f"/grids/game/{game_id}"
         if dims:
             url += f"?dimensions={dims}"
-        grid_data = _api_get(url)
-        if grid_data and grid_data.get("success") and grid_data.get("data"):
-            result["grid"] = _pick_first_image(grid_data["data"])
-            if result["grid"]:
-                logger.info("Got grid art URL for game %d (dimensions=%s)", game_id, dims or "any")
+        data = _api_get(url)
+        if data and data.get("success") and data.get("data"):
+            result["grid_p"] = _pick_first_image(data["data"])
+            if result["grid_p"]:
                 break
 
-    # Capsule (library header, saved as {appid}.png) — headers endpoint
-    capsule_data = _api_get(f"/headers/game/{game_id}")
-    if capsule_data and capsule_data.get("success"):
-        result["capsule"] = _pick_first_image(capsule_data.get("data", []))
-        if result["capsule"]:
-            logger.info("Got capsule header URL for game %d", game_id)
+    # Wide capsule (landscape — eAssetType 3 / grid_l)
+    for dims in ["460x215", "920x430", ""]:
+        url = f"/grids/game/{game_id}"
+        if dims:
+            url += f"?dimensions={dims}"
+        data = _api_get(url)
+        if data and data.get("success") and data.get("data"):
+            result["wide"] = _pick_first_image(data["data"])
+            if result["wide"]:
+                break
 
-    # Hero (header banner, 1920x620)
+    # Hero (eAssetType 1)
     hero_data = _api_get(f"/heroes/game/{game_id}")
     if hero_data and hero_data.get("success"):
         result["hero"] = _pick_first_image(hero_data.get("data", []))
-        if result["hero"]:
-            logger.info("Got hero art URL for game %d", game_id)
 
-    # Logo (1024x256)
+    # Logo (eAssetType 2)
     logo_data = _api_get(f"/logos/game/{game_id}")
     if logo_data and logo_data.get("success"):
         result["logo"] = _pick_first_image(logo_data.get("data", []))
-        if result["logo"]:
-            logger.info("Got logo URL for game %d", game_id)
+
+    result["success"] = bool(result["grid_p"] or result["hero"] or result["logo"] or result["wide"])
+    if not result["success"]:
+        result["error"] = f"No art found for '{game_name}' on SteamGridDB"
 
     return result
 
@@ -233,12 +271,11 @@ def apply_steam_grid(
     unsigned_appid: int,
     user_id: Optional[str] = None,
 ) -> dict:
-    """Search SteamGridDB for game art and apply it to the Steam shortcut.
+    """Search SteamGridDB for game art and apply it to the Steam shortcut (legacy file-copy).
 
-    Args:
-        game_name: The game name to search for
-        unsigned_appid: The unsigned 32-bit app ID (Steam shortcut ID)
-        user_id: Optional Steam user ID override
+    This is the OLD approach — downloads files directly to the grid folder.
+    It's kept as a fallback for icon art (type 4) which can't use Steam's API.
+    For all other asset types, use `SetCustomArtworkForApp` from the frontend.
 
     Returns:
         dict with keys: success, applied (list of art types), errors (list)
@@ -256,19 +293,13 @@ def apply_steam_grid(
             result["errors"].append(f"Could not determine user: {e}")
             return result
 
-    # 1. Search for game
-    game_id = search_game(game_name)
-    if not game_id:
-        result["errors"].append(f"No SteamGridDB result for '{game_name}'")
+    # Use the new unified fetcher
+    urls = fetch_steamgrid_art_urls(game_name)
+    if not urls["success"]:
+        result["errors"].append(urls.get("error") or f"No art found for '{game_name}'")
         return result
 
-    # 2. Fetch art URLs
-    art = fetch_art(game_id)
-    if not any(art.values()):
-        result["errors"].append(f"No art found for '{game_name}' on SteamGridDB")
-        return result
-
-    # 3. Locate grid folder
+    # 2. Locate grid folder
     try:
         steam_root = find_steam_root()
     except Exception as e:
@@ -287,14 +318,12 @@ def apply_steam_grid(
 
     appid_str = str(unsigned_appid)
 
-    # 4. Determine capsule URL — prefer dedicated headers endpoint, fall back to grid
-    capsule_url = art["capsule"] or art["grid"]
-
+    # Map art types to filenames (non-Steam shortcut naming scheme)
     type_map = {
-        "grid": (art["grid"], f"{appid_str}_p.png"),
-        "hero": (art["hero"], f"{appid_str}_hero.png"),
-        "logo": (art["logo"], f"{appid_str}_logo.png"),
-        "capsule": (capsule_url, f"{appid_str}.png"),
+        "grid": (urls["grid_p"], f"{appid_str}_p.png"),
+        "hero": (urls["hero"], f"{appid_str}_hero.png"),
+        "logo": (urls["logo"], f"{appid_str}_logo.png"),
+        "capsule": (urls["grid_p"], f"{appid_str}.png"),
     }
 
     any_success = False

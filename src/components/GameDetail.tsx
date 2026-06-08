@@ -1,6 +1,7 @@
 import { VFC, useState, useEffect } from "react";
 import { callable } from "@decky/api";
 import { GameConfig } from "../types";
+import { useArtwork } from "../hooks/useArtwork";
 
 const removeGame = callable<[name: string], { success: boolean }>(
   "remove_game"
@@ -39,10 +40,6 @@ const updateGameConfig = callable<
   { success: boolean }
 >("update_game_config");
 const scanExes = callable<[subfolder: string], string[]>("scan_game_exes");
-const applySteamGrid = callable<
-  [game_name: string, unsigned_appid: number],
-  { success: boolean; applied?: string[]; errors?: string[] }
->("apply_steam_grid");
 
 /** Popular Proton dependencies shown as toggle chips. */
 const POPULAR_DEPS = [
@@ -156,6 +153,9 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
 
   // ── Proton versions ─────────────────────────────────────────────────────
   const [protonVersions, setProtonVersions] = useState<string[]>([]);
+
+  // ── Artwork ───────────────────────────────────────────────────────────────
+  const { applyAllArt } = useArtwork();
 
   // ── Init on mount ───────────────────────────────────────────────────────
   useEffect(() => {
@@ -357,16 +357,20 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
     setLoading("art");
     setFeedback(null);
     try {
-      const res = await applySteamGrid(name, steamInfo.unsigned_appid);
-      if (res.success) {
-        const applied = (res.applied || []).join(", ");
+      const { applied, errors } = await applyAllArt(
+        name,
+        steamInfo.unsigned_appid
+      );
+      if (applied.length > 0) {
         setFeedback({
           ok: true,
-          msg: `Applied ${applied} art — restart Steam to see it`,
+          msg: `Applied ${applied.join(", ")} art`,
         });
       } else {
-        const errors = (res.errors || []).join("; ");
-        setFeedback({ ok: false, msg: errors || "No art found" });
+        setFeedback({
+          ok: false,
+          msg: errors.join("; ") || "No art found",
+        });
       }
     } catch (err: any) {
       setFeedback({ ok: false, msg: err?.message || "Error" });
