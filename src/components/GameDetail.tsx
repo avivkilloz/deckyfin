@@ -641,11 +641,32 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         </button>
 
         <button
-          onClick={handleAddToSteam}
-          disabled={loading === "add" || !!steamInfo}
-          style={{ ...BTN_STYLE, opacity: loading === "add" || !!steamInfo ? 0.5 : 1 }}
+          onClick={steamInfo ? handleUpdateSteam : handleAddToSteam}
+          disabled={loading === "add" || loading === "update"}
+          style={
+            steamInfo
+              ? {
+                  ...BTN_STYLE,
+                  border: "1px solid #0078d4",
+                  color: "#0078d4",
+                  opacity: loading === "update" ? 0.5 : 1,
+                }
+              : {
+                  ...BTN_STYLE,
+                  border: "1px solid #0078d4",
+                  background: "#0078d4",
+                  color: "white",
+                  opacity: loading === "add" ? 0.5 : 1,
+                }
+          }
         >
-          {loading === "add" ? "Adding…" : "Add to Steam"}
+          {loading === "add"
+            ? "Adding…"
+            : loading === "update"
+            ? "Updating…"
+            : steamInfo
+            ? "Update Steam"
+            : "Add to Steam"}
         </button>
 
         <button
@@ -659,19 +680,6 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           }}
         >
           {loading === "remove" ? "Removing…" : "Remove from Steam"}
-        </button>
-
-        <button
-          onClick={handleUpdateSteam}
-          disabled={!steamInfo || loading === "update"}
-          style={{
-            ...BTN_STYLE,
-            border: "1px solid #0078d4",
-            color: "#0078d4",
-            opacity: !steamInfo || loading === "update" ? 0.5 : 1,
-          }}
-        >
-          {loading === "update" ? "Updating…" : "Update Steam"}
         </button>
 
         <button
