@@ -5,6 +5,7 @@ export interface GameConfig {
   path?: string;
   executable: string;
   start_dir?: string;
+  steam_app_id?: number;
   proton_version?: string;
   proton_dependencies?: string[];
   proton_sync_paths?: string[];

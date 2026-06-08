@@ -223,6 +223,7 @@ def initialize_app_structure(games_folder: Optional[str] = None) -> Dict[str, An
                 "name": folder_name,
                 "path": folder_path,
                 "executable": "",
+                "steam_app_id": None,
                 "proton_version": "",
                 "proton_dependencies": [],
                 "proton_sync_paths": [],

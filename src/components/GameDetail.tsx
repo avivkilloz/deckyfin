@@ -99,6 +99,13 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
   const [storedName, setStoredName] = useState(game.name); // last saved name (lookup key)
   const [executable, setExecutable] = useState(game.executable);
   const [startDir, setStartDir] = useState(game.start_dir || "");
+  const [steamAppId, setSteamAppId] = useState<number | undefined>(
+    game.steam_app_id
+  );
+  const [steamAppIdInput, setSteamAppIdInput] = useState(
+    game.steam_app_id !== undefined ? String(game.steam_app_id) : ""
+  );
+
   const [protonVersion, setProtonVersion] = useState(
     game.proton_version || ""
   );
@@ -183,6 +190,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
         name,
         executable,
         start_dir: startDir || null,
+        steam_app_id: steamAppId ?? null,
         proton_version: protonVersion || null,
         proton_dependencies: mergedDeps,
       });
@@ -469,6 +477,19 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
         style={FIELD_STYLE}
       />
 
+      {/* Steam App ID */}
+      <label style={LABEL_STYLE}>Steam App ID</label>
+      <input
+        value={steamAppIdInput}
+        onChange={(e) => {
+          setSteamAppIdInput(e.target.value);
+          const parsed = parseInt(e.target.value, 10);
+          setSteamAppId(isNaN(parsed) ? undefined : parsed);
+        }}
+        placeholder="e.g. 730 for CS:GO"
+        style={FIELD_STYLE}
+      />
+
       {/* Proton Version */}
       <label style={LABEL_STYLE}>Proton Version</label>
       <select
@@ -560,18 +581,19 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
         <span
           onClick={() =>
             Navigation.NavigateToExternalWeb(
-              `https://steamdb.info/search/?a=all&q=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`
+              steamAppId
+                ? `https://steamdb.info/app/${steamAppId}/`
+                : `https://steamdb.info/search/?a=all&q=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`
             )
           }
           style={{ color: "#0078d4", textDecoration: "underline", cursor: "pointer" }}
         >
           SteamDB
         </span>
-        {" \u2014 "}find depot names like{" "}
-        <code style={{ fontSize: "0.9em", background: "rgba(255,255,255,0.08)", padding: "1px 4px", borderRadius: "3px" }}>vcrun2022</code>
-        ,{" "}
-        <code style={{ fontSize: "0.9em", background: "rgba(255,255,255,0.08)", padding: "1px 4px", borderRadius: "3px" }}>d3dx9</code>
-        {" "}under Depots → Redistributables
+        {" — "}under Depots → Redistributables
+        {steamAppId && (
+          <span style={{ color: "#666" }}> (App {steamAppId})</span>
+        )}
       </div>
 
       {/* ── Separator ──────────────────────────────────────────────────── */}
