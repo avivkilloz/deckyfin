@@ -1,5 +1,6 @@
 import { VFC, useState, useEffect } from "react";
 import { callable } from "@decky/api";
+import { Navigation } from "@decky/ui";
 
 const setGamesFolder = callable<
   [path: string],
@@ -112,16 +113,17 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
 
       <p style={{ fontSize: "0.85em", color: "#aaa", marginBottom: "10px" }}>
         A default key is bundled. Set a custom one here to override it.
-        Get your own free key at{" "}
-        <a
-          href="https://www.steamgriddb.com/profile/preferences/api"
-          target="_blank"
-          style={{ color: "#0078d4", textDecoration: "underline" }}
+        Get your own free key{" "}
+        <span
+          onClick={() =>
+            Navigation.NavigateToExternalWeb("https://www.steamgriddb.com/profile/preferences/api")
+          }
+          style={{ color: "#0078d4", textDecoration: "underline", cursor: "pointer" }}
         >
-          steamgriddb.com
-        </a>
+          here
+        </span>
+        .
       </p>
-
       <input
         type="text"
         value={sgKey}

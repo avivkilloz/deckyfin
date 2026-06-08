@@ -1,5 +1,6 @@
 import { VFC, useState, useEffect } from "react";
 import { callable } from "@decky/api";
+import { Navigation } from "@decky/ui";
 import { GameConfig } from "../types";
 import { useArtwork } from "../hooks/useArtwork";
 
@@ -551,6 +552,26 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
             color: "#e0e0e0",
           }}
         />
+      </div>
+
+      {/* ── SteamDB lookup ──────────────────────────────────────────────── */}
+      <div style={{ fontSize: "0.82em", color: "#888", marginBottom: "8px" }}>
+        Look up dependencies on{" "}
+        <span
+          onClick={() =>
+            Navigation.NavigateToExternalWeb(
+              `https://steamdb.info/search/?a=all&q=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`
+            )
+          }
+          style={{ color: "#0078d4", textDecoration: "underline", cursor: "pointer" }}
+        >
+          SteamDB
+        </span>
+        {" \u2014 "}find depot names like{" "}
+        <code style={{ fontSize: "0.9em", background: "rgba(255,255,255,0.08)", padding: "1px 4px", borderRadius: "3px" }}>vcrun2022</code>
+        ,{" "}
+        <code style={{ fontSize: "0.9em", background: "rgba(255,255,255,0.08)", padding: "1px 4px", borderRadius: "3px" }}>d3dx9</code>
+        {" "}under "Required Items"
       </div>
 
       {/* ── Separator ──────────────────────────────────────────────────── */}
