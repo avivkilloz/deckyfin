@@ -67,6 +67,7 @@ const POPULAR_DEPS = [
 interface Props {
   game: GameConfig;
   onBack: () => void;
+  onNeedsRestart?: () => void;
 }
 
 const LABEL_STYLE: React.CSSProperties = {
@@ -93,7 +94,7 @@ const BTN_STYLE: React.CSSProperties = {
   color: "#e0e0e0",
 };
 
-export const GameDetail: VFC<Props> = ({ game, onBack }) => {
+export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   // ── Editable config fields ──────────────────────────────────────────────
   const [name, setName] = useState(game.name);
   const [storedName, setStoredName] = useState(game.name); // last saved name (lookup key)
@@ -248,6 +249,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
           ok: true,
           msg: `Added to Steam (App ID: ${res.unsigned_appid}) — restart Steam to see it`,
         });
+        onNeedsRestart?.();
       } else {
         setFeedback({ ok: false, msg: res.error || "Failed to add to Steam" });
       }
@@ -289,6 +291,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
           ok: true,
           msg: `Steam updated${protonMsg} — restart Steam to apply`,
         });
+        onNeedsRestart?.();
       } else {
         setFeedback({ ok: false, msg: res.error || "Failed to update Steam shortcut" });
       }
@@ -306,6 +309,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
       if (res.success) {
         setSteamInfo(null);
         setFeedback({ ok: true, msg: "Removed from Steam — restart Steam to apply" });
+        onNeedsRestart?.();
       } else {
         setFeedback({ ok: false, msg: res.error || "Not found in Steam shortcuts" });
       }
@@ -647,7 +651,12 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
         <button
           onClick={handleRemoveSteam}
           disabled={loading === "remove" || !steamInfo}
-          style={{ ...BTN_STYLE, opacity: loading === "remove" || !steamInfo ? 0.5 : 1 }}
+          style={{
+            ...BTN_STYLE,
+            border: "1px solid #c0392b",
+            color: "#e74c3c",
+            opacity: loading === "remove" || !steamInfo ? 0.5 : 1,
+          }}
         >
           {loading === "remove" ? "Removing…" : "Remove from Steam"}
         </button>
@@ -690,7 +699,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack }) => {
           disabled={!steamInfo || mergedDeps.length === 0 || loading === "deps"}
           style={{ ...BTN_STYLE, opacity: !steamInfo || mergedDeps.length === 0 || loading === "deps" ? 0.5 : 1 }}
         >
-          {loading === "deps" ? "Installing…" : "Install Deps"}
+          {loading === "deps" ? "Installing…" : "Install Dependencies"}
         </button>
 
         <button

@@ -22,6 +22,7 @@ export const GameLibrary: VFC = () => {
   const [selectedGame, setSelectedGame] = useState<GameConfig | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [restarting, setRestarting] = useState(false);
+  const [needsRestart, setNeedsRestart] = useState(false);
 
   const handleRestartSteam = useCallback(async () => {
     setRestarting(true);
@@ -81,6 +82,7 @@ export const GameLibrary: VFC = () => {
           loadData();
           setView("library");
         }}
+        onNeedsRestart={() => setNeedsRestart(true)}
       />
     );
   }
@@ -98,7 +100,12 @@ export const GameLibrary: VFC = () => {
       >
         <h2 style={{ margin: 0 }}>🎮 Deckyfin</h2>
         <div style={{ display: "flex", gap: "6px" }}>
-          <button onClick={handleRestartSteam} disabled={restarting} title="Restart Steam">
+          <button onClick={handleRestartSteam} disabled={restarting} title="Restart Steam"
+            style={{
+              background: needsRestart ? "#2ecc71" : undefined,
+              border: needsRestart ? "1px solid #27ae60" : undefined,
+              color: needsRestart ? "white" : undefined,
+            }}>
             {restarting ? "…" : "↺"}
           </button>
           <button onClick={() => setView("settings")}>⚙</button>
