@@ -103,6 +103,7 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
   return (
     <Focusable
       onCancel={onBack}
+      onCancelButton={onBack}
       focusClassName="is-focused"
       style={{ padding: "8px" }}
     >
