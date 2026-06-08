@@ -302,6 +302,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   };
 
   const handleRemoveSteam = async () => {
+    if (!window.confirm(`Remove "${name}" from Steam?`)) return;
     setLoading("remove");
     setFeedback(null);
     try {
@@ -392,6 +393,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   };
 
   const handleRemove = async () => {
+    if (!window.confirm(`Remove "${storedName}" from Deckyfin? This cannot be undone.`)) return;
     setFeedback(null);
     try {
       await removeGame(storedName);
@@ -670,19 +672,6 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         </button>
 
         <button
-          onClick={handleRemoveSteam}
-          disabled={loading === "remove" || !steamInfo}
-          style={{
-            ...BTN_STYLE,
-            border: "1px solid #c0392b",
-            color: "#e74c3c",
-            opacity: loading === "remove" || !steamInfo ? 0.5 : 1,
-          }}
-        >
-          {loading === "remove" ? "Removing…" : "Remove from Steam"}
-        </button>
-
-        <button
           onClick={handleInitPrefix}
           disabled={!steamInfo || loading === "init"}
           style={{ ...BTN_STYLE, opacity: !steamInfo || loading === "init" ? 0.5 : 1 }}
@@ -732,8 +721,33 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         </p>
       )}
 
-      {/* ── Remove Game ─────────────────────────────────────────────────── */}
-      <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.08)", margin: "24px 0 12px" }} />
+      {/* ── Danger Zone ──────────────────────────────────────────────────── */}
+      <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.08)", margin: "24px 0 8px" }} />
+      <div style={{ fontSize: "0.8em", color: "#e74c3c", marginBottom: "8px", fontWeight: "bold" }}>
+        ⚠ Danger Zone
+      </div>
+
+      {steamInfo && (
+        <button
+          onClick={handleRemoveSteam}
+          disabled={loading === "remove"}
+          style={{
+            width: "100%",
+            padding: "10px 0",
+            fontSize: "0.85em",
+            cursor: "pointer",
+            borderRadius: "4px",
+            border: "1px solid #c0392b",
+            background: "transparent",
+            color: "#e74c3c",
+            marginBottom: "8px",
+            opacity: loading === "remove" ? 0.5 : 1,
+          }}
+        >
+          {loading === "remove" ? "Removing…" : `Remove "${name}" from Steam`}
+        </button>
+      )}
+
       <button
         onClick={handleRemove}
         style={{
