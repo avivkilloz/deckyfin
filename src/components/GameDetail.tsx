@@ -101,10 +101,11 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   const steamAppIdRef = useRef<HTMLInputElement>(null);
   const customDepsRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const backRef = useRef<HTMLDivElement>(null);
 
   // ── Auto-focus root on mount so B-button works immediately ──
   useEffect(() => {
-    const timer = setTimeout(() => rootRef.current?.focus(), 150);
+    const timer = setTimeout(() => backRef.current?.focus(), 150);
     return () => clearTimeout(timer);
   }, []);
 
@@ -414,12 +415,13 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
     >
       {/* Back */}
       <Focusable
+        ref={backRef}
         onActivate={onBack}
         onClick={onBack}
         focusClassName="is-focused"
         style={{ ...BTN_STYLE, marginBottom: "12px", display: "inline-block" }}
       >
-        ← Back
+        ‹ Back
       </Focusable>
 
       {/* ── Config Fields ──────────────────────────────────────────────── */}
@@ -443,9 +445,10 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           display: "flex",
           gap: "6px",
           marginBottom: showExePicker ? "4px" : "10px",
+          alignItems: "center",
         }}
       >
-        <Focusable onActivate={() => exeRef.current?.focus()} focusClassName="is-focused" style={{ flex: 1 }}>
+        <Focusable onActivate={() => exeRef.current?.focus()} focusClassName="is-focused" style={{ flex: 1, marginBottom: 0 }}>
           <input
             ref={exeRef}
             value={executable}
@@ -457,7 +460,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           onActivate={handleOpenExePicker}
           onClick={handleOpenExePicker}
           focusClassName="is-focused"
-          style={BTN_STYLE}
+          style={{ ...BTN_STYLE, alignSelf: "center" }}
         >
           {showExePicker ? "✕" : "Browse"}
         </Focusable>
@@ -465,7 +468,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
 
       {/* Executable picker dropdown */}
       {showExePicker && (
-        <div
+        <Focusable
           style={{
             marginBottom: "10px",
             border: "1px solid #555",
@@ -497,7 +500,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
               {exe}
             </Focusable>
           ))}
-        </div>
+        </Focusable>
       )}
 
       {/* Start Dir */}
@@ -538,7 +541,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           display: "inline-block",
           marginBottom: protonPickerOpen ? "4px" : "10px",
           background: protonVersion ? "transparent" : "transparent",
-          color: protonVersion ? "#2ecc71" : "#888",
+          color: protonVersion ? "#0078d4" : "#888",
         }}
       >
         {protonVersion || "— None —"}
@@ -557,7 +560,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
             onActivate={() => { setProtonVersion(""); setShowProtonPicker(false); }}
             onClick={() => { setProtonVersion(""); setShowProtonPicker(false); }}
             focusClassName="is-focused"
-            style={{ padding: "8px 10px", cursor: "pointer", fontSize: "0.85em", borderBottom: "1px solid #333", color: !protonVersion ? "#2ecc71" : "#ccc" }}
+            style={{ padding: "8px 10px", cursor: "pointer", fontSize: "0.85em", borderBottom: "1px solid #333", color: !protonVersion ? "#0078d4" : "#ccc" }}
             onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
             onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
           >
@@ -569,7 +572,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
               onActivate={() => { setProtonVersion(v); setShowProtonPicker(false); }}
               onClick={() => { setProtonVersion(v); setShowProtonPicker(false); }}
               focusClassName="is-focused"
-              style={{ padding: "8px 10px", cursor: "pointer", fontSize: "0.85em", borderBottom: "1px solid #333", color: protonVersion === v ? "#2ecc71" : "#ccc" }}
+              style={{ padding: "8px 10px", cursor: "pointer", fontSize: "0.85em", borderBottom: "1px solid #333", color: protonVersion === v ? "#0078d4" : "#ccc" }}
               onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
               onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
             >

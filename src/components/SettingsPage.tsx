@@ -37,10 +37,12 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
   const folderRef = useRef<HTMLInputElement>(null);
   const sgKeyRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const backRef = useRef<HTMLDivElement>(null);
 
-  // ── Auto-focus root on mount so B-button works immediately ──
+  // ── Auto-focus Back button on mount so B-button works immediately ──
   useEffect(() => {
-    rootRef.current?.focus();
+    const timer = setTimeout(() => backRef.current?.focus(), 150);
+    return () => clearTimeout(timer);
   }, []);
 
   const [folderPath, setFolderPath] = useState(gamesFolder || "");
@@ -115,6 +117,7 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
       style={{ padding: "8px" }}
     >
       <Focusable
+        ref={backRef}
         onActivate={onBack}
         onClick={onBack}
         focusClassName="is-focused"
@@ -126,12 +129,16 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
           marginBottom: "12px",
         }}
       >
-        ← Back
+        ‹ Back
       </Focusable>
       <h3>Settings</h3>
 
       {/* ── Games Folder ────────────────────────────────────────────────── */}
       <label>Games Folder:</label>
+      <p style={{ fontSize: "0.85em", color: "#aaa", marginBottom: "8px" }}>
+        Path to the root directory containing your game folders. Each
+        subdirectory is treated as a separate game with its own config.
+      </p>
       <Focusable onActivate={() => folderRef.current?.focus()} focusClassName="is-focused" style={{ marginBottom: "12px" }}>
         <input
           ref={folderRef}
