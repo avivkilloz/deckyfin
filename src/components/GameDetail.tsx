@@ -1,6 +1,6 @@
 import { VFC, useState, useEffect, useRef } from "react";
 import { callable } from "@decky/api";
-import { Navigation, Focusable, TextField } from "@decky/ui";
+import { Navigation, Focusable, Dropdown } from "@decky/ui";
 import { GameConfig } from "../types";
 import { useArtwork } from "../hooks/useArtwork";
 
@@ -102,7 +102,12 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   const steamAppIdRef = useRef<HTMLInputElement>(null);
   const protonRef = useRef<HTMLSelectElement>(null);
   const customDepsRef = useRef<HTMLInputElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
 
+  // ── Auto-focus root on mount so B-button works immediately ──
+  useEffect(() => {
+    rootRef.current?.focus();
+  }, []);
 
   // ── Editable config fields ──────────────────────────────────────────────
   const [name, setName] = useState(game.name);
@@ -401,6 +406,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
 
   return (
     <Focusable
+      ref={rootRef}
       onCancel={onBack}
       onCancelButton={onBack}
       focusClassName="is-focused"
@@ -521,23 +527,19 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         />
       </Focusable>
 
-      {/* Proton Version */}
+      {/* Proton Version: Dropdown */}
       <label style={LABEL_STYLE}>Proton Version</label>
-      <Focusable onActivate={() => protonRef.current?.focus()} focusClassName="is-focused">
-        <select
-          ref={protonRef}
-          value={protonVersion}
-          onChange={(e) => setProtonVersion(e.target.value)}
-          style={FIELD_STYLE}
-        >
-          <option value="">— None —</option>
-          {protonVersions.map((v) => (
-            <option key={v} value={v}>
-              {v}
-            </option>
-          ))}
-        </select>
-      </Focusable>
+      <Dropdown
+        rgOptions={[
+          { data: "", label: "— None —" },
+          ...protonVersions.map((v) => ({ data: v, label: v })),
+        ]}
+        selectedOption={protonVersion}
+        onChange={(opt) => setProtonVersion(opt.data)}
+        focusable={true}
+        menuLabel="Select Proton Version"
+        strDefaultLabel="— None —"
+      />
 
       {/* ── Dependencies: Toggle Chips + Custom ──────────────────────── */}
       <label style={LABEL_STYLE}>

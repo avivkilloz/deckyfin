@@ -36,6 +36,12 @@ const BTN_STYLE: React.CSSProperties = {
 export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
   const folderRef = useRef<HTMLInputElement>(null);
   const sgKeyRef = useRef<HTMLInputElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  // ── Auto-focus root on mount so B-button works immediately ──
+  useEffect(() => {
+    rootRef.current?.focus();
+  }, []);
 
   const [folderPath, setFolderPath] = useState(gamesFolder || "");
   const [message, setMessage] = useState<string | null>(null);
@@ -102,6 +108,7 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
 
   return (
     <Focusable
+      ref={rootRef}
       onCancel={onBack}
       onCancelButton={onBack}
       focusClassName="is-focused"

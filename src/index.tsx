@@ -10,8 +10,7 @@ export default definePlugin(() => {
         <style>{`
           .gpfocus,
           .is-focused {
-            outline: 2px solid #0078d4 !important;
-            outline-offset: 1px !important;
+            box-shadow: 0 0 0 2px #0078d4 !important;
           }
         `}</style>
         <GameLibrary />
