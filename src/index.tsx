@@ -1,11 +1,27 @@
 import { definePlugin } from "@decky/api";
 import { GameLibrary } from "./components/GameLibrary";
 
+// Injected once — adds gamepad focus ring to all Focusable elements inside deckyfin
+const FOCUS_CSS = `
+  #deckyfin-wrap .Panel.gpfocus,
+  #deckyfin-wrap .Focusable.gpfocus {
+    outline: 2px solid rgba(81, 203, 238, 0.8) !important;
+    outline-offset: 1px !important;
+  }
+`;
+
+let styleEl: HTMLStyleElement | null = null;
+
 export default definePlugin(() => {
+  // Inject focus ring CSS when plugin mounts
+  styleEl = document.createElement("style");
+  styleEl.textContent = FOCUS_CSS;
+  document.head.appendChild(styleEl);
+
   return {
     name: "Deckyfin",
     title: <div>Deckyfin</div>,
-    content: <GameLibrary />,
+    content: <div id="deckyfin-wrap"><GameLibrary /></div>,
     icon: (
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -19,6 +35,11 @@ export default definePlugin(() => {
     ),
     onDismount() {
       console.log("Deckyfin unmounted");
+      // Clean up injected CSS
+      if (styleEl) {
+        styleEl.remove();
+        styleEl = null;
+      }
     },
   };
 });
