@@ -103,11 +103,13 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
   return (
     <Focusable
       onCancel={onBack}
+      focusClassName="is-focused"
       style={{ padding: "8px" }}
     >
       <Focusable
         onActivate={onBack}
         onClick={onBack}
+        focusClassName="is-focused"
         style={{
           ...BTN_STYLE,
           padding: "6px 10px",
@@ -122,7 +124,7 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
 
       {/* ── Games Folder ────────────────────────────────────────────────── */}
       <label>Games Folder:</label>
-      <Focusable onActivate={() => folderRef.current?.focus()}>
+      <Focusable onActivate={() => folderRef.current?.focus()} focusClassName="is-focused">
         <input
           ref={folderRef}
           type="text"
@@ -136,6 +138,7 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
       <Focusable
         onActivate={handleSave}
         onClick={handleSave}
+        focusClassName="is-focused"
         style={BTN_STYLE}
       >
         Save
@@ -156,13 +159,14 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
           onClick={() =>
             Navigation.NavigateToExternalWeb("https://www.steamgriddb.com/profile/preferences/api")
           }
+          focusClassName="is-focused"
           style={{ color: "#0078d4", textDecoration: "underline", cursor: "pointer", display: "inline" }}
         >
           here
         </Focusable>
         .
       </p>
-      <Focusable onActivate={() => sgKeyRef.current?.focus()}>
+      <Focusable onActivate={() => sgKeyRef.current?.focus()} focusClassName="is-focused">
         <input
           ref={sgKeyRef}
           type="text"
@@ -177,6 +181,7 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
         <Focusable
           onActivate={handleSaveKey}
           onClick={handleSaveKey}
+          focusClassName="is-focused"
           style={BTN_STYLE}
         >
           Save Key
@@ -205,6 +210,7 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
       <Focusable
         onActivate={handleRescan}
         onClick={handleRescan}
+        focusClassName="is-focused"
         style={{
           padding: "8px 16px",
           fontSize: "0.85em",

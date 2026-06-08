@@ -401,12 +401,14 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   return (
     <Focusable
       onCancel={onBack}
+      focusClassName="is-focused"
       style={{ padding: "8px" }}
     >
       {/* Back */}
       <Focusable
         onActivate={onBack}
         onClick={onBack}
+        focusClassName="is-focused"
         style={{ ...BTN_STYLE, marginBottom: "12px", display: "inline-block" }}
       >
         ← Back
@@ -417,7 +419,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
 
       {/* Name */}
       <label style={LABEL_STYLE}>Name</label>
-      <Focusable onActivate={() => nameRef.current?.focus()}>
+      <Focusable onActivate={() => nameRef.current?.focus()} focusClassName="is-focused">
         <input
           ref={nameRef}
           value={name}
@@ -435,7 +437,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           marginBottom: showExePicker ? "4px" : "10px",
         }}
       >
-        <Focusable onActivate={() => exeRef.current?.focus()} style={{ flex: 1 }}>
+        <Focusable onActivate={() => exeRef.current?.focus()} focusClassName="is-focused" style={{ flex: 1 }}>
           <input
             ref={exeRef}
             value={executable}
@@ -446,6 +448,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         <Focusable
           onActivate={handleOpenExePicker}
           onClick={handleOpenExePicker}
+          focusClassName="is-focused"
           style={BTN_STYLE}
         >
           {showExePicker ? "✕" : "Browse"}
@@ -473,6 +476,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
               key={exe}
               onActivate={() => handleSelectExe(exe)}
               onClick={() => handleSelectExe(exe)}
+              focusClassName="is-focused"
               style={{
                 padding: "8px 10px",
                 cursor: "pointer",
@@ -490,7 +494,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
 
       {/* Start Dir */}
       <label style={LABEL_STYLE}>Start Dir</label>
-      <Focusable onActivate={() => startDirRef.current?.focus()}>
+      <Focusable onActivate={() => startDirRef.current?.focus()} focusClassName="is-focused">
         <input
           ref={startDirRef}
           value={startDir}
@@ -501,7 +505,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
 
       {/* Steam App ID */}
       <label style={LABEL_STYLE}>Steam App ID</label>
-      <Focusable onActivate={() => steamAppIdRef.current?.focus()}>
+      <Focusable onActivate={() => steamAppIdRef.current?.focus()} focusClassName="is-focused">
         <input
           ref={steamAppIdRef}
           value={steamAppIdInput}
@@ -517,7 +521,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
 
       {/* Proton Version */}
       <label style={LABEL_STYLE}>Proton Version</label>
-      <Focusable onActivate={() => protonRef.current?.focus()}>
+      <Focusable onActivate={() => protonRef.current?.focus()} focusClassName="is-focused">
         <select
           ref={protonRef}
           value={protonVersion}
@@ -565,6 +569,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
                 key={dep}
                 onActivate={() => toggleCheckedDep(dep)}
                 onClick={() => toggleCheckedDep(dep)}
+                focusClassName="is-focused"
                 style={{
                   padding: "4px 12px",
                   fontSize: "0.82em",
@@ -587,7 +592,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         <label style={{ fontSize: "0.82em", color: "#888", display: "block", marginBottom: "2px" }}>
           Custom (comma-separated)
         </label>
-        <Focusable onActivate={() => customDepsRef.current?.focus()}>
+        <Focusable onActivate={() => customDepsRef.current?.focus()} focusClassName="is-focused">
           <input
             ref={customDepsRef}
             value={customDeps}
@@ -625,6 +630,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
                 : `https://steamdb.info/search/?a=all&q=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`
             )
           }
+          focusClassName="is-focused"
           style={{ color: "#0078d4", textDecoration: "underline", cursor: "pointer", display: "inline" }}
         >
           SteamDB
@@ -666,6 +672,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         <Focusable
           onActivate={handleApplyConfig}
           onClick={handleApplyConfig}
+          focusClassName="is-focused"
           style={BTN_STYLE}
         >
           Apply Config
@@ -674,6 +681,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         <Focusable
           onActivate={steamInfo ? handleUpdateSteam : handleAddToSteam}
           onClick={steamInfo ? handleUpdateSteam : handleAddToSteam}
+          focusClassName="is-focused"
           style={{
             ...BTN_STYLE,
             opacity: loading === "add" || loading === "update" ? 0.5 : 1,
@@ -691,6 +699,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         <Focusable
           onActivate={handleInitPrefix}
           onClick={handleInitPrefix}
+          focusClassName="is-focused"
           style={{
             ...BTN_STYLE,
             opacity: !steamInfo || loading === "init" ? 0.5 : 1,
@@ -702,6 +711,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         <Focusable
           onActivate={() => setForceReinit(!forceReinit)}
           onClick={() => setForceReinit(!forceReinit)}
+          focusClassName="is-focused"
           style={{
             ...BTN_STYLE,
             background: forceReinit ? "#ff6666" : "transparent",
@@ -715,6 +725,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         <Focusable
           onActivate={handleInstallDeps}
           onClick={handleInstallDeps}
+          focusClassName="is-focused"
           style={{
             ...BTN_STYLE,
             opacity: !steamInfo || mergedDeps.length === 0 || loading === "deps" ? 0.5 : 1,
@@ -726,6 +737,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         <Focusable
           onActivate={handleAddArt}
           onClick={handleAddArt}
+          focusClassName="is-focused"
           style={{
             ...BTN_STYLE,
             opacity: !steamInfo || loading === "art" ? 0.5 : 1,
@@ -773,6 +785,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
                 <Focusable
                   onActivate={() => { setConfirming(null); handleRemoveSteam(); }}
                   onClick={() => { setConfirming(null); handleRemoveSteam(); }}
+                  focusClassName="is-focused"
                   style={{
                     ...BTN_STYLE,
                     border: "1px solid #c0392b",
@@ -785,6 +798,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
                 <Focusable
                   onActivate={() => setConfirming(null)}
                   onClick={() => setConfirming(null)}
+                  focusClassName="is-focused"
                   style={BTN_STYLE}
                 >
                   Cancel
@@ -795,6 +809,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
             <Focusable
               onActivate={() => setConfirming("steam")}
               onClick={() => setConfirming("steam")}
+              focusClassName="is-focused"
               style={{
                 width: "100%",
                 padding: "10px 0",
@@ -831,6 +846,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
             <Focusable
               onActivate={() => { setConfirming(null); handleRemove(); }}
               onClick={() => { setConfirming(null); handleRemove(); }}
+              focusClassName="is-focused"
               style={{
                 ...BTN_STYLE,
                 border: "1px solid #c0392b",
@@ -843,6 +859,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
             <Focusable
               onActivate={() => setConfirming(null)}
               onClick={() => setConfirming(null)}
+              focusClassName="is-focused"
               style={BTN_STYLE}
             >
               Cancel
@@ -853,6 +870,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         <Focusable
           onActivate={() => setConfirming("deckyfin")}
           onClick={() => setConfirming("deckyfin")}
+          focusClassName="is-focused"
           style={{
             width: "100%",
             padding: "12px 0",

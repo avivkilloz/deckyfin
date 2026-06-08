@@ -27,6 +27,7 @@ export const GameCard: VFC<Props> = ({ game, isInSteam, onClick }) => {
     <Focusable
       onActivate={onClick}
       onClick={onClick}
+      focusClassName="is-focused"
       style={{
         padding: "12px",
         borderRadius: "8px",

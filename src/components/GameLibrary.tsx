@@ -123,6 +123,7 @@ export const GameLibrary: VFC = () => {
           <Focusable
             onActivate={handleRestartSteam}
             onClick={handleRestartSteam}
+            focusClassName="is-focused"
             style={{
               ...BTN_RESTART,
               border: needsRestart ? "1px solid #27ae60" : "1px solid #555",
@@ -134,6 +135,7 @@ export const GameLibrary: VFC = () => {
           <Focusable
             onActivate={() => setView("settings")}
             onClick={() => setView("settings")}
+            focusClassName="is-focused"
             style={BTN_SETTINGS}
           >
             ⚙ Settings
@@ -142,7 +144,7 @@ export const GameLibrary: VFC = () => {
       </div>
 
       {/* Search */}
-      <Focusable onActivate={() => searchRef.current?.focus()} style={{ marginBottom: "12px" }}>
+      <Focusable onActivate={() => searchRef.current?.focus()} focusClassName="is-focused" style={{ marginBottom: "12px" }}>
         <input
           ref={searchRef}
           type="text"
