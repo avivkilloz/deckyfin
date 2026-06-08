@@ -109,8 +109,8 @@ export const GameLibrary: VFC = () => {
               cursor: "pointer",
               borderRadius: "4px",
               border: needsRestart ? "1px solid #27ae60" : "1px solid #555",
-              background: needsRestart ? "#2ecc71" : "transparent",
-              color: needsRestart ? "white" : "#e0e0e0",
+              background: "transparent",
+              color: needsRestart ? "#2ecc71" : "#e0e0e0",
             }}
           >
             {restarting ? "…" : "↺ Restart Steam"}
