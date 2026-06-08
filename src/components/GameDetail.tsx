@@ -155,6 +155,9 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
   const [forceReinit, setForceReinit] = useState(false);
 
+  // ── Confirmation state (inline, CEF confirm() is blocked) ──────────────
+  const [confirming, setConfirming] = useState<"steam" | "deckyfin" | null>(null);
+
   // ── Executable picker ───────────────────────────────────────────────────
   const [showExePicker, setShowExePicker] = useState(false);
   const [exeOptions, setExeOptions] = useState<string[]>([]);
@@ -302,7 +305,6 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   };
 
   const handleRemoveSteam = async () => {
-    if (!window.confirm(`Remove "${name}" from Steam?`)) return;
     setLoading("remove");
     setFeedback(null);
     try {
@@ -393,7 +395,6 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   };
 
   const handleRemove = async () => {
-    if (!window.confirm(`Remove "${storedName}" from Deckyfin? This cannot be undone.`)) return;
     setFeedback(null);
     try {
       await removeGame(storedName);
@@ -632,12 +633,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
       >
         <button
           onClick={handleApplyConfig}
-          style={{
-            ...BTN_STYLE,
-            border: "1px solid #0078d4",
-            background: "#0078d4",
-            color: "white",
-          }}
+          style={BTN_STYLE}
         >
           Apply Config
         </button>
@@ -645,22 +641,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         <button
           onClick={steamInfo ? handleUpdateSteam : handleAddToSteam}
           disabled={loading === "add" || loading === "update"}
-          style={
-            steamInfo
-              ? {
-                  ...BTN_STYLE,
-                  border: "1px solid #0078d4",
-                  color: "#0078d4",
-                  opacity: loading === "update" ? 0.5 : 1,
-                }
-              : {
-                  ...BTN_STYLE,
-                  border: "1px solid #0078d4",
-                  background: "#0078d4",
-                  color: "white",
-                  opacity: loading === "add" ? 0.5 : 1,
-                }
-          }
+          style={{ ...BTN_STYLE, opacity: loading === "add" || loading === "update" ? 0.5 : 1 }}
         >
           {loading === "add"
             ? "Adding…"
@@ -728,41 +709,112 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
       </div>
 
       {steamInfo && (
+        <div>
+          {confirming === "steam" ? (
+            <div
+              style={{
+                border: "1px solid #c0392b",
+                borderRadius: "4px",
+                padding: "10px",
+                marginBottom: "8px",
+                textAlign: "center",
+                fontSize: "0.85em",
+                color: "#e74c3c",
+              }}
+            >
+              <div style={{ marginBottom: "6px" }}>Remove from Steam?</div>
+              <div style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
+                <button
+                  onClick={() => { setConfirming(null); handleRemoveSteam(); }}
+                  style={{
+                    ...BTN_STYLE,
+                    border: "1px solid #c0392b",
+                    background: "#c0392b",
+                    color: "white",
+                  }}
+                >
+                  Yes, Remove
+                </button>
+                <button
+                  onClick={() => setConfirming(null)}
+                  style={BTN_STYLE}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirming("steam")}
+              disabled={loading === "remove"}
+              style={{
+                width: "100%",
+                padding: "10px 0",
+                fontSize: "0.85em",
+                cursor: "pointer",
+                borderRadius: "4px",
+                border: "1px solid #c0392b",
+                background: "transparent",
+                color: "#e74c3c",
+                marginBottom: "8px",
+                opacity: loading === "remove" ? 0.5 : 1,
+              }}
+            >
+              {loading === "remove" ? "Removing…" : "Remove from Steam"}
+            </button>
+          )}
+        </div>
+      )}
+
+      {confirming === "deckyfin" ? (
+        <div
+          style={{
+            border: "1px solid #c0392b",
+            borderRadius: "4px",
+            padding: "12px",
+            textAlign: "center",
+            fontSize: "0.85em",
+            color: "#e74c3c",
+          }}
+        >
+          <div style={{ marginBottom: "6px" }}>Remove from Deckyfin? This cannot be undone.</div>
+          <div style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
+            <button
+              onClick={() => { setConfirming(null); handleRemove(); }}
+              style={{
+                ...BTN_STYLE,
+                border: "1px solid #c0392b",
+                background: "#c0392b",
+                color: "white",
+              }}
+            >
+              Yes, Remove
+            </button>
+            <button
+              onClick={() => setConfirming(null)}
+              style={BTN_STYLE}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
         <button
-          onClick={handleRemoveSteam}
-          disabled={loading === "remove"}
+          onClick={() => setConfirming("deckyfin")}
           style={{
             width: "100%",
-            padding: "10px 0",
+            padding: "12px 0",
             fontSize: "0.85em",
             cursor: "pointer",
             borderRadius: "4px",
             border: "1px solid #c0392b",
             background: "transparent",
             color: "#e74c3c",
-            marginBottom: "8px",
-            opacity: loading === "remove" ? 0.5 : 1,
           }}
         >
-          {loading === "remove" ? "Removing…" : `Remove "${name}" from Steam`}
+          Remove from Deckyfin
         </button>
       )}
-
-      <button
-        onClick={handleRemove}
-        style={{
-          width: "100%",
-          padding: "12px 0",
-          fontSize: "0.85em",
-          cursor: "pointer",
-          borderRadius: "4px",
-          border: "1px solid #c0392b",
-          background: "transparent",
-          color: "#e74c3c",
-        }}
-      >
-        Remove "{name}" from Deckyfin
-      </button>
     </div>
   );
 };
