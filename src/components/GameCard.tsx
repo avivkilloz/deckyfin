@@ -1,5 +1,6 @@
 import { VFC, useState, useEffect } from "react";
 import { callable } from "@decky/api";
+import { Focusable } from "@decky/ui";
 import { GameConfig } from "../types";
 
 const getGameCardArt = callable<
@@ -23,7 +24,8 @@ export const GameCard: VFC<Props> = ({ game, isInSteam, onClick }) => {
   }, [game.name]);
 
   return (
-    <div
+    <Focusable
+      onActivate={onClick}
       onClick={onClick}
       style={{
         padding: "12px",
@@ -108,6 +110,6 @@ export const GameCard: VFC<Props> = ({ game, isInSteam, onClick }) => {
           Proton: {game.proton_version}
         </p>
       )}
-    </div>
+    </Focusable>
   );
 };

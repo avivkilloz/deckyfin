@@ -1,5 +1,6 @@
-import { VFC, useState, useEffect, useCallback } from "react";
+import { VFC, useState, useEffect, useCallback, useRef } from "react";
 import { callable } from "@decky/api";
+import { Focusable } from "@decky/ui";
 import { GameConfig } from "../types";
 import { GameCard } from "../components/GameCard";
 import { SettingsPage } from "../components/SettingsPage";
@@ -9,6 +10,25 @@ const getGames = callable<[], GameConfig[]>("get_games");
 const getGamesFolder = callable<[], string | null>("get_games_folder");
 const listNonSteamGames = callable<[], { name: string }[]>("list_nonsteam_games");
 const restartSteam = callable<[], { success: boolean; message?: string }>("restart_steam");
+
+const BTN_RESTART: React.CSSProperties = {
+  padding: "6px 10px",
+  fontSize: "0.82em",
+  cursor: "pointer",
+  borderRadius: "4px",
+  background: "transparent",
+  color: "#e0e0e0",
+};
+
+const BTN_SETTINGS: React.CSSProperties = {
+  padding: "6px 10px",
+  fontSize: "0.82em",
+  cursor: "pointer",
+  borderRadius: "4px",
+  border: "1px solid #555",
+  background: "transparent",
+  color: "#e0e0e0",
+};
 
 export const GameLibrary: VFC = () => {
   const [games, setGames] = useState<GameConfig[]>([]);
@@ -23,6 +43,7 @@ export const GameLibrary: VFC = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [restarting, setRestarting] = useState(false);
   const [needsRestart, setNeedsRestart] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   const handleRestartSteam = useCallback(async () => {
     setRestarting(true);
@@ -99,52 +120,42 @@ export const GameLibrary: VFC = () => {
         }}
       >
         <div style={{ display: "flex", gap: "6px" }}>
-          <button
+          <Focusable
+            onActivate={handleRestartSteam}
             onClick={handleRestartSteam}
-            disabled={restarting}
-            title="Restart Steam"
             style={{
-              padding: "6px 10px",
-              fontSize: "0.82em",
-              cursor: "pointer",
-              borderRadius: "4px",
+              ...BTN_RESTART,
               border: needsRestart ? "1px solid #27ae60" : "1px solid #555",
-              background: "transparent",
               color: needsRestart ? "#2ecc71" : "#e0e0e0",
             }}
           >
             {restarting ? "…" : "↺ Restart Steam"}
-          </button>
-          <button
+          </Focusable>
+          <Focusable
+            onActivate={() => setView("settings")}
             onClick={() => setView("settings")}
-            style={{
-              padding: "6px 10px",
-              fontSize: "0.82em",
-              cursor: "pointer",
-              borderRadius: "4px",
-              border: "1px solid #555",
-              background: "transparent",
-              color: "#e0e0e0",
-            }}
+            style={BTN_SETTINGS}
           >
             ⚙ Settings
-          </button>
+          </Focusable>
         </div>
       </div>
 
       {/* Search */}
-      <input
-        type="text"
-        placeholder="Search games..."
-        value={searchQuery}
-        onChange={(e) => setSearchQuery(e.target.value)}
-        style={{
-          width: "100%",
-          padding: "8px",
-          marginBottom: "12px",
-          boxSizing: "border-box",
-        }}
-      />
+      <Focusable onActivate={() => searchRef.current?.focus()} style={{ marginBottom: "12px" }}>
+        <input
+          ref={searchRef}
+          type="text"
+          placeholder="Search games..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          style={{
+            width: "100%",
+            padding: "8px",
+            boxSizing: "border-box",
+          }}
+        />
+      </Focusable>
 
       {/* Game list */}
       {loading && <p>Loading...</p>}

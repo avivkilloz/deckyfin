@@ -1,6 +1,6 @@
-import { VFC, useState, useEffect } from "react";
+import { VFC, useState, useEffect, useRef } from "react";
 import { callable } from "@decky/api";
-import { Navigation } from "@decky/ui";
+import { Navigation, Focusable, TextField } from "@decky/ui";
 
 const setGamesFolder = callable<
   [path: string],
@@ -23,7 +23,20 @@ interface Props {
   onBack: () => void;
 }
 
+const BTN_STYLE: React.CSSProperties = {
+  padding: "8px 12px",
+  fontSize: "0.85em",
+  cursor: "pointer",
+  borderRadius: "4px",
+  border: "1px solid #555",
+  background: "transparent",
+  color: "#e0e0e0",
+};
+
 export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
+  const folderRef = useRef<HTMLInputElement>(null);
+  const sgKeyRef = useRef<HTMLInputElement>(null);
+
   const [folderPath, setFolderPath] = useState(gamesFolder || "");
   const [message, setMessage] = useState<string | null>(null);
   const [rescanned, setRescanned] = useState(false);
@@ -88,40 +101,45 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
   };
 
   return (
-    <div style={{ padding: "8px" }}>
-      <button onClick={onBack} style={{
-        padding: "6px 10px",
-        fontSize: "0.82em",
-        cursor: "pointer",
-        borderRadius: "4px",
-        border: "1px solid #555",
-        background: "transparent",
-        color: "#e0e0e0",
-        marginBottom: "12px",
-      }}>
+    <Focusable
+      onCancel={onBack}
+      style={{ padding: "8px" }}
+    >
+      <Focusable
+        onActivate={onBack}
+        onClick={onBack}
+        style={{
+          ...BTN_STYLE,
+          padding: "6px 10px",
+          fontSize: "0.82em",
+          display: "inline-block",
+          marginBottom: "12px",
+        }}
+      >
         ← Back
-      </button>
+      </Focusable>
       <h3>Settings</h3>
 
       {/* ── Games Folder ────────────────────────────────────────────────── */}
       <label>Games Folder:</label>
-      <input
-        type="text"
-        value={folderPath}
-        onChange={(e) => setFolderPath(e.target.value)}
-        placeholder="/home/deck/games"
-        style={{ width: "100%", marginBottom: "12px", padding: "8px", boxSizing: "border-box" }}
-      />
+      <Focusable onActivate={() => folderRef.current?.focus()}>
+        <input
+          ref={folderRef}
+          type="text"
+          value={folderPath}
+          onChange={(e) => setFolderPath(e.target.value)}
+          placeholder="/home/deck/games"
+          style={{ width: "100%", marginBottom: "12px", padding: "8px", boxSizing: "border-box" }}
+        />
+      </Focusable>
 
-      <button onClick={handleSave} style={{
-        padding: "8px 12px",
-        fontSize: "0.85em",
-        cursor: "pointer",
-        borderRadius: "4px",
-        border: "1px solid #555",
-        background: "transparent",
-        color: "#e0e0e0",
-      }}>Save</button>
+      <Focusable
+        onActivate={handleSave}
+        onClick={handleSave}
+        style={BTN_STYLE}
+      >
+        Save
+      </Focusable>
 
       <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.12)", margin: "20px 0" }} />
 
@@ -131,34 +149,38 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
       <p style={{ fontSize: "0.85em", color: "#aaa", marginBottom: "10px" }}>
         A default key is bundled. Set a custom one here to override it.
         Get your own free key{" "}
-        <span
+        <Focusable
+          onActivate={() =>
+            Navigation.NavigateToExternalWeb("https://www.steamgriddb.com/profile/preferences/api")
+          }
           onClick={() =>
             Navigation.NavigateToExternalWeb("https://www.steamgriddb.com/profile/preferences/api")
           }
-          style={{ color: "#0078d4", textDecoration: "underline", cursor: "pointer" }}
+          style={{ color: "#0078d4", textDecoration: "underline", cursor: "pointer", display: "inline" }}
         >
           here
-        </span>
+        </Focusable>
         .
       </p>
-      <input
-        type="text"
-        value={sgKey}
-        onChange={(e) => setSgKey(e.target.value)}
-        placeholder="Enter your API key or leave empty for default"
-        style={{ width: "100%", marginBottom: "8px", padding: "8px", boxSizing: "border-box" }}
-      />
+      <Focusable onActivate={() => sgKeyRef.current?.focus()}>
+        <input
+          ref={sgKeyRef}
+          type="text"
+          value={sgKey}
+          onChange={(e) => setSgKey(e.target.value)}
+          placeholder="Enter your API key or leave empty for default"
+          style={{ width: "100%", marginBottom: "8px", padding: "8px", boxSizing: "border-box" }}
+        />
+      </Focusable>
 
       <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-        <button onClick={handleSaveKey} style={{
-          padding: "8px 12px",
-          fontSize: "0.85em",
-          cursor: "pointer",
-          borderRadius: "4px",
-          border: "1px solid #555",
-          background: "transparent",
-          color: "#e0e0e0",
-        }}>Save Key</button>
+        <Focusable
+          onActivate={handleSaveKey}
+          onClick={handleSaveKey}
+          style={BTN_STYLE}
+        >
+          Save Key
+        </Focusable>
         {sgHasOverride && (
           <span style={{ fontSize: "0.8em", color: "#f0ad4e" }}>
             (custom key active)
@@ -180,7 +202,8 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
       <p style={{ fontSize: "0.85em", color: "#aaa", marginBottom: "10px" }}>
         Re-discover games from the configured folder and create config entries for any new subdirectories.
       </p>
-      <button
+      <Focusable
+        onActivate={handleRescan}
         onClick={handleRescan}
         style={{
           padding: "8px 16px",
@@ -190,12 +213,13 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
           border: "1px solid #f0ad4e",
           background: "transparent",
           color: "#f0ad4e",
+          display: "inline-block",
         }}
       >
         Rescan Games Folder
-      </button>
+      </Focusable>
 
       {message && <p style={{ marginTop: "12px", color: rescanned ? "#f0ad4e" : undefined }}>{message}</p>}
-    </div>
+    </Focusable>
   );
 };

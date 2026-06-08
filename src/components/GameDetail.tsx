@@ -1,6 +1,6 @@
-import { VFC, useState, useEffect } from "react";
+import { VFC, useState, useEffect, useRef } from "react";
 import { callable } from "@decky/api";
-import { Navigation } from "@decky/ui";
+import { Navigation, Focusable, TextField } from "@decky/ui";
 import { GameConfig } from "../types";
 import { useArtwork } from "../hooks/useArtwork";
 
@@ -95,6 +95,14 @@ const BTN_STYLE: React.CSSProperties = {
 };
 
 export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
+  // ── Refs for text inputs (controller focus) ──────────────────────────
+  const nameRef = useRef<HTMLInputElement>(null);
+  const exeRef = useRef<HTMLInputElement>(null);
+  const startDirRef = useRef<HTMLInputElement>(null);
+  const steamAppIdRef = useRef<HTMLInputElement>(null);
+  const protonRef = useRef<HTMLSelectElement>(null);
+  const customDepsRef = useRef<HTMLInputElement>(null);
+
   // ── Editable config fields ──────────────────────────────────────────────
   const [name, setName] = useState(game.name);
   const [storedName, setStoredName] = useState(game.name); // last saved name (lookup key)
@@ -274,25 +282,9 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
       );
       if (res.success && res.app_id && res.unsigned_appid) {
         setSteamInfo({ app_id: res.app_id, unsigned_appid: res.unsigned_appid });
-        let protonMsg = "";
-        if (protonVersion) {
-          // Create the prefix first so Steam doesn't reset the compat tool
-          // on next restart (without a compatdata dir Steam may overwrite the mapping)
-          try {
-            await initPrefix(res.app_id, protonVersion, false);
-          } catch (_) {
-            // Non-critical — prefix init is best-effort here; the user can
-            // explicitly Init Prefix or Install Deps later to create it.
-          }
-          const protonRes = await setGameProton(res.app_id, protonVersion);
-          if (protonRes.success) {
-            setCurrentProton(protonVersion);
-            protonMsg = ` — Proton: ${protonVersion}`;
-          }
-        }
         setFeedback({
           ok: true,
-          msg: `Steam updated${protonMsg} — restart Steam to apply`,
+          msg: "Steam updated — restart Steam to apply",
         });
         onNeedsRestart?.();
       } else {
@@ -407,20 +399,32 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   // ── Render ──────────────────────────────────────────────────────────────
 
   return (
-    <div style={{ padding: "8px" }}>
+    <Focusable
+      onCancel={onBack}
+      style={{ padding: "8px" }}
+    >
       {/* Back */}
-      <button onClick={onBack} style={{ ...BTN_STYLE, marginBottom: "12px" }}>← Back</button>
+      <Focusable
+        onActivate={onBack}
+        onClick={onBack}
+        style={{ ...BTN_STYLE, marginBottom: "12px", display: "inline-block" }}
+      >
+        ← Back
+      </Focusable>
 
       {/* ── Config Fields ──────────────────────────────────────────────── */}
       <h4 style={{ margin: "0 0 10px 0" }}>Game Settings</h4>
 
       {/* Name */}
       <label style={LABEL_STYLE}>Name</label>
-      <input
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        style={FIELD_STYLE}
-      />
+      <Focusable onActivate={() => nameRef.current?.focus()}>
+        <input
+          ref={nameRef}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          style={FIELD_STYLE}
+        />
+      </Focusable>
 
       {/* Executable */}
       <label style={LABEL_STYLE}>Executable</label>
@@ -431,14 +435,21 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           marginBottom: showExePicker ? "4px" : "10px",
         }}
       >
-        <input
-          value={executable}
-          onChange={(e) => setExecutable(e.target.value)}
-          style={{ flex: 1, padding: "6px", boxSizing: "border-box" }}
-        />
-        <button onClick={handleOpenExePicker} style={BTN_STYLE}>
+        <Focusable onActivate={() => exeRef.current?.focus()} style={{ flex: 1 }}>
+          <input
+            ref={exeRef}
+            value={executable}
+            onChange={(e) => setExecutable(e.target.value)}
+            style={{ width: "100%", padding: "6px", boxSizing: "border-box" }}
+          />
+        </Focusable>
+        <Focusable
+          onActivate={handleOpenExePicker}
+          onClick={handleOpenExePicker}
+          style={BTN_STYLE}
+        >
           {showExePicker ? "✕" : "Browse"}
-        </button>
+        </Focusable>
       </div>
 
       {/* Executable picker dropdown */}
@@ -458,8 +469,9 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
             </p>
           )}
           {exeOptions.map((exe) => (
-            <div
+            <Focusable
               key={exe}
+              onActivate={() => handleSelectExe(exe)}
               onClick={() => handleSelectExe(exe)}
               style={{
                 padding: "8px 10px",
@@ -471,46 +483,55 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
               onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
             >
               {exe}
-            </div>
+            </Focusable>
           ))}
         </div>
       )}
 
       {/* Start Dir */}
       <label style={LABEL_STYLE}>Start Dir</label>
-      <input
-        value={startDir}
-        onChange={(e) => setStartDir(e.target.value)}
-        style={FIELD_STYLE}
-      />
+      <Focusable onActivate={() => startDirRef.current?.focus()}>
+        <input
+          ref={startDirRef}
+          value={startDir}
+          onChange={(e) => setStartDir(e.target.value)}
+          style={FIELD_STYLE}
+        />
+      </Focusable>
 
       {/* Steam App ID */}
       <label style={LABEL_STYLE}>Steam App ID</label>
-      <input
-        value={steamAppIdInput}
-        onChange={(e) => {
-          setSteamAppIdInput(e.target.value);
-          const parsed = parseInt(e.target.value, 10);
-          setSteamAppId(isNaN(parsed) ? undefined : parsed);
-        }}
-        placeholder="e.g. 730 for CS:GO"
-        style={FIELD_STYLE}
-      />
+      <Focusable onActivate={() => steamAppIdRef.current?.focus()}>
+        <input
+          ref={steamAppIdRef}
+          value={steamAppIdInput}
+          onChange={(e) => {
+            setSteamAppIdInput(e.target.value);
+            const parsed = parseInt(e.target.value, 10);
+            setSteamAppId(isNaN(parsed) ? undefined : parsed);
+          }}
+          placeholder="e.g. 730 for CS:GO"
+          style={FIELD_STYLE}
+        />
+      </Focusable>
 
       {/* Proton Version */}
       <label style={LABEL_STYLE}>Proton Version</label>
-      <select
-        value={protonVersion}
-        onChange={(e) => setProtonVersion(e.target.value)}
-        style={FIELD_STYLE}
-      >
-        <option value="">— None —</option>
-        {protonVersions.map((v) => (
-          <option key={v} value={v}>
-            {v}
-          </option>
-        ))}
-      </select>
+      <Focusable onActivate={() => protonRef.current?.focus()}>
+        <select
+          ref={protonRef}
+          value={protonVersion}
+          onChange={(e) => setProtonVersion(e.target.value)}
+          style={FIELD_STYLE}
+        >
+          <option value="">— None —</option>
+          {protonVersions.map((v) => (
+            <option key={v} value={v}>
+              {v}
+            </option>
+          ))}
+        </select>
+      </Focusable>
 
       {/* ── Dependencies: Toggle Chips + Custom ──────────────────────── */}
       <label style={LABEL_STYLE}>
@@ -540,8 +561,9 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           {POPULAR_DEPS.map((dep) => {
             const selected = checkedDeps.includes(dep);
             return (
-              <button
+              <Focusable
                 key={dep}
+                onActivate={() => toggleCheckedDep(dep)}
                 onClick={() => toggleCheckedDep(dep)}
                 style={{
                   padding: "4px 12px",
@@ -556,7 +578,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
                 }}
               >
                 {dep}
-              </button>
+              </Focusable>
             );
           })}
         </div>
@@ -565,27 +587,37 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         <label style={{ fontSize: "0.82em", color: "#888", display: "block", marginBottom: "2px" }}>
           Custom (comma-separated)
         </label>
-        <input
-          value={customDeps}
-          onChange={(e) => setCustomDeps(e.target.value)}
-          placeholder="e.g. dotnet_core,faudio"
-          style={{
-            width: "100%",
-            padding: "4px 6px",
-            boxSizing: "border-box",
-            fontSize: "0.95em",
-            border: "1px solid #555",
-            borderRadius: "3px",
-            background: "transparent",
-            color: "#e0e0e0",
-          }}
-        />
+        <Focusable onActivate={() => customDepsRef.current?.focus()}>
+          <input
+            ref={customDepsRef}
+            value={customDeps}
+            onChange={(e) => setCustomDeps(e.target.value)}
+            placeholder="e.g. dotnet_core,faudio"
+            style={{
+              width: "100%",
+              padding: "4px 6px",
+              boxSizing: "border-box",
+              fontSize: "0.95em",
+              border: "1px solid #555",
+              borderRadius: "3px",
+              background: "transparent",
+              color: "#e0e0e0",
+            }}
+          />
+        </Focusable>
       </div>
 
       {/* ── SteamDB lookup ──────────────────────────────────────────────── */}
       <div style={{ fontSize: "0.82em", color: "#888", marginBottom: "8px" }}>
         Look up dependencies on{" "}
-        <span
+        <Focusable
+          onActivate={() =>
+            Navigation.NavigateToExternalWeb(
+              steamAppId
+                ? `https://steamdb.info/app/${steamAppId}/`
+                : `https://steamdb.info/search/?a=all&q=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`
+            )
+          }
           onClick={() =>
             Navigation.NavigateToExternalWeb(
               steamAppId
@@ -593,10 +625,10 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
                 : `https://steamdb.info/search/?a=all&q=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`
             )
           }
-          style={{ color: "#0078d4", textDecoration: "underline", cursor: "pointer" }}
+          style={{ color: "#0078d4", textDecoration: "underline", cursor: "pointer", display: "inline" }}
         >
           SteamDB
-        </span>
+        </Focusable>
         {" — "}under Depots → Redistributables
         {steamAppId && (
           <span style={{ color: "#666" }}> (App {steamAppId})</span>
@@ -631,17 +663,21 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           marginBottom: "14px",
         }}
       >
-        <button
+        <Focusable
+          onActivate={handleApplyConfig}
           onClick={handleApplyConfig}
           style={BTN_STYLE}
         >
           Apply Config
-        </button>
+        </Focusable>
 
-        <button
+        <Focusable
+          onActivate={steamInfo ? handleUpdateSteam : handleAddToSteam}
           onClick={steamInfo ? handleUpdateSteam : handleAddToSteam}
-          disabled={loading === "add" || loading === "update"}
-          style={{ ...BTN_STYLE, opacity: loading === "add" || loading === "update" ? 0.5 : 1 }}
+          style={{
+            ...BTN_STYLE,
+            opacity: loading === "add" || loading === "update" ? 0.5 : 1,
+          }}
         >
           {loading === "add"
             ? "Adding…"
@@ -650,17 +686,21 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
             : steamInfo
             ? "Update Steam"
             : "Add to Steam"}
-        </button>
+        </Focusable>
 
-        <button
+        <Focusable
+          onActivate={handleInitPrefix}
           onClick={handleInitPrefix}
-          disabled={!steamInfo || loading === "init"}
-          style={{ ...BTN_STYLE, opacity: !steamInfo || loading === "init" ? 0.5 : 1 }}
+          style={{
+            ...BTN_STYLE,
+            opacity: !steamInfo || loading === "init" ? 0.5 : 1,
+          }}
         >
           {loading === "init" ? "Initing…" : forceReinit ? "Re-init Prefix" : "Init Prefix"}
-        </button>
+        </Focusable>
 
-        <button
+        <Focusable
+          onActivate={() => setForceReinit(!forceReinit)}
           onClick={() => setForceReinit(!forceReinit)}
           style={{
             ...BTN_STYLE,
@@ -670,23 +710,29 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           }}
         >
           {forceReinit ? "✓ Force re-init" : "☐ Force re-init"}
-        </button>
+        </Focusable>
 
-        <button
+        <Focusable
+          onActivate={handleInstallDeps}
           onClick={handleInstallDeps}
-          disabled={!steamInfo || mergedDeps.length === 0 || loading === "deps"}
-          style={{ ...BTN_STYLE, opacity: !steamInfo || mergedDeps.length === 0 || loading === "deps" ? 0.5 : 1 }}
+          style={{
+            ...BTN_STYLE,
+            opacity: !steamInfo || mergedDeps.length === 0 || loading === "deps" ? 0.5 : 1,
+          }}
         >
           {loading === "deps" ? "Installing…" : "Install Dependencies"}
-        </button>
+        </Focusable>
 
-        <button
+        <Focusable
+          onActivate={handleAddArt}
           onClick={handleAddArt}
-          disabled={!steamInfo || loading === "art"}
-          style={{ ...BTN_STYLE, opacity: !steamInfo || loading === "art" ? 0.5 : 1 }}
+          style={{
+            ...BTN_STYLE,
+            opacity: !steamInfo || loading === "art" ? 0.5 : 1,
+          }}
         >
           {loading === "art" ? "Adding Art…" : "Add Art"}
-        </button>
+        </Focusable>
       </div>
 
       {/* ── Feedback ───────────────────────────────────────────────────── */}
@@ -724,7 +770,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
             >
               <div style={{ marginBottom: "6px" }}>Remove from Steam?</div>
               <div style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
-                <button
+                <Focusable
+                  onActivate={() => { setConfirming(null); handleRemoveSteam(); }}
                   onClick={() => { setConfirming(null); handleRemoveSteam(); }}
                   style={{
                     ...BTN_STYLE,
@@ -734,19 +781,20 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
                   }}
                 >
                   Yes, Remove
-                </button>
-                <button
+                </Focusable>
+                <Focusable
+                  onActivate={() => setConfirming(null)}
                   onClick={() => setConfirming(null)}
                   style={BTN_STYLE}
                 >
                   Cancel
-                </button>
+                </Focusable>
               </div>
             </div>
           ) : (
-            <button
+            <Focusable
+              onActivate={() => setConfirming("steam")}
               onClick={() => setConfirming("steam")}
-              disabled={loading === "remove"}
               style={{
                 width: "100%",
                 padding: "10px 0",
@@ -757,11 +805,12 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
                 background: "transparent",
                 color: "#e74c3c",
                 marginBottom: "8px",
+                textAlign: "center",
                 opacity: loading === "remove" ? 0.5 : 1,
               }}
             >
               {loading === "remove" ? "Removing…" : "Remove from Steam"}
-            </button>
+            </Focusable>
           )}
         </div>
       )}
@@ -779,7 +828,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         >
           <div style={{ marginBottom: "6px" }}>Remove from Deckyfin? This cannot be undone.</div>
           <div style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
-            <button
+            <Focusable
+              onActivate={() => { setConfirming(null); handleRemove(); }}
               onClick={() => { setConfirming(null); handleRemove(); }}
               style={{
                 ...BTN_STYLE,
@@ -789,17 +839,19 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
               }}
             >
               Yes, Remove
-            </button>
-            <button
+            </Focusable>
+            <Focusable
+              onActivate={() => setConfirming(null)}
               onClick={() => setConfirming(null)}
               style={BTN_STYLE}
             >
               Cancel
-            </button>
+            </Focusable>
           </div>
         </div>
       ) : (
-        <button
+        <Focusable
+          onActivate={() => setConfirming("deckyfin")}
           onClick={() => setConfirming("deckyfin")}
           style={{
             width: "100%",
@@ -810,11 +862,12 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
             border: "1px solid #c0392b",
             background: "transparent",
             color: "#e74c3c",
+            textAlign: "center",
           }}
         >
           Remove from Deckyfin
-        </button>
+        </Focusable>
       )}
-    </div>
+    </Focusable>
   );
 };
