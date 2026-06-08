@@ -135,14 +135,16 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
         />
       </Focusable>
 
-      <Focusable
-        onActivate={handleSave}
-        onClick={handleSave}
-        focusClassName="is-focused"
-        style={BTN_STYLE}
-      >
-        Save
-      </Focusable>
+      <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+        <Focusable
+          onActivate={handleSave}
+          onClick={handleSave}
+          focusClassName="is-focused"
+          style={BTN_STYLE}
+        >
+          Save
+        </Focusable>
+      </div>
 
       <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.12)", margin: "20px 0" }} />
 

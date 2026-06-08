@@ -102,6 +102,21 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   const steamAppIdRef = useRef<HTMLInputElement>(null);
   const protonRef = useRef<HTMLSelectElement>(null);
   const customDepsRef = useRef<HTMLInputElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  // ── B-button (back) handler that works regardless of focus ──────────
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape" || e.code === "Escape") {
+        e.stopPropagation();
+        onBack();
+      }
+    };
+    el.addEventListener("keydown", handler);
+    return () => el.removeEventListener("keydown", handler);
+  }, [onBack]);
 
   // ── Editable config fields ──────────────────────────────────────────────
   const [name, setName] = useState(game.name);
@@ -399,10 +414,10 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   // ── Render ──────────────────────────────────────────────────────────────
 
   return (
-    <Focusable
-      onCancel={onBack}
-      focusClassName="is-focused"
-      style={{ padding: "8px" }}
+    <div
+      ref={rootRef}
+      tabIndex={-1}
+      style={{ padding: "8px", outline: "none" }}
     >
       {/* Back */}
       <Focusable
@@ -886,6 +901,6 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           Remove from Deckyfin
         </Focusable>
       )}
-    </Focusable>
+    </div>
   );
 };

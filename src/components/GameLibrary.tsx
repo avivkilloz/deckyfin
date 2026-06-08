@@ -119,7 +119,7 @@ export const GameLibrary: VFC = () => {
           marginBottom: "12px",
         }}
       >
-        <div style={{ display: "flex", gap: "6px" }}>
+        <Focusable style={{ display: "flex", gap: "6px" }}>
           <Focusable
             onActivate={handleRestartSteam}
             onClick={handleRestartSteam}
@@ -140,7 +140,7 @@ export const GameLibrary: VFC = () => {
           >
             ⚙ Settings
           </Focusable>
-        </div>
+        </Focusable>
       </div>
 
       {/* Search */}

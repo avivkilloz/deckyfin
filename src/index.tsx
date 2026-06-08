@@ -7,14 +7,6 @@ export default definePlugin(() => {
     title: <div>Deckyfin</div>,
     content: (
       <div id="deckyfin-wrap">
-        <style>{`
-          .gpfocus,
-          .is-focused {
-            outline: 3px solid rgba(0, 255, 0, 1) !important;
-            outline-offset: 2px !important;
-            background: rgba(255, 0, 0, 0.15) !important;
-          }
-        `}</style>
         <GameLibrary />
       </div>
     ),
