@@ -1,6 +1,6 @@
 import { VFC, useState, useEffect, useRef } from "react";
 import { callable } from "@decky/api";
-import { Navigation, Focusable, Dropdown } from "@decky/ui";
+import { Navigation, Focusable } from "@decky/ui";
 import { GameConfig } from "../types";
 import { useArtwork } from "../hooks/useArtwork";
 
@@ -80,7 +80,6 @@ const LABEL_STYLE: React.CSSProperties = {
 const FIELD_STYLE: React.CSSProperties = {
   width: "100%",
   padding: "6px",
-  marginBottom: "10px",
   boxSizing: "border-box",
 };
 
@@ -100,13 +99,13 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   const exeRef = useRef<HTMLInputElement>(null);
   const startDirRef = useRef<HTMLInputElement>(null);
   const steamAppIdRef = useRef<HTMLInputElement>(null);
-  const protonRef = useRef<HTMLSelectElement>(null);
   const customDepsRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
   // ── Auto-focus root on mount so B-button works immediately ──
   useEffect(() => {
-    rootRef.current?.focus();
+    const timer = setTimeout(() => rootRef.current?.focus(), 150);
+    return () => clearTimeout(timer);
   }, []);
 
   // ── Editable config fields ──────────────────────────────────────────────
@@ -124,6 +123,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   const [protonVersion, setProtonVersion] = useState(
     game.proton_version || ""
   );
+  const [protonPickerOpen, setShowProtonPicker] = useState(false);
 
   // ── Dependencies: checkboxes + custom ────────────────────────────────────
   const existingDeps = game.proton_dependencies || [];
@@ -427,7 +427,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
 
       {/* Name */}
       <label style={LABEL_STYLE}>Name</label>
-      <Focusable onActivate={() => nameRef.current?.focus()} focusClassName="is-focused">
+      <Focusable onActivate={() => nameRef.current?.focus()} focusClassName="is-focused" style={{ marginBottom: "10px" }}>
         <input
           ref={nameRef}
           value={name}
@@ -502,7 +502,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
 
       {/* Start Dir */}
       <label style={LABEL_STYLE}>Start Dir</label>
-      <Focusable onActivate={() => startDirRef.current?.focus()} focusClassName="is-focused">
+      <Focusable onActivate={() => startDirRef.current?.focus()} focusClassName="is-focused" style={{ marginBottom: "10px" }}>
         <input
           ref={startDirRef}
           value={startDir}
@@ -513,7 +513,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
 
       {/* Steam App ID */}
       <label style={LABEL_STYLE}>Steam App ID</label>
-      <Focusable onActivate={() => steamAppIdRef.current?.focus()} focusClassName="is-focused">
+      <Focusable onActivate={() => steamAppIdRef.current?.focus()} focusClassName="is-focused" style={{ marginBottom: "10px" }}>
         <input
           ref={steamAppIdRef}
           value={steamAppIdInput}
@@ -527,19 +527,57 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         />
       </Focusable>
 
-      {/* Proton Version: Dropdown */}
+      {/* Proton Version: inline picker */}
       <label style={LABEL_STYLE}>Proton Version</label>
-      <Dropdown
-        rgOptions={[
-          { data: "", label: "— None —" },
-          ...protonVersions.map((v) => ({ data: v, label: v })),
-        ]}
-        selectedOption={protonVersion}
-        onChange={(opt) => setProtonVersion(opt.data)}
-        focusable={true}
-        menuLabel="Select Proton Version"
-        strDefaultLabel="— None —"
-      />
+      <Focusable
+        onActivate={() => setShowProtonPicker((p) => !p)}
+        onClick={() => setShowProtonPicker((p) => !p)}
+        focusClassName="is-focused"
+        style={{
+          ...BTN_STYLE,
+          display: "inline-block",
+          marginBottom: protonPickerOpen ? "4px" : "10px",
+          background: protonVersion ? "transparent" : "transparent",
+          color: protonVersion ? "#2ecc71" : "#888",
+        }}
+      >
+        {protonVersion || "— None —"}
+      </Focusable>
+      {protonPickerOpen && (
+        <div
+          style={{
+            marginBottom: "10px",
+            border: "1px solid #555",
+            borderRadius: "4px",
+            maxHeight: "200px",
+            overflowY: "auto",
+          }}
+        >
+          <Focusable
+            onActivate={() => { setProtonVersion(""); setShowProtonPicker(false); }}
+            onClick={() => { setProtonVersion(""); setShowProtonPicker(false); }}
+            focusClassName="is-focused"
+            style={{ padding: "8px 10px", cursor: "pointer", fontSize: "0.85em", borderBottom: "1px solid #333", color: !protonVersion ? "#2ecc71" : "#ccc" }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+          >
+            — None —
+          </Focusable>
+          {protonVersions.map((v) => (
+            <Focusable
+              key={v}
+              onActivate={() => { setProtonVersion(v); setShowProtonPicker(false); }}
+              onClick={() => { setProtonVersion(v); setShowProtonPicker(false); }}
+              focusClassName="is-focused"
+              style={{ padding: "8px 10px", cursor: "pointer", fontSize: "0.85em", borderBottom: "1px solid #333", color: protonVersion === v ? "#2ecc71" : "#ccc" }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+            >
+              {v}
+            </Focusable>
+          ))}
+        </div>
+      )}
 
       {/* ── Dependencies: Toggle Chips + Custom ──────────────────────── */}
       <label style={LABEL_STYLE}>

@@ -132,14 +132,14 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
 
       {/* ── Games Folder ────────────────────────────────────────────────── */}
       <label>Games Folder:</label>
-      <Focusable onActivate={() => folderRef.current?.focus()} focusClassName="is-focused">
+      <Focusable onActivate={() => folderRef.current?.focus()} focusClassName="is-focused" style={{ marginBottom: "12px" }}>
         <input
           ref={folderRef}
           type="text"
           value={folderPath}
           onChange={(e) => setFolderPath(e.target.value)}
           placeholder="/home/deck/games"
-          style={{ width: "100%", marginBottom: "12px", padding: "8px", boxSizing: "border-box" }}
+          style={{ width: "100%", padding: "8px", boxSizing: "border-box" }}
         />
       </Focusable>
 
@@ -176,14 +176,14 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
         </Focusable>
         .
       </p>
-      <Focusable onActivate={() => sgKeyRef.current?.focus()} focusClassName="is-focused">
+      <Focusable onActivate={() => sgKeyRef.current?.focus()} focusClassName="is-focused" style={{ marginBottom: "8px" }}>
         <input
           ref={sgKeyRef}
           type="text"
           value={sgKey}
           onChange={(e) => setSgKey(e.target.value)}
           placeholder="Enter your API key or leave empty for default"
-          style={{ width: "100%", marginBottom: "8px", padding: "8px", boxSizing: "border-box" }}
+          style={{ width: "100%", padding: "8px", boxSizing: "border-box" }}
         />
       </Focusable>
 
