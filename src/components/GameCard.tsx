@@ -35,8 +35,10 @@ export const GameCard: VFC<Props> = ({ game, isInSteam, onClick }) => {
         border: "1px solid rgba(255,255,255,0.1)",
         transition: "background 0.2s",
       }}
+      onFocus={(e) => (e.currentTarget.style.boxShadow = "0 0 0 3px #51cbf8, 0 0 12px rgba(81,203,248,0.4)")}
+      onBlur={(e) => (e.currentTarget.style.boxShadow = "none")}
       onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.05)")}
-      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+      onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.boxShadow = "none"; }}
     >
       {/* Art image or gradient placeholder */}
       <div
