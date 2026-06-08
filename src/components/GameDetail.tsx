@@ -421,7 +421,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         focusClassName="is-focused"
         style={{ ...BTN_STYLE, marginBottom: "12px", display: "inline-block" }}
       >
-        ‹ Back
+        ❮ Back
       </Focusable>
 
       {/* ── Config Fields ──────────────────────────────────────────────── */}
@@ -489,6 +489,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
               onClick={() => handleSelectExe(exe)}
               focusClassName="is-focused"
               style={{
+                margin: "0 2px",
                 padding: "8px 10px",
                 cursor: "pointer",
                 fontSize: "0.85em",
@@ -560,7 +561,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
             onActivate={() => { setProtonVersion(""); setShowProtonPicker(false); }}
             onClick={() => { setProtonVersion(""); setShowProtonPicker(false); }}
             focusClassName="is-focused"
-            style={{ padding: "8px 10px", cursor: "pointer", fontSize: "0.85em", borderBottom: "1px solid #333", color: !protonVersion ? "#0078d4" : "#ccc" }}
+            style={{ margin: "0 2px", padding: "8px 10px", cursor: "pointer", fontSize: "0.85em", borderBottom: "1px solid #333", color: !protonVersion ? "#0078d4" : "#ccc" }}
             onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
             onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
           >
@@ -572,7 +573,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
               onActivate={() => { setProtonVersion(v); setShowProtonPicker(false); }}
               onClick={() => { setProtonVersion(v); setShowProtonPicker(false); }}
               focusClassName="is-focused"
-              style={{ padding: "8px 10px", cursor: "pointer", fontSize: "0.85em", borderBottom: "1px solid #333", color: protonVersion === v ? "#0078d4" : "#ccc" }}
+              style={{ margin: "0 2px", padding: "8px 10px", cursor: "pointer", fontSize: "0.85em", borderBottom: "1px solid #333", color: protonVersion === v ? "#0078d4" : "#ccc" }}
               onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
               onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
             >

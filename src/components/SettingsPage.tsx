@@ -129,12 +129,12 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
           marginBottom: "12px",
         }}
       >
-        ‹ Back
+        ❮ Back
       </Focusable>
-      <h3>Settings</h3>
+      <h3 style={{ margin: "0 0 10px 0" }}>Settings</h3>
 
       {/* ── Games Folder ────────────────────────────────────────────────── */}
-      <label>Games Folder:</label>
+      <h4 style={{ margin: "0 0 10px 0" }}>Games Folder</h4>
       <p style={{ fontSize: "0.85em", color: "#aaa", marginBottom: "8px" }}>
         Path to the root directory containing your game folders. Each
         subdirectory is treated as a separate game with its own config.
