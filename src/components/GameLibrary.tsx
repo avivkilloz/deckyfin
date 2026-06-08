@@ -98,17 +98,37 @@ export const GameLibrary: VFC = () => {
           marginBottom: "12px",
         }}
       >
-        <h2 style={{ margin: 0 }}>🎮 Deckyfin</h2>
         <div style={{ display: "flex", gap: "6px" }}>
-          <button onClick={handleRestartSteam} disabled={restarting} title="Restart Steam"
+          <button
+            onClick={handleRestartSteam}
+            disabled={restarting}
+            title="Restart Steam"
             style={{
-              background: needsRestart ? "#2ecc71" : undefined,
-              border: needsRestart ? "1px solid #27ae60" : undefined,
-              color: needsRestart ? "white" : undefined,
-            }}>
-            {restarting ? "…" : "↺"}
+              padding: "6px 10px",
+              fontSize: "0.82em",
+              cursor: "pointer",
+              borderRadius: "4px",
+              border: needsRestart ? "1px solid #27ae60" : "1px solid #555",
+              background: needsRestart ? "#2ecc71" : "transparent",
+              color: needsRestart ? "white" : "#e0e0e0",
+            }}
+          >
+            {restarting ? "…" : "↺ Restart Steam"}
           </button>
-          <button onClick={() => setView("settings")}>⚙</button>
+          <button
+            onClick={() => setView("settings")}
+            style={{
+              padding: "6px 10px",
+              fontSize: "0.82em",
+              cursor: "pointer",
+              borderRadius: "4px",
+              border: "1px solid #555",
+              background: "transparent",
+              color: "#e0e0e0",
+            }}
+          >
+            ⚙ Settings
+          </button>
         </div>
       </div>
 

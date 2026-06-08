@@ -409,7 +409,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   return (
     <div style={{ padding: "8px" }}>
       {/* Back */}
-      <button onClick={onBack} style={{ marginBottom: "12px" }}>← Back</button>
+      <button onClick={onBack} style={{ ...BTN_STYLE, marginBottom: "12px" }}>← Back</button>
 
       {/* ── Config Fields ──────────────────────────────────────────────── */}
       <h4 style={{ margin: "0 0 10px 0" }}>Game Settings</h4>
