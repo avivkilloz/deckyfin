@@ -1,0 +1,410 @@
+(1)(deck@steamdeck deckyfin)$ sudo XDG_RUNTIME_DIR=/run/user/1000 runuser -u deck -- flatpak run com.github.Matoking.protontricks 3225169897 -- --force --unattended vcrun2022
+[sudo] password for deck: 
+
+Note that the directories 
+
+'/var/lib/flatpak/exports/share'
+'/home/deck/.local/share/flatpak/exports/share'
+
+are not in the search path set by the XDG_DATA_DIRS environment variable, so
+applications installed by Flatpak may not appear on your desktop until the
+session is restarted.
+
+
+Note that the directories 
+
+'/var/lib/flatpak/exports/share'
+'/home/deck/.local/share/flatpak/exports/share'
+
+are not in the search path set by the XDG_DATA_DIRS environment variable, so
+applications installed by Flatpak may not appear on your desktop until the
+session is restarted.
+
+steam-runtime-launcher-service[61]: W: The --socket option is deprecated. Prefer to use --session or --bus-name.
+Executing cd /app/bin
+                     Using winetricks 20260125 (protontricks) - sha256sum: 8b2d90a1df27c829f27ee0d1ba3dc8c8f7c81e4c107127d85082ec06dc6bf4c8 with wine-10.0 (Staging) and WINEARCH=win64
+          Executing w_do_call vcrun2022
+                                       Executing load_vcrun2022 
+                                                                Using native,builtin override for following DLLs: concrt140 msvcp140 msvcp140_1 msvcp140_2 msvcp140_atomic_wait msvcp140_codecvt_ids vcamp140 vccorlib140 vcomp140 vcruntime140
+                                                                  Executing /home/deck/.var/app/com.github.Matoking.protontricks/cache/protontricks/proton/GE-Proton10-25/bin/wine C:\windows\syswow64\regedit.exe /S C:\windows\Temp\_vcrun2022\override-dll.reg
+                                                                                    steam-runtime-launch-client[1580]: W: The --socket option is deprecated. Prefer to use the session bus.
+fsync: up and running.
+002c:fixme:winediag:loader_init wine-staging 10.0 is a testing version containing experimental patches.
+002c:fixme:winediag:loader_init Please mention your exact version when filing bug reports on winehq.org.
+0040:fixme:ntoskrnl:driver_stub 0000000000249930 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\pci" stub!
+0040:fixme:ntoskrnl:driver_stub 0000000000249B80 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\hidusb" stub!
+0040:fixme:ntoskrnl:driver_stub 000000000024A720 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\Disk" stub!
+0050:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+0094:fixme:ntoskrnl:driver_stub 0000000000249930 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\pci" stub!
+0094:fixme:ntoskrnl:driver_stub 0000000000249B80 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\hidusb" stub!
+0094:fixme:ntoskrnl:driver_stub 000000000024A720 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\Disk" stub!
+00a0:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+00b8:err:hid:get_container_id_for_usb_udev_device Failed to get parent device.
+00b8:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00b8:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00bc:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00bc:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00d0:fixme:wineusb:add_usb_device Interface 1 has 6 alternate settings; using the first one.
+00d0:fixme:wineusb:add_usb_device Interface 0 has 2 alternate settings; using the first one.
+00d0:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d0:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d0:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d0:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d0:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d0:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d0:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d0:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d0:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d0:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d0:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d0:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d0:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d0:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d0:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d0:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d0:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d0:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d0:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d0:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d0:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d0:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d0:fixme:wineusb:query_id Unhandled ID query type 0x5.
+Executing /home/deck/.var/app/com.github.Matoking.protontricks/cache/protontricks/proton/GE-Proton10-25/bin/wine64 C:\windows\regedit.exe /S C:\windows\Temp\_vcrun2022\override-dll.reg
+           steam-runtime-launch-client[1637]: W: The --socket option is deprecated. Prefer to use the session bus.
+wineserver: using server-side synchronization.
+002c:fixme:winediag:loader_init wine-staging 10.0 is a testing version containing experimental patches.
+002c:fixme:winediag:loader_init Please mention your exact version when filing bug reports on winehq.org.
+0040:fixme:ntoskrnl:driver_stub 0000000000249930 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\pci" stub!
+0040:fixme:ntoskrnl:driver_stub 0000000000249B80 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\hidusb" stub!
+0040:fixme:ntoskrnl:driver_stub 000000000024A720 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\Disk" stub!
+0050:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+0094:fixme:ntoskrnl:driver_stub 0000000000249930 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\pci" stub!
+0094:fixme:ntoskrnl:driver_stub 0000000000249B80 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\hidusb" stub!
+0094:fixme:ntoskrnl:driver_stub 000000000024A720 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\Disk" stub!
+00a0:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+00b4:err:hid:get_container_id_for_usb_udev_device Failed to get parent device.
+00b4:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00b4:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00b8:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00b8:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00d4:fixme:wineusb:add_usb_device Interface 1 has 6 alternate settings; using the first one.
+00d4:fixme:wineusb:add_usb_device Interface 0 has 2 alternate settings; using the first one.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+grep: warning: stray \ before /
+                               Executing cabextract -q --directory=/home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_vcrun2022/win32 /home/deck/.var/app/com.github.Matoking.protontricks/cache/winetricks/vcrun2022/vc_redist.x86.exe -F a10
+                                                                                                            Executing cabextract -q --directory=/home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/syswow64 /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_vcrun2022/win32/a10 -F msvcp140.dll
+                        /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_vcrun2022/win32/a10: WARNING; possible 10368 extra bytes at end of file.
+                 Executing cd /home/deck/.var/app/com.github.Matoking.protontricks/cache/winetricks/vcrun2022
+                                                                                                             Executing /home/deck/.var/app/com.github.Matoking.protontricks/cache/protontricks/proton/GE-Proton10-25/bin/wine vc_redist.x86.exe /q
+                                                                     steam-runtime-launch-client[1808]: W: The --socket option is deprecated. Prefer to use the session bus.
+fsync: up and running.
+002c:fixme:winediag:loader_init wine-staging 10.0 is a testing version containing experimental patches.
+002c:fixme:winediag:loader_init Please mention your exact version when filing bug reports on winehq.org.
+0040:fixme:ntoskrnl:driver_stub 0000000000249930 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\pci" stub!
+0040:fixme:ntoskrnl:driver_stub 0000000000249B80 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\hidusb" stub!
+0040:fixme:ntoskrnl:driver_stub 000000000024A720 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\Disk" stub!
+0050:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+0098:fixme:ntoskrnl:driver_stub 0000000000249930 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\pci" stub!
+0098:fixme:ntoskrnl:driver_stub 0000000000249B80 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\hidusb" stub!
+0098:fixme:ntoskrnl:driver_stub 000000000024A720 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\Disk" stub!
+00a4:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+00bc:err:hid:get_container_id_for_usb_udev_device Failed to get parent device.
+00bc:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00bc:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00c0:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00c0:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00d8:fixme:wineusb:add_usb_device Interface 1 has 6 alternate settings; using the first one.
+00d8:fixme:wineusb:add_usb_device Interface 0 has 2 alternate settings; using the first one.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+0024:fixme:heap:RtlSetHeapInformation HEAP_INFORMATION_CLASS 1 not implemented!
+012c:fixme:oleacc:find_class_data unhandled window class: L"#32769"
+012c:fixme:uiautomation:uia_get_providers_for_hwnd Override provider callback currently unimplemented.
+012c:fixme:uiautomation:default_uia_provider_callback Default ProviderType_NonClientArea provider unimplemented.
+012c:fixme:oleacc:find_class_data unhandled window class: L"#32769"
+0024:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+0024:fixme:advapi:DecryptFileW (L"C:\\users\\steamuser\\AppData\\Local\\Temp\\{2C7B87EE-3E30-42B0-90F6-E8832847FAE5}\\", 00000000): stub
+012c:fixme:uiautomation:base_hwnd_fragment_get_FragmentRoot 000000000081B568, 000000000021F9D0: stub!
+012c:fixme:uiautomation:base_hwnd_fragment_GetEmbeddedFragmentRoots 000000000081B568, 000000000021F9E0: stub!
+0148:fixme:heap:RtlSetHeapInformation HEAP_INFORMATION_CLASS 1 not implemented!
+0148:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+0148:fixme:advapi:DecryptFileW (L"C:\\users\\steamuser\\AppData\\Local\\Temp\\{BE4C2F58-3E1F-481E-8D2C-D9A4B3A6BC80}\\", 00000000): stub
+0138:fixme:uiautomation:msaa_provider_GetPatternProvider Unimplemented patternId 10002
+0138:fixme:uiautomation:base_hwnd_provider_GetPatternProvider 0000000000881A10, 10002, 000000000192F8A0: stub
+0050:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+015c:fixme:shell:SHAutoComplete stub
+0148:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+0148:fixme:advapi:DecryptFileW (L"C:\\users\\steamuser\\AppData\\Local\\Temp\\{BE4C2F58-3E1F-481E-8D2C-D9A4B3A6BC80}\\", 00000000): stub
+0148:fixme:exec:SHELL_execute flags ignored: 0x00000100
+016c:fixme:heap:RtlSetHeapInformation HEAP_INFORMATION_CLASS 1 not implemented!
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:fixme:ole:CoInitializeSecurity 0077F608, -1, 00000000, 00000000, 6, 2, 00000000, 12288, 00000000 stub
+016c:fixme:wuapi:automatic_updates_Pause 
+016c:fixme:sfc:SRSetRestorePointW 0077F4D0 0077F6E0
+0138:fixme:uiautomation:msaa_provider_GetPatternProvider Unimplemented patternId 10002
+0138:fixme:uiautomation:base_hwnd_provider_GetPatternProvider 0000000000877D50, 10002, 000000000192F8A0: stub
+017c:fixme:advapi:DecryptFileW (L"C:\\ProgramData\\Package Cache\\{922480B5-CAEB-4B1B-AAA4-9716EFDCE26B}v14.44.35211\\packages\\vcRuntimeMinimum_x86\\vc_runtimeMinimum_x86.msi", 00000000): stub
+017c:fixme:advapi:DecryptFileW (L"C:\\ProgramData\\Package Cache\\{922480B5-CAEB-4B1B-AAA4-9716EFDCE26B}v14.44.35211\\packages\\vcRuntimeMinimum_x86\\cab1.cab", 00000000): stub
+017c:fixme:advapi:DecryptFileW (L"C:\\ProgramData\\Package Cache\\{C18FB403-1E88-43C8-AD8A-CED50F23DE8B}v14.44.35211\\packages\\vcRuntimeAdditional_x86\\vc_runtimeAdditional_x86.msi", 00000000): stub
+017c:fixme:advapi:DecryptFileW (L"C:\\ProgramData\\Package Cache\\{C18FB403-1E88-43C8-AD8A-CED50F23DE8B}v14.44.35211\\packages\\vcRuntimeAdditional_x86\\cab1.cab", 00000000): stub
+016c:fixme:file:NtLockFile I/O completion on lock not implemented yet
+016c:fixme:ntdll:NtQuerySystemInformation info_class SYSTEM_PERFORMANCE_INFORMATION
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+0050:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:fixme:wuapi:automatic_updates_Resume 
+016c:fixme:kernelbase:AppPolicyGetProcessTerminationMethod FFFFFFFA, 0077FEB8
+0148:fixme:kernelbase:AppPolicyGetProcessTerminationMethod FFFFFFFA, 0077FEB8
+0024:fixme:kernelbase:AppPolicyGetProcessTerminationMethod FFFFFFFA, 0057FEB8
+Using native,builtin override for following DLLs: vcruntime140_1
+                                                                Executing /home/deck/.var/app/com.github.Matoking.protontricks/cache/protontricks/proton/GE-Proton10-25/bin/wine C:\windows\syswow64\regedit.exe /S C:\windows\Temp\_vcrun2022\override-dll.reg
+                                                                                  steam-runtime-launch-client[1912]: W: The --socket option is deprecated. Prefer to use the session bus.
+wineserver: using server-side synchronization.
+002c:fixme:winediag:loader_init wine-staging 10.0 is a testing version containing experimental patches.
+002c:fixme:winediag:loader_init Please mention your exact version when filing bug reports on winehq.org.
+0040:fixme:ntoskrnl:driver_stub 0000000000249930 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\pci" stub!
+0040:fixme:ntoskrnl:driver_stub 0000000000249B80 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\hidusb" stub!
+0040:fixme:ntoskrnl:driver_stub 000000000024A720 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\Disk" stub!
+0050:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+0094:fixme:ntoskrnl:driver_stub 0000000000249930 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\pci" stub!
+0094:fixme:ntoskrnl:driver_stub 0000000000249B80 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\hidusb" stub!
+0094:fixme:ntoskrnl:driver_stub 000000000024A720 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\Disk" stub!
+00a0:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+00b4:err:hid:get_container_id_for_usb_udev_device Failed to get parent device.
+00b4:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00b4:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00b8:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00b8:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00d8:fixme:wineusb:add_usb_device Interface 1 has 6 alternate settings; using the first one.
+00d8:fixme:wineusb:add_usb_device Interface 0 has 2 alternate settings; using the first one.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+Executing /home/deck/.var/app/com.github.Matoking.protontricks/cache/protontricks/proton/GE-Proton10-25/bin/wine64 C:\windows\regedit.exe /S C:\windows\Temp\_vcrun2022\override-dll.reg
+           steam-runtime-launch-client[2074]: W: The --socket option is deprecated. Prefer to use the session bus.
+wineserver: using server-side synchronization.
+002c:fixme:winediag:loader_init wine-staging 10.0 is a testing version containing experimental patches.
+002c:fixme:winediag:loader_init Please mention your exact version when filing bug reports on winehq.org.
+0040:fixme:ntoskrnl:driver_stub 0000000000249930 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\pci" stub!
+0040:fixme:ntoskrnl:driver_stub 0000000000249B80 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\hidusb" stub!
+0040:fixme:ntoskrnl:driver_stub 000000000024A720 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\Disk" stub!
+0050:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+0094:fixme:ntoskrnl:driver_stub 0000000000249930 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\pci" stub!
+0094:fixme:ntoskrnl:driver_stub 0000000000249B80 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\hidusb" stub!
+0094:fixme:ntoskrnl:driver_stub 000000000024A720 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\Disk" stub!
+00a0:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+00b4:err:hid:get_container_id_for_usb_udev_device Failed to get parent device.
+00b4:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00b4:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00b8:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00b8:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00d8:fixme:wineusb:add_usb_device Interface 1 has 6 alternate settings; using the first one.
+00d8:fixme:wineusb:add_usb_device Interface 0 has 2 alternate settings; using the first one.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+grep: warning: stray \ before /
+                               Executing cabextract -q --directory=/home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_vcrun2022/win64 /home/deck/.var/app/com.github.Matoking.protontricks/cache/winetricks/vcrun2022/vc_redist.x64.exe -F a12
+                                                                                                            Executing cabextract -q --directory=/home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/system32 /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_vcrun2022/win64/a12 -F msvcp140.dll
+                        /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_vcrun2022/win64/a12: WARNING; possible 10368 extra bytes at end of file.
+                 Executing /home/deck/.var/app/com.github.Matoking.protontricks/cache/protontricks/proton/GE-Proton10-25/bin/wine vc_redist.x64.exe /q
+                                                                                                                                                      steam-runtime-launch-client[2239]: W: The --socket option is deprecated. Prefer to use the session bus.
+fsync: up and running.
+002c:fixme:winediag:loader_init wine-staging 10.0 is a testing version containing experimental patches.
+002c:fixme:winediag:loader_init Please mention your exact version when filing bug reports on winehq.org.
+0040:fixme:ntoskrnl:driver_stub 0000000000249930 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\pci" stub!
+0040:fixme:ntoskrnl:driver_stub 0000000000249B80 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\hidusb" stub!
+0040:fixme:ntoskrnl:driver_stub 000000000024A720 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\Disk" stub!
+0050:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+0098:fixme:ntoskrnl:driver_stub 0000000000249930 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\pci" stub!
+0098:fixme:ntoskrnl:driver_stub 0000000000249B80 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\hidusb" stub!
+0098:fixme:ntoskrnl:driver_stub 000000000024A720 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\Disk" stub!
+00a4:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+00b8:err:hid:get_container_id_for_usb_udev_device Failed to get parent device.
+00b8:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00b8:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00bc:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00bc:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00dc:fixme:wineusb:add_usb_device Interface 1 has 6 alternate settings; using the first one.
+00dc:fixme:wineusb:add_usb_device Interface 0 has 2 alternate settings; using the first one.
+00dc:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00dc:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00dc:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00dc:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00dc:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00dc:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00dc:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00dc:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00dc:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00dc:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00dc:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00dc:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00dc:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00dc:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00dc:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00dc:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00dc:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00dc:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00dc:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00dc:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00dc:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00dc:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00dc:fixme:wineusb:query_id Unhandled ID query type 0x5.
+0024:fixme:heap:RtlSetHeapInformation HEAP_INFORMATION_CLASS 1 not implemented!
+012c:fixme:oleacc:find_class_data unhandled window class: L"#32769"
+012c:fixme:uiautomation:uia_get_providers_for_hwnd Override provider callback currently unimplemented.
+012c:fixme:uiautomation:default_uia_provider_callback Default ProviderType_NonClientArea provider unimplemented.
+0024:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+012c:fixme:oleacc:find_class_data unhandled window class: L"#32769"
+0024:fixme:advapi:DecryptFileW (L"C:\\users\\steamuser\\AppData\\Local\\Temp\\{AE77657E-EA6A-4D3C-866D-E219296C0C03}\\", 00000000): stub
+012c:fixme:uiautomation:base_hwnd_fragment_get_FragmentRoot 000000000081B568, 000000000021F9D0: stub!
+012c:fixme:uiautomation:base_hwnd_fragment_GetEmbeddedFragmentRoots 000000000081B568, 000000000021F9E0: stub!
+0144:fixme:heap:RtlSetHeapInformation HEAP_INFORMATION_CLASS 1 not implemented!
+0144:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+0144:fixme:advapi:DecryptFileW (L"C:\\users\\steamuser\\AppData\\Local\\Temp\\{45140B41-5EEB-4428-A8EA-1595C20C6F62}\\", 00000000): stub
+013c:fixme:uiautomation:msaa_provider_GetPatternProvider Unimplemented patternId 10002
+013c:fixme:uiautomation:base_hwnd_provider_GetPatternProvider 0000000000871800, 10002, 000000000192F8A0: stub
+0050:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+0158:fixme:shell:SHAutoComplete stub
+0144:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+0144:fixme:advapi:DecryptFileW (L"C:\\users\\steamuser\\AppData\\Local\\Temp\\{45140B41-5EEB-4428-A8EA-1595C20C6F62}\\", 00000000): stub
+0144:fixme:exec:SHELL_execute flags ignored: 0x00000100
+016c:fixme:heap:RtlSetHeapInformation HEAP_INFORMATION_CLASS 1 not implemented!
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:fixme:ole:CoInitializeSecurity 0077F608, -1, 00000000, 00000000, 6, 2, 00000000, 12288, 00000000 stub
+016c:fixme:wuapi:automatic_updates_Pause 
+016c:fixme:sfc:SRSetRestorePointW 0077F4D0 0077F6E0
+013c:fixme:uiautomation:msaa_provider_GetPatternProvider Unimplemented patternId 10002
+013c:fixme:uiautomation:base_hwnd_provider_GetPatternProvider 000000000087E590, 10002, 000000000192F8A0: stub
+017c:fixme:advapi:DecryptFileW (L"C:\\ProgramData\\Package Cache\\{43B0D101-A022-48F4-9D04-BA404CEB1D53}v14.44.35211\\packages\\vcRuntimeMinimum_amd64\\vc_runtimeMinimum_x64.msi", 00000000): stub
+017c:fixme:advapi:DecryptFileW (L"C:\\ProgramData\\Package Cache\\{43B0D101-A022-48F4-9D04-BA404CEB1D53}v14.44.35211\\packages\\vcRuntimeMinimum_amd64\\cab1.cab", 00000000): stub
+017c:fixme:advapi:DecryptFileW (L"C:\\ProgramData\\Package Cache\\{86AB2CC9-08BD-4643-B0F9-F82D006D72FF}v14.44.35211\\packages\\vcRuntimeAdditional_amd64\\vc_runtimeAdditional_x64.msi", 00000000): stub
+017c:fixme:advapi:DecryptFileW (L"C:\\ProgramData\\Package Cache\\{86AB2CC9-08BD-4643-B0F9-F82D006D72FF}v14.44.35211\\packages\\vcRuntimeAdditional_amd64\\cab1.cab", 00000000): stub
+016c:fixme:file:NtLockFile I/O completion on lock not implemented yet
+016c:fixme:ntdll:NtQuerySystemInformation info_class SYSTEM_PERFORMANCE_INFORMATION
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+0050:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:fixme:wuapi:automatic_updates_Resume 
+016c:fixme:kernelbase:AppPolicyGetProcessTerminationMethod FFFFFFFA, 0077FEB8
+0144:fixme:kernelbase:AppPolicyGetProcessTerminationMethod FFFFFFFA, 0077FEB8
+0024:fixme:kernelbase:AppPolicyGetProcessTerminationMethod FFFFFFFA, 0057FEB8
+(deck@steamdeck deckyfin)$
