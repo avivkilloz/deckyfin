@@ -5,9 +5,16 @@ Exposes game management methods to the React frontend via Decky IPC.
 
 import logging
 import ssl
+import sys
 import traceback
 from pathlib import Path
 from typing import Optional
+
+# Bootstrap: ensure py_modules/ directory is on sys.path so vendored
+# packages (vdf, etc.) are importable from function-level imports.
+_py_modules = str(Path(__file__).resolve().parent / "py_modules")
+if _py_modules not in sys.path:
+    sys.path.insert(0, _py_modules)
 
 from deckyfin_config import (
     get_games_folder,
@@ -361,7 +368,7 @@ class Plugin:
                     return {"data_uri": f"data:image/{ext};base64,{b64}"}
             return {"data_uri": None}
         except Exception as e:
-            logger.warning("Failed to get card art for '%s': %s", game_name, e)
+            logging.getLogger(APP_NAME).warning("Failed to get card art for '%s': %s", game_name, e)
             return {"data_uri": None}
 
 
