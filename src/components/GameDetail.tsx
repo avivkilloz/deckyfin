@@ -460,7 +460,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           onActivate={handleOpenExePicker}
           onClick={handleOpenExePicker}
           focusClassName="is-focused"
-          style={{ ...BTN_STYLE, alignSelf: "center" }}
+          style={{ ...BTN_STYLE, alignSelf: "center", padding: "6px 12px" }}
         >
           {showExePicker ? "✕" : "Browse"}
         </Focusable>
@@ -475,6 +475,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
             borderRadius: "4px",
             maxHeight: "180px",
             overflowY: "auto",
+            padding: "2px 0",
           }}
         >
           {exeOptions.length === 0 && (
@@ -542,7 +543,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           display: "inline-block",
           marginBottom: protonPickerOpen ? "4px" : "10px",
           background: protonVersion ? "transparent" : "transparent",
-          color: protonVersion ? "#0078d4" : "#888",
+          color: protonVersion ? "#e0e0e0" : "#888",
         }}
       >
         {protonVersion || "— None —"}
@@ -555,6 +556,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
             borderRadius: "4px",
             maxHeight: "200px",
             overflowY: "auto",
+            padding: "2px 0",
           }}
         >
           <Focusable
