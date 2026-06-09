@@ -147,6 +147,7 @@ export const GameLibrary: VFC = () => {
       <CompactTextField
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
+        placeholder="Search Games"
         style={{ width: "100%", marginBottom: "12px" }}
       />
 

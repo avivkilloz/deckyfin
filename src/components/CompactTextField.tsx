@@ -4,12 +4,14 @@ import { TextField } from "@decky/ui";
 interface Props {
   value: string;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  placeholder?: string;
   style?: React.CSSProperties;
 }
 
 export const CompactTextField: VFC<Props> = ({
   value,
   onChange,
+  placeholder,
   style,
 }) => {
   const ref = useRef<any>(null);
@@ -29,6 +31,7 @@ export const CompactTextField: VFC<Props> = ({
     <TextField
       value={value}
       onChange={onChange}
+      placeholder={placeholder}
       style={style}
       {...({ ref } as any)}
     />
