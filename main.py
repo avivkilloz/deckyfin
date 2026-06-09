@@ -185,6 +185,22 @@ class Plugin:
             return [{"error": "Games folder not configured"}]
         return find_game_executables(Path(games_path) / subfolder)
 
+    async def list_subfolders(self, path: str) -> list:
+        """List subdirectory names under the given path. Used by the folder browser."""
+        try:
+            root = Path(path)
+            if not root.exists() or not root.is_dir():
+                return []
+            items = []
+            for item in sorted(root.iterdir()):
+                if item.is_dir() and not item.name.startswith("."):
+                    items.append(item.name)
+            return items
+        except PermissionError:
+            return []
+        except Exception:
+            return []
+
     # ── Steam Actions ─────────────────────────────────────────────────────
 
     async def add_steam_shortcut(

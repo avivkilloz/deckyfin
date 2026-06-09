@@ -1,4 +1,4 @@
-import { VFC, useState, useEffect, useRef } from "react";
+import { VFC, useState, useEffect, useRef, useCallback } from "react";
 import { callable } from "@decky/api";
 import { Navigation, Focusable } from "@decky/ui";
 import { CompactTextField } from "../components/CompactTextField";
@@ -18,6 +18,7 @@ const setSteamGridKey = callable<
   [key: string],
   { success: boolean }
 >("set_steamgrid_key");
+const listSubfolders = callable<[path: string], string[]>("list_subfolders");
 
 interface Props {
   gamesFolder: string | null;
@@ -46,6 +47,50 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
   const [folderPath, setFolderPath] = useState(gamesFolder || "");
   const [message, setMessage] = useState<string | null>(null);
   const [rescanned, setRescanned] = useState(false);
+
+  // ── Folder browser ───────────────────────────────────────────────────────
+  const [showFolderPicker, setShowFolderPicker] = useState(false);
+  const [browsePath, setBrowsePath] = useState("/");
+  const [subfolders, setSubfolders] = useState<string[]>([]);
+  const [browseLoading, setBrowseLoading] = useState(false);
+
+  const loadSubfolders = useCallback(async (path: string) => {
+    setBrowseLoading(true);
+    try {
+      const dirs = await listSubfolders(path);
+      setSubfolders(dirs);
+      setBrowsePath(path);
+    } catch {
+      setSubfolders([]);
+    }
+    setBrowseLoading(false);
+  }, []);
+
+  const handleOpenFolderPicker = async () => {
+    if (showFolderPicker) {
+      setShowFolderPicker(false);
+      return;
+    }
+    await loadSubfolders("/");
+    setShowFolderPicker(true);
+  };
+
+  const handleFolderClick = async (name: string) => {
+    const newPath = browsePath === "/" ? `/${name}` : `${browsePath}/${name}`;
+    await loadSubfolders(newPath);
+  };
+
+  const handleGoUp = async () => {
+    if (browsePath === "/") return;
+    const parent = browsePath.substring(0, browsePath.lastIndexOf("/"));
+    const newPath = parent || "/";
+    await loadSubfolders(newPath);
+  };
+
+  const handleSelectFolder = () => {
+    setFolderPath(browsePath);
+    setShowFolderPicker(false);
+  };
 
   // ── SteamGridDB key ──────────────────────────────────────────────────
   const [sgKey, setSgKey] = useState("");
@@ -136,11 +181,113 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
         Path to the root directory containing your game folders. Each
         subdirectory is treated as a separate game with its own config.
       </p>
-      <CompactTextField
-        value={folderPath}
-        onChange={(e) => setFolderPath(e.target.value)}
-        style={{ width: "100%", marginBottom: "12px" }}
-      />
+      <div
+        style={{
+          display: "flex",
+          gap: "6px",
+          alignItems: "center",
+          marginBottom: "12px",
+        }}
+      >
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <CompactTextField
+            value={folderPath}
+            onChange={(e) => setFolderPath(e.target.value)}
+            style={{ width: "100%" }}
+          />
+        </div>
+        <Focusable
+          onActivate={handleOpenFolderPicker}
+          onClick={handleOpenFolderPicker}
+          focusClassName="is-focused"
+          style={{ ...BTN_STYLE, alignSelf: "center", padding: "4px 12px" }}
+        >
+          {showFolderPicker ? "✕" : "Browse"}
+        </Focusable>
+      </div>
+
+      {/* Folder browser dropdown */}
+      {showFolderPicker && (
+        <Focusable
+          style={{
+            marginBottom: "10px",
+            border: "1px solid #555",
+            borderRadius: "4px",
+            padding: "6px 8px",
+          }}
+        >
+          <div style={{ fontSize: "0.85em", color: "#aaa", marginBottom: "6px", wordBreak: "break-all" }}>
+            {browsePath}
+          </div>
+          {browseLoading && (
+            <p style={{ padding: "8px", margin: 0, fontSize: "0.85em", color: "#888" }}>
+              Loading…
+            </p>
+          )}
+          {!browseLoading && (
+            <div style={{ maxHeight: "180px", overflowY: "auto" }}>
+              {browsePath !== "/" && (
+                <Focusable
+                  onActivate={handleGoUp}
+                  onClick={handleGoUp}
+                  focusClassName="is-focused"
+                  style={{
+                    padding: "4px 10px",
+                    cursor: "pointer",
+                    fontSize: "0.85em",
+                    borderBottom: "1px solid #333",
+                    color: "#f0ad4e",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                >
+                  .. (up)
+                </Focusable>
+              )}
+              {subfolders.length === 0 && browsePath === "/" && (
+                <p style={{ padding: "8px", margin: 0, fontSize: "0.85em", color: "#888" }}>
+                  No subdirectories found
+                </p>
+              )}
+              {subfolders.map((name) => (
+                <Focusable
+                  key={name}
+                  onActivate={() => handleFolderClick(name)}
+                  onClick={() => handleFolderClick(name)}
+                  focusClassName="is-focused"
+                  style={{
+                    padding: "4px 10px",
+                    cursor: "pointer",
+                    fontSize: "0.85em",
+                    borderBottom: "1px solid #333",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                >
+                  📁 {name}
+                </Focusable>
+              ))}
+              <Focusable
+                onActivate={handleSelectFolder}
+                onClick={handleSelectFolder}
+                focusClassName="is-focused"
+                style={{
+                  padding: "8px 10px",
+                  cursor: "pointer",
+                  fontSize: "0.85em",
+                  color: "#27ae60",
+                  textAlign: "center",
+                  fontWeight: "bold",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.12)")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+              >
+                ✓ Select This Folder
+              </Focusable>
+            </div>
+          )}
+        </Focusable>
+      )}
 
       <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
         <Focusable
