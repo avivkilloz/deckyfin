@@ -1,209 +1,77 @@
-[2026-06-08 00:35:39,437][INFO]: Deckyfin v1.0.0 loaded
-[2026-06-08 00:35:51,586][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,590][INFO]: Found 15 non-Steam games for user 808327172
-[2026-06-08 00:35:51,591][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,594][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,595][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,595][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,596][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,597][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,598][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,599][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,599][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,600][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,601][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,601][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,602][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,603][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,604][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,604][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,605][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,606][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,607][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,611][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,612][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,612][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,613][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,614][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,615][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,615][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,616][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,617][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,617][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,618][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,619][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,619][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,620][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,621][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,621][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,622][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,623][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,623][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,624][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,625][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,625][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,626][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,626][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,627][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,628][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,628][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,629][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,630][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,630][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,631][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,632][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,632][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,633][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,634][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,634][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,635][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,636][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,636][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,637][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,638][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,638][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,639][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,640][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,640][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,641][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,642][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,642][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,643][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,644][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,644][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:51,645][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:53,635][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:55,245][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:35:55,596][INFO]: SteamGridDB found 'Axiom Verge' (ID 5816) for query 'Axiom Verge'
-[2026-06-08 00:35:56,111][INFO]: Got grid art URL for game 5816 (dimensions=920x430)
-[2026-06-08 00:35:56,363][WARNING]: SteamGridDB HTTP 404 for /headers/game/5816: <!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8">
-    <link rel="dns-prefetch" href="https://cdn2.steamgriddb.com/"> 
-    <link rel="preconnect" href="https://cdn2.steamgriddb.com/">
-    <link href="https://fonts.googleapis.com/css?family=Open+Sans:300,400,600,700&amp;display=swap" rel="stylesheet">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, shrink-to-fit=no, user-scalable=no">
-    <t
-[2026-06-08 00:35:56,613][INFO]: Got hero art URL for game 5816
-[2026-06-08 00:35:56,884][INFO]: Got logo URL for game 5816
-[2026-06-08 00:35:56,946][INFO]: Applied grid art to Axiom Verge (2406484979_p.png)
-[2026-06-08 00:35:57,004][INFO]: Applied hero art to Axiom Verge (2406484979_hero.png)
-[2026-06-08 00:35:57,052][INFO]: Applied logo art to Axiom Verge (2406484979_logo.png)
-[2026-06-08 00:36:02,898][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,901][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,902][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,903][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,904][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,905][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,905][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,906][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,907][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,907][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,908][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,908][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,909][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,910][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,910][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,911][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,912][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,913][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,913][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,918][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,919][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,920][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,920][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,921][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,921][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,922][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,923][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,923][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,924][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,925][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,926][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,926][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,927][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,928][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,928][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,929][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,930][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,930][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,931][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,932][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,932][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,933][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,934][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,934][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,935][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,935][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,936][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,937][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,938][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,939][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,939][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,940][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,941][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,941][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,942][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,943][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,943][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,944][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,945][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,945][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,946][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,947][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,947][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,948][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,949][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,949][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,950][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,951][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,951][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,952][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,953][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,954][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:02,957][INFO]: Found 15 non-Steam games for user 808327172
-[2026-06-08 00:36:07,456][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:09,133][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:09,389][INFO]: SteamGridDB found 'Gothic 1 Remake' (ID 5279913) for query 'Gothic 1'
-[2026-06-08 00:36:09,908][INFO]: Got grid art URL for game 5279913 (dimensions=920x430)
-[2026-06-08 00:36:10,165][WARNING]: SteamGridDB HTTP 404 for /headers/game/5279913: <!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8">
-    <link rel="dns-prefetch" href="https://cdn2.steamgriddb.com/"> 
-    <link rel="preconnect" href="https://cdn2.steamgriddb.com/">
-    <link href="https://fonts.googleapis.com/css?family=Open+Sans:300,400,600,700&amp;display=swap" rel="stylesheet">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, shrink-to-fit=no, user-scalable=no">
-    <t
-[2026-06-08 00:36:10,418][INFO]: Got hero art URL for game 5279913
-[2026-06-08 00:36:10,667][INFO]: Got logo URL for game 5279913
-[2026-06-08 00:36:10,715][INFO]: Applied grid art to Gothic 1 (2385116368_p.png)
-[2026-06-08 00:36:10,781][INFO]: Applied hero art to Gothic 1 (2385116368_hero.png)
-[2026-06-08 00:36:10,822][INFO]: Applied logo art to Gothic 1 (2385116368_logo.png)
-[2026-06-08 00:36:12,917][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:12,924][INFO]: Auto-detected logged in Steam user 808327172
-[2026-06-08 00:36:12,926][INFO]: Found 15 non-Steam games for user 808327172
-[2026-06-08 00:36:14,461][INFO]: No gamescope found — using -bigpicture
-[2026-06-08 00:36:14,461][INFO]: Detected Steam mode flags: ['-bigpicture']  display_env keys: ['XDG_SESSION_TYPE', 'XAUTHORITY', 'HOME', 'WAYLAND_DISPLAY', 'USER', 'DISPLAY', 'XDG_RUNTIME_DIR', 'DBUS_SESSION_BUS_ADDRESS']
-[2026-06-08 00:36:14,461][INFO]: Killed Steam process pid=77517 name=srt-logger
-[2026-06-08 00:36:14,462][INFO]: Killed Steam process pid=77612 name=steam
-[2026-06-08 00:36:14,462][INFO]: Killed Steam process pid=77997 name=steam-runtime-launcher-service
-[2026-06-08 00:36:14,462][INFO]: Killed Steam process pid=81120 name=srt-bwrap
-[2026-06-08 00:36:14,462][INFO]: Killed Steam process pid=81130 name=srt-logger
-[2026-06-08 00:36:14,462][INFO]: Killed Steam process pid=81227 name=steamwebhelper
-[2026-06-08 00:36:14,462][INFO]: Killed Steam process pid=81230 name=steamwebhelper
-[2026-06-08 00:36:14,462][INFO]: Killed Steam process pid=81235 name=steamwebhelper
-[2026-06-08 00:36:14,462][INFO]: Killed Steam process pid=81236 name=steamwebhelper
-[2026-06-08 00:36:14,462][INFO]: Killed Steam process pid=81238 name=steamwebhelper
-[2026-06-08 00:36:14,462][INFO]: Killed Steam process pid=81257 name=steamwebhelper
-[2026-06-08 00:36:14,462][INFO]: Killed Steam process pid=81303 name=steamwebhelper
-[2026-06-08 00:36:14,462][INFO]: Killed Steam process pid=81304 name=steamwebhelper
-[2026-06-08 00:36:14,462][INFO]: Killed Steam process pid=81326 name=steamwebhelper
-[2026-06-08 00:36:14,462][INFO]: Killed Steam process pid=81409 name=steamwebhelper
-[2026-06-08 00:36:16,463][INFO]: Steam relaunch: machinectl shell
-[2026-06-08 00:36:17,463][INFO]: Steam relaunch output (if any): check /tmp/deckyfin_steam_launch.log
-[2026-06-08 00:36:17,463][INFO]: Steam restarted successfully with flags: ['-bigpicture']
-deckyfin $ 
+[2026-06-09 17:23:37,972][WARNING]: vdf module not available, cannot parse loginusers.vdf
+[2026-06-09 17:23:37,972][INFO]: Multiple Steam users found, defaulting to 0
+[2026-06-09 17:23:37,973][ERROR]: ERROR get_game_card_art: name 'logger' is not defined
+Traceback (most recent call last):
+  File "/home/deck/homebrew/plugins/deckyfin/main.py", line 334, in get_game_card_art
+    info = get_steam_shortcut_info(game_name, uid)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/deck/homebrew/plugins/deckyfin/py_modules/steam_games.py", line 298, in get_steam_shortcut_info
+    shortcuts = _load_vdf_binary(shortcuts_path)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/deck/homebrew/plugins/deckyfin/py_modules/steam_games.py", line 70, in _load_vdf_binary
+    import vdf
+ModuleNotFoundError: No module named 'vdf'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/deck/homebrew/plugins/deckyfin/main.py", line 396, in wrapper
+    result = await orig(self, *args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/deck/homebrew/plugins/deckyfin/main.py", line 364, in get_game_card_art
+    logger.warning("Failed to get card art for '%s': %s", game_name, e)
+    ^^^^^^
+NameError: name 'logger' is not defined
+
+[2026-06-09 17:23:37,974][WARNING]: vdf module not available, cannot parse loginusers.vdf
+[2026-06-09 17:23:37,974][INFO]: Multiple Steam users found, defaulting to 0
+[2026-06-09 17:23:37,975][ERROR]: ERROR list_nonsteam_games: No module named 'vdf'
+Traceback (most recent call last):
+  File "/home/deck/homebrew/plugins/deckyfin/main.py", line 396, in wrapper
+    result = await orig(self, *args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/deck/homebrew/plugins/deckyfin/main.py", line 134, in list_nonsteam_games
+    return list_nonsteam_games()
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/deck/homebrew/plugins/deckyfin/py_modules/steam_games.py", line 117, in list_nonsteam_games
+    shortcuts = _load_vdf_binary(shortcuts_path)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/deck/homebrew/plugins/deckyfin/py_modules/steam_games.py", line 70, in _load_vdf_binary
+    import vdf
+ModuleNotFoundError: No module named 'vdf'
+
+[2026-06-09 17:23:39,881][WARNING]: vdf module not available, cannot parse loginusers.vdf
+[2026-06-09 17:23:39,881][INFO]: Multiple Steam users found, defaulting to 0
+[2026-06-09 17:23:39,882][ERROR]: ERROR get_steam_shortcut: No module named 'vdf'
+Traceback (most recent call last):
+  File "/home/deck/homebrew/plugins/deckyfin/main.py", line 396, in wrapper
+    result = await orig(self, *args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/deck/homebrew/plugins/deckyfin/main.py", line 222, in get_steam_shortcut
+    info = get_steam_shortcut_info(app_name, uid)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/deck/homebrew/plugins/deckyfin/py_modules/steam_games.py", line 298, in get_steam_shortcut_info
+    shortcuts = _load_vdf_binary(shortcuts_path)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/deck/homebrew/plugins/deckyfin/py_modules/steam_games.py", line 70, in _load_vdf_binary
+    import vdf
+ModuleNotFoundError: No module named 'vdf'
+
+[2026-06-09 17:23:58,671][INFO]: Updated game config 'Baldurs Gate 3' with {'name': 'Baldurs Gate 3', 'executable': 'Baldurs Gate 3/bin/bg3.exe', 'start_dir': 'Baldurs Gate 3', 'steam_app_id': None, 'proton_version': 'GE-Proton10-34', 'proton_dependencies': ['vcrun2022', 'd3dx9']}
+[2026-06-09 17:24:07,455][WARNING]: vdf module not available, cannot parse loginusers.vdf
+[2026-06-09 17:24:07,455][INFO]: Multiple Steam users found, defaulting to 0
+[2026-06-09 17:24:07,457][ERROR]: ERROR add_steam_shortcut: No module named 'vdf'
+Traceback (most recent call last):
+  File "/home/deck/homebrew/plugins/deckyfin/main.py", line 396, in wrapper
+    result = await orig(self, *args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/deck/homebrew/plugins/deckyfin/main.py", line 172, in add_steam_shortcut
+    app_id = add_nonsteam_game(str(exe), app_name, resolved_start, launch_options)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/deck/homebrew/plugins/deckyfin/py_modules/steam_games.py", line 215, in add_nonsteam_game
+    _save_vdf_binary(shortcuts, shortcuts_path)
+  File "/home/deck/homebrew/plugins/deckyfin/py_modules/steam_games.py", line 77, in _save_vdf_binary
+    import vdf
+ModuleNotFoundError: No module named 'vdf'
+
+(deck@steamdeck deckyfin)$
