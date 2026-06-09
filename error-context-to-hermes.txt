@@ -1,1 +1,93 @@
+when I install dependencies using flatpak from deckyfin, I cannot open expedition 33, it fails with:
 
+"The following component(s) are required to run this program:
+Microsoft Visual C++ Runtime"
+
+this is the logs installing the dependencies with deckyfin:
+
+[2026-06-09 23:02:01,202][INFO]: Initializing Proton prefix app_id=-1069797399 user_id=892854676 proton=GE-Proton10-25 reinit=True
+[2026-06-09 23:02:01,205][INFO]: Updated compat.vdf for app_id=-1069797399 user_id=892854676
+[2026-06-09 23:02:01,304][INFO]: Updated local config for user=892854676 app=-1069797399
+[2026-06-09 23:02:01,439][INFO]: Updated global config for app 3225169897 proton=GE-Proton10-25
+[2026-06-09 23:02:01,440][INFO]: Set Proton version for app_id=-1069797399 unsigned=3225169897 to GE-Proton10-25 (user=892854676)
+[2026-06-09 23:02:01,882][INFO]: Removed existing prefix at /home/deck/.local/share/Steam/steamapps/compatdata/3225169897
+[2026-06-09 23:02:15,008][INFO]: Prefix initialized successfully at /home/deck/.local/share/Steam/steamapps/compatdata/3225169897
+[2026-06-09 23:02:15,074][INFO]: Fixed prefix ownership to deck for /home/deck/.local/share/Steam/steamapps/compatdata/3225169897
+[2026-06-09 23:02:18,957][INFO]: Updated game config 'Clair Obscur - Expedition 33' with {'processing_state': {'status': 'installing', 'deps': ['vcrun2022', 'd3dx9'], 'pfxid': '3225169897'}}
+[2026-06-09 23:02:18,963][INFO]: Selected Proton: GE-Proton10-34 (/home/deck/.local/share/Steam/compatibilitytools.d/GE-Proton10-34/files/bin/wine64, /home/deck/.local/share/Steam/compatibilitytools.d/GE-Proton10-34/files/bin/wineserver)
+[2026-06-09 23:02:19,031][INFO]: Trying flatpak protontricks for vcrun2022 in prefix 3225169897
+[2026-06-09 23:02:44,580][INFO]: Installed vcrun2022 in prefix 3225169897 (flatpak protontricks)
+[2026-06-09 23:02:44,608][INFO]: Fixed prefix ownership to deck for /home/deck/.local/share/Steam/steamapps/compatdata/3225169897
+[2026-06-09 23:02:44,650][INFO]: Trying flatpak protontricks for d3dx9 in prefix 3225169897
+[2026-06-09 23:03:15,494][INFO]: Installed d3dx9 in prefix 3225169897 (flatpak protontricks)
+[2026-06-09 23:03:15,519][INFO]: Fixed prefix ownership to deck for /home/deck/.local/share/Steam/steamapps/compatdata/3225169897
+[2026-06-09 23:03:15,523][INFO]: Updated game config 'Clair Obscur - Expedition 33' with {'processing_state': None}
+[2026-06-09 23:03:27,996][INFO]: SteamGridDB found 'Clair Obscur: Expedition 33' (ID 5454521) for query 'Clair Obscur - Expedition 33'
+[2026-06-09 23:04:11,993][INFO]: Auto-detected logged in Steam user 892854676
+[2026-06-09 23:04:12,104][INFO]: Found 74 non-Steam games for user 892854676
+[2026-06-09 23:04:12,108][INFO]: Auto-detected logged in Steam user 892854676
+
+
+but then when I run this script from cli, it installs the same dependencies and I succeed to open the game:
+
+
+#!/bin/bash
+
+# Script to install dependencies in a Proton prefix using protontricks
+# Usage: ./protontricks-install-dependencies.sh <pfxid> <dependencies>
+# Example: ./protontricks-install-dependencies.sh 730 vcrun2022,d3dx9
+
+# Check if correct number of arguments provided
+if [ $# -ne 2 ]; then
+    echo "Error: Invalid number of arguments"
+    echo "Usage: $0 <pfxid> <dependencies>"
+    echo "Example: $0 730 vcrun2022,d3dx9"
+    exit 1
+fi
+
+pfxid=$1
+dependencies=$2
+
+# Check if pfxid is a number
+if ! [[ "$pfxid" =~ ^[0-9]+$ ]]; then
+    echo "Error: pfxid must be a numeric Steam App ID"
+    exit 1
+fi
+
+# Check if dependencies parameter is provided
+if [ -z "$dependencies" ]; then
+    echo "Error: No dependencies specified"
+    exit 1
+fi
+
+echo "Installing dependencies for Proton prefix: $pfxid"
+echo "Dependencies: $dependencies"
+echo ""
+
+# Convert comma-separated list to array
+IFS=',' read -ra dep_array <<< "$dependencies"
+
+# Install each dependency
+for dep in "${dep_array[@]}"; do
+    # Trim whitespace
+    dep=$(echo "$dep" | xargs)
+
+    echo "Installing $dep..."
+    flatpak run com.github.Matoking.protontricks "$pfxid" -- --force --unattended "$dep"
+
+    if [ $? -eq 0 ]; then
+        echo "✓ Successfully installed $dep"
+    else
+        echo "✗ Failed to install $dep"
+    fi
+    echo ""
+done
+
+echo "Installation complete!"
+
+
+I run this script with the following arguments: 
+
+bash ~/git/utils/scripts/protontricks/protontricks-install-dependencies.sh 3225169897 vcrun2022,d3dx9
+
+the script opens no UI, everything is from CLI, and it does not prompt me with anything.
