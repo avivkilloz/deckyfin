@@ -1,0 +1,272 @@
+{
+  "games": [
+    {
+      "name": "Abiotic Factor",
+      "path": "abiotic-factor",
+      "executable": "",
+      "steam_app_id": null,
+      "proton_version": "",
+      "proton_dependencies": [],
+      "proton_sync_paths": [],
+      "categories": [],
+      "launch_options": ""
+    },
+    {
+      "name": "Baldurs Gate 3",
+      "path": "baldurs-gate-3",
+      "executable": "Baldurs Gate 3/bin/bg3.exe",
+      "steam_app_id": null,
+      "proton_version": "GE-Proton10-34",
+      "proton_dependencies": [
+        "vcrun2022",
+        "d3dx9"
+      ],
+      "proton_sync_paths": [],
+      "categories": [],
+      "launch_options": "",
+      "start_dir": "Baldurs Gate 3"
+    },
+    {
+      "name": "CULTIC",
+      "path": "cultic",
+      "executable": "",
+      "steam_app_id": null,
+      "proton_version": "",
+      "proton_dependencies": [],
+      "proton_sync_paths": [],
+      "categories": [],
+      "launch_options": ""
+    },
+    {
+      "name": "Clair Obscur - Expedition 33",
+      "path": "clair-obscur---expedition-33",
+      "executable": "",
+      "steam_app_id": null,
+      "proton_version": "",
+      "proton_dependencies": [],
+      "proton_sync_paths": [],
+      "categories": [],
+      "launch_options": ""
+    },
+    {
+      "name": "Cyberpunk 2077",
+      "path": "cyberpunk-2077",
+      "executable": "",
+      "steam_app_id": null,
+      "proton_version": "",
+      "proton_dependencies": [],
+      "proton_sync_paths": [],
+      "categories": [],
+      "launch_options": ""
+    },
+    {
+      "name": "Dead Island 2",
+      "path": "dead-island-2",
+      "executable": "",
+      "steam_app_id": null,
+      "proton_version": "",
+      "proton_dependencies": [],
+      "proton_sync_paths": [],
+      "categories": [],
+      "launch_options": ""
+    },
+    {
+      "name": "ENDER LILIES - Quietus of the Knights",
+      "path": "ender-lilies---quietus-of-the-knights",
+      "executable": "",
+      "steam_app_id": null,
+      "proton_version": "",
+      "proton_dependencies": [],
+      "proton_sync_paths": [],
+      "categories": [],
+      "launch_options": ""
+    },
+    {
+      "name": "Fallout New Vegas",
+      "path": "fallout-new-vegas",
+      "executable": "",
+      "steam_app_id": null,
+      "proton_version": "",
+      "proton_dependencies": [],
+      "proton_sync_paths": [],
+      "categories": [],
+      "launch_options": ""
+    },
+    {
+      "name": "Gabbys Dollhouse Ready To Party",
+      "path": "gabbys-dollhouse-ready-to-party",
+      "executable": "",
+      "steam_app_id": null,
+      "proton_version": "",
+      "proton_dependencies": [],
+      "proton_sync_paths": [],
+      "categories": [],
+      "launch_options": ""
+    },
+    {
+      "name": "Hades II",
+      "path": "hades-ii",
+      "executable": "",
+      "steam_app_id": null,
+      "proton_version": "",
+      "proton_dependencies": [],
+      "proton_sync_paths": [],
+      "categories": [],
+      "launch_options": ""
+    },
+    {
+      "name": "Hollow Knight Silksong",
+      "path": "hollow-knight-silksong",
+      "executable": "",
+      "steam_app_id": null,
+      "proton_version": "",
+      "proton_dependencies": [],
+      "proton_sync_paths": [],
+      "categories": [],
+      "launch_options": ""
+    },
+    {
+      "name": "It Takes Two",
+      "path": "it-takes-two",
+      "executable": "",
+      "steam_app_id": null,
+      "proton_version": "",
+      "proton_dependencies": [],
+      "proton_sync_paths": [],
+      "categories": [],
+      "launch_options": ""
+    },
+    {
+      "name": "LEGO Voyagers",
+      "path": "lego-voyagers",
+      "executable": "",
+      "steam_app_id": null,
+      "proton_version": "",
+      "proton_dependencies": [],
+      "proton_sync_paths": [],
+      "categories": [],
+      "launch_options": ""
+    },
+    {
+      "name": "Life is Strange Remastered",
+      "path": "life-is-strange-remastered",
+      "executable": "",
+      "steam_app_id": null,
+      "proton_version": "",
+      "proton_dependencies": [],
+      "proton_sync_paths": [],
+      "categories": [],
+      "launch_options": ""
+    },
+    {
+      "name": "Little Nightmares Enhanced Edition",
+      "path": "little-nightmares-enhanced-edition",
+      "executable": "",
+      "steam_app_id": null,
+      "proton_version": "",
+      "proton_dependencies": [],
+      "proton_sync_paths": [],
+      "categories": [],
+      "launch_options": ""
+    },
+    {
+      "name": "NINJA GAIDEN - Ragebound",
+      "path": "ninja-gaiden---ragebound",
+      "executable": "",
+      "steam_app_id": null,
+      "proton_version": "",
+      "proton_dependencies": [],
+      "proton_sync_paths": [],
+      "categories": [],
+      "launch_options": ""
+    },
+    {
+      "name": "Resident Evil 4",
+      "path": "resident-evil-4",
+      "executable": "",
+      "steam_app_id": null,
+      "proton_version": "",
+      "proton_dependencies": [],
+      "proton_sync_paths": [],
+      "categories": [],
+      "launch_options": ""
+    },
+    {
+      "name": "Rise of the Tomb Raider",
+      "path": "rise-of-the-tomb-raider",
+      "executable": "",
+      "steam_app_id": null,
+      "proton_version": "",
+      "proton_dependencies": [],
+      "proton_sync_paths": [],
+      "categories": [],
+      "launch_options": ""
+    },
+    {
+      "name": "Schedule I",
+      "path": "schedule-i",
+      "executable": "",
+      "steam_app_id": null,
+      "proton_version": "",
+      "proton_dependencies": [],
+      "proton_sync_paths": [],
+      "categories": [],
+      "launch_options": ""
+    },
+    {
+      "name": "Split Fiction",
+      "path": "split-fiction",
+      "executable": "",
+      "steam_app_id": null,
+      "proton_version": "",
+      "proton_dependencies": [],
+      "proton_sync_paths": [],
+      "categories": [],
+      "launch_options": ""
+    },
+    {
+      "name": "TEKKEN 8",
+      "path": "tekken-8",
+      "executable": "",
+      "steam_app_id": null,
+      "proton_version": "",
+      "proton_dependencies": [],
+      "proton_sync_paths": [],
+      "categories": [],
+      "launch_options": ""
+    },
+    {
+      "name": "The Alters",
+      "path": "the-alters",
+      "executable": "",
+      "steam_app_id": null,
+      "proton_version": "",
+      "proton_dependencies": [],
+      "proton_sync_paths": [],
+      "categories": [],
+      "launch_options": ""
+    },
+    {
+      "name": "The Wolf Among Us",
+      "path": "the-wolf-among-us",
+      "executable": "",
+      "steam_app_id": null,
+      "proton_version": "",
+      "proton_dependencies": [],
+      "proton_sync_paths": [],
+      "categories": [],
+      "launch_options": ""
+    },
+    {
+      "name": "Uncharted Legacy of Thieves Collection",
+      "path": "uncharted-legacy-of-thieves-collection",
+      "executable": "",
+      "steam_app_id": null,
+      "proton_version": "",
+      "proton_dependencies": [],
+      "proton_sync_paths": [],
+      "categories": [],
+      "launch_options": ""
+    }
+  ]
+}
