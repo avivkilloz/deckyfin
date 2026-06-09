@@ -1,4 +1,4 @@
-import { VFC, useState, useEffect, useRef } from "react";
+import { VFC, useState, useEffect, useRef, useCallback } from "react";
 import { callable } from "@decky/api";
 import { Navigation, Focusable, TextField } from "@decky/ui";
 
@@ -38,6 +38,48 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
   const sgKeyRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const backRef = useRef<HTMLDivElement>(null);
+  const folderWrapRef = useRef<HTMLDivElement>(null);
+  const sgKeyWrapRef = useRef<HTMLDivElement>(null);
+
+  // ── Steam opens virtual keyboard only on real click events ──
+  const activateInput = useCallback(
+    (ref: React.RefObject<HTMLInputElement | null>) => {
+      ref.current?.focus();
+      ref.current?.click();
+    },
+    []
+  );
+
+  // ── Return focus to the Focusable wrapper when B pressed inside input ──
+  useEffect(() => {
+    const el = folderRef.current;
+    if (!el) return;
+    const handler = (e: Event) => {
+      e.stopPropagation();
+      folderWrapRef.current?.focus();
+    };
+    el.addEventListener("vgp_oncancel", handler);
+    el.addEventListener("vgp_onok", handler);
+    return () => {
+      el.removeEventListener("vgp_oncancel", handler);
+      el.removeEventListener("vgp_onok", handler);
+    };
+  }, []);
+
+  useEffect(() => {
+    const el = sgKeyRef.current;
+    if (!el) return;
+    const handler = (e: Event) => {
+      e.stopPropagation();
+      sgKeyWrapRef.current?.focus();
+    };
+    el.addEventListener("vgp_oncancel", handler);
+    el.addEventListener("vgp_onok", handler);
+    return () => {
+      el.removeEventListener("vgp_oncancel", handler);
+      el.removeEventListener("vgp_onok", handler);
+    };
+  }, []);
 
   // ── Auto-focus Back button on mount so B-button works immediately ──
   useEffect(() => {
@@ -139,7 +181,12 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
         Path to the root directory containing your game folders. Each
         subdirectory is treated as a separate game with its own config.
       </p>
-      <Focusable onActivate={() => folderRef.current?.focus()} focusClassName="is-focused" style={{ marginBottom: "12px" }}>
+      <Focusable
+        ref={folderWrapRef}
+        onActivate={() => activateInput(folderRef)}
+        focusClassName="is-focused"
+        style={{ marginBottom: "12px" }}
+      >
         <input
           ref={folderRef}
           type="text"
@@ -183,7 +230,12 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
         </Focusable>
         .
       </p>
-      <Focusable onActivate={() => sgKeyRef.current?.focus()} focusClassName="is-focused" style={{ marginBottom: "8px" }}>
+      <Focusable
+        ref={sgKeyWrapRef}
+        onActivate={() => activateInput(sgKeyRef)}
+        focusClassName="is-focused"
+        style={{ marginBottom: "8px" }}
+      >
         <input
           ref={sgKeyRef}
           type="text"
