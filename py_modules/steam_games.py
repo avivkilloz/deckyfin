@@ -207,13 +207,18 @@ def add_nonsteam_game(
             if start_dir is None:
                 start_dir = str(Path(exe_path).parent)
             exe_formatted = f'"{exe_path}"'
-            app_id = calc_shortcut_app_id(app_name, exe_formatted)
+
+            # Preserve the existing appid (see update_nonsteam_game for reasoning)
+            existing_app_id = shortcuts_dict[idx].get("appid")
+            if existing_app_id is not None:
+                app_id = existing_app_id
+            else:
+                app_id = calc_shortcut_app_id(app_name, exe_formatted)
 
             shortcuts_dict[idx]["AppName"] = app_name
             shortcuts_dict[idx]["Exe"] = exe_formatted
             shortcuts_dict[idx]["StartDir"] = start_dir
             shortcuts_dict[idx]["LaunchOptions"] = launch_options
-            shortcuts_dict[idx]["appid"] = app_id
 
             shortcuts["shortcuts"] = shortcuts_dict
             _save_vdf_binary(shortcuts, shortcuts_path)
@@ -308,12 +313,20 @@ def update_nonsteam_game(
         start_dir = str(Path(exe_path).parent)
 
     exe_formatted = f'"{exe_path}"'
-    app_id = calc_shortcut_app_id(app_name, exe_formatted)
+
+    # Preserve the existing appid — Steam calculates it from exe+name
+    # and other tools (Heroic, Lutris) use different algorithms. If we
+    # recalculate here we'd overwrite it with a potentially different value,
+    # breaking Proton config mapping keys that other code uses with this app_id.
+    existing_app_id = shortcuts_dict[target_idx].get("appid")
+    if existing_app_id is not None:
+        app_id = existing_app_id
+    else:
+        app_id = calc_shortcut_app_id(app_name, exe_formatted)
 
     shortcuts_dict[target_idx]["Exe"] = exe_formatted
     shortcuts_dict[target_idx]["StartDir"] = start_dir
     shortcuts_dict[target_idx]["LaunchOptions"] = launch_options
-    shortcuts_dict[target_idx]["appid"] = app_id
 
     shortcuts["shortcuts"] = shortcuts_dict
     _save_vdf_binary(shortcuts, shortcuts_path)
