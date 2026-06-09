@@ -1,61 +1,34 @@
-[2026-06-09 17:33:41,229][INFO]: Killed Steam process pid=230429 name=steamwebhelper
-[2026-06-09 17:33:41,229][INFO]: Killed Steam process pid=230452 name=steamwebhelper
-[2026-06-09 17:33:41,229][INFO]: Killed Steam process pid=230536 name=steamwebhelper
-[2026-06-09 17:33:43,231][INFO]: Steam relaunch: machinectl shell
-[2026-06-09 17:33:44,231][INFO]: Steam relaunch output (if any): check /tmp/deckyfin_steam_launch.log
-[2026-06-09 17:33:44,231][INFO]: Steam restarted successfully with flags: ['-bigpicture']
-[2026-06-09 17:34:10,855][INFO]: Auto-detected logged in Steam user 892854676
-[2026-06-09 17:34:10,931][INFO]: Found 73 non-Steam games for user 892854676
-[2026-06-09 17:34:10,934][INFO]: Auto-detected logged in Steam user 892854676
-[2026-06-09 17:34:10,949][INFO]: Auto-detected logged in Steam user 892854676
-[2026-06-09 17:34:10,962][INFO]: Auto-detected logged in Steam user 892854676
-[2026-06-09 17:34:10,976][INFO]: Auto-detected logged in Steam user 892854676
-[2026-06-09 17:34:10,987][INFO]: Auto-detected logged in Steam user 892854676
-[2026-06-09 17:34:11,000][INFO]: Auto-detected logged in Steam user 892854676
-[2026-06-09 17:34:11,012][INFO]: Auto-detected logged in Steam user 892854676
-[2026-06-09 17:34:11,026][INFO]: Auto-detected logged in Steam user 892854676
-[2026-06-09 17:34:11,040][INFO]: Auto-detected logged in Steam user 892854676
-[2026-06-09 17:34:11,053][INFO]: Auto-detected logged in Steam user 892854676
-[2026-06-09 17:34:11,067][INFO]: Auto-detected logged in Steam user 892854676
-[2026-06-09 17:34:11,081][INFO]: Auto-detected logged in Steam user 892854676
-[2026-06-09 17:34:11,098][INFO]: Auto-detected logged in Steam user 892854676
-[2026-06-09 17:34:11,116][INFO]: Auto-detected logged in Steam user 892854676
-[2026-06-09 17:34:11,134][INFO]: Auto-detected logged in Steam user 892854676
-[2026-06-09 17:34:11,151][INFO]: Auto-detected logged in Steam user 892854676
-[2026-06-09 17:34:11,166][INFO]: Auto-detected logged in Steam user 892854676
-[2026-06-09 17:34:11,181][INFO]: Auto-detected logged in Steam user 892854676
-[2026-06-09 17:34:11,197][INFO]: Auto-detected logged in Steam user 892854676
-[2026-06-09 17:34:11,214][INFO]: Auto-detected logged in Steam user 892854676
-[2026-06-09 17:34:11,232][INFO]: Auto-detected logged in Steam user 892854676
-[2026-06-09 17:34:11,250][INFO]: Auto-detected logged in Steam user 892854676
-[2026-06-09 17:34:11,267][INFO]: Auto-detected logged in Steam user 892854676
-[2026-06-09 17:34:11,283][INFO]: Auto-detected logged in Steam user 892854676
-[2026-06-09 17:34:12,515][INFO]: Auto-detected logged in Steam user 892854676
-[2026-06-09 17:34:26,904][INFO]: Auto-detected logged in Steam user 892854676
-[2026-06-09 17:34:26,904][INFO]: Initializing Proton prefix app_id=-9621204 user_id=892854676 proton=GE-Proton10-34 reinit=False
-[2026-06-09 17:34:26,905][INFO]: Updated compat.vdf for app_id=-9621204 user_id=892854676
-[2026-06-09 17:34:26,950][INFO]: Updated local config for user=892854676 app=-9621204
-[2026-06-09 17:34:26,991][INFO]: Updated global config for app 4285346092 proton=GE-Proton10-34
-[2026-06-09 17:34:26,992][INFO]: Set Proton version for app_id=-9621204 unsigned=4285346092 to GE-Proton10-34 (user=892854676)
-[2026-06-09 17:34:32,216][INFO]: Auto-detected logged in Steam user 892854676
-[2026-06-09 17:34:32,216][INFO]: Initializing Proton prefix app_id=-9621204 user_id=892854676 proton=GE-Proton10-34 reinit=True
-[2026-06-09 17:34:32,217][INFO]: Updated compat.vdf for app_id=-9621204 user_id=892854676
-[2026-06-09 17:34:32,277][INFO]: Updated local config for user=892854676 app=-9621204
-[2026-06-09 17:34:32,328][INFO]: Updated global config for app 4285346092 proton=GE-Proton10-34
-[2026-06-09 17:34:32,328][INFO]: Set Proton version for app_id=-9621204 unsigned=4285346092 to GE-Proton10-34 (user=892854676)
-[2026-06-09 17:34:32,524][INFO]: Removed existing prefix at /home/deck/.local/share/Steam/steamapps/compatdata/4285346092
-[2026-06-09 17:34:41,240][INFO]: Prefix initialized successfully at /home/deck/.local/share/Steam/steamapps/compatdata/4285346092
-[2026-06-09 17:34:41,269][INFO]: Fixed prefix ownership to deck for /home/deck/.local/share/Steam/steamapps/compatdata/4285346092
-[2026-06-09 17:34:54,081][INFO]: SteamGridDB found 'Baldur's Gate 3 Toolkit' (ID 5464113) for query 'Baldurs Gate 3'
-[2026-06-09 17:35:25,092][INFO]: Auto-detected logged in Steam user 892854676
-[2026-06-09 17:35:25,170][INFO]: Found 73 non-Steam games for user 892854676
-[2026-06-09 17:35:25,174][INFO]: Auto-detected logged in Steam user 892854676
-[2026-06-09 17:35:25,186][INFO]: Auto-detected logged in Steam user 892854676
-[2026-06-09 17:35:25,197][INFO]: Auto-detected logged in Steam user 892854676
-[2026-06-09 17:35:25,210][INFO]: Auto-detected logged in Steam user 892854676
-[2026-06-09 17:35:25,221][INFO]: Auto-detected logged in Steam user 892854676
-[2026-06-09 17:35:25,233][INFO]: Auto-detected logged in Steam user 892854676
-[2026-06-09 17:35:25,244][INFO]: Auto-detected logged in Steam user 892854676
-[2026-06-09 17:35:25,254][INFO]: Auto-detected logged in Steam user 892854676
-[2026-06-09 17:35:25,266][INFO]: Auto-detected logged in Steam user 892854676
+> deckyfin@0.1.0 build
+> rollup -c
+
+
+./src/index.tsx → dist...
+(!) [plugin typescript] src/components/GameDetail.tsx (328:73): @rollup/plugin-typescript TS2551: Property 'error' does not exist on type '{ success: boolean; removed_shortcut?: boolean | undefined; removed_prefix?: boolean | undefined; removed_grid?: boolean | undefined; unsigned_appid?: number | undefined; errors?: string[] | undefined; }'. Did you mean 'errors'?
+/home/deck/git/github/avivkilloz/deckyfin/src/components/GameDetail.tsx:328:73
+
+328         const detail = res.errors?.length ? res.errors.join("; ") : res.error || "Not found";
+                                                                            ~~~~~
+
+  src/components/GameDetail.tsx:25:126
+    25   { success: boolean; removed_shortcut?: boolean; removed_prefix?: boolean; removed_grid?: boolean; unsigned_appid?: number; errors?: string[] }
+                                                                                                                                    ~~~~~~
+    'errors' is declared here.
+
+(!) [plugin typescript] src/components/GameDetail.tsx (874:12): @rollup/plugin-typescript TS2367: This comparison appears to be unintentional because the types '"steam" | "deckyfin" | null' and '"purge"' have no overlap.
+/home/deck/git/github/avivkilloz/deckyfin/src/components/GameDetail.tsx:874:12
+
+874           {confirming === "purge" ? (
+               ~~~~~~~~~~~~~~~~~~~~~~
+
+(!) [plugin typescript] src/components/GameDetail.tsx (916:47): @rollup/plugin-typescript TS2345: Argument of type '"purge"' is not assignable to parameter of type 'SetStateAction<"steam" | "deckyfin" | null>'.
+/home/deck/git/github/avivkilloz/deckyfin/src/components/GameDetail.tsx:916:47
+
+916               onActivate={() => setConfirming("purge")}
+                                                  ~~~~~~~
+
+(!) [plugin typescript] src/components/GameDetail.tsx (917:44): @rollup/plugin-typescript TS2345: Argument of type '"purge"' is not assignable to parameter of type 'SetStateAction<"steam" | "deckyfin" | null>'.
+/home/deck/git/github/avivkilloz/deckyfin/src/components/GameDetail.tsx:917:44
+
+917               onClick={() => setConfirming("purge")}
+                                               ~~~~~~~
 
