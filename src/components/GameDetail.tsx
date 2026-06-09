@@ -507,7 +507,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         focusClassName="is-focused"
         style={{ ...BTN_STYLE, marginBottom: "12px", display: "inline-block" }}
       >
-        ← Back
+        Back
       </Focusable>
 
       {/* ── Config Fields ──────────────────────────────────────────────── */}
