@@ -20,16 +20,15 @@ export default definePlugin(() => {
       <svg
         xmlns="http://www.w3.org/2000/svg"
         viewBox="0 0 24 24"
-        fill="currentColor"
         width="24"
         height="24"
       >
-        <path d="M20 6H4c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2z"
-          fill="currentColor" />
-        <circle cx="8" cy="12" r="2" fill="currentColor" />
-        <circle cx="16" cy="12" r="2" fill="currentColor" />
-        <path d="M11 9v2H9v2h2v2h2v-2h2v-2h-2V9h-2z"
-          fill="currentColor" />
+        <g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+          <rect x="0" y="7" width="24" height="10" rx="3"/>
+          <path d="M9 10v4M7 12h4" />
+          <circle cx="11" cy="12" r="2" fill="currentColor" />
+          <circle cx="15" cy="12" r="2" fill="currentColor" />
+        </g>
       </svg>
     ),
     onDismount() {

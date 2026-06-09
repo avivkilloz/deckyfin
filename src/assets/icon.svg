@@ -1,32 +1,22 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
-  <!-- Controller body -->
-  <rect x="8" y="28" width="84" height="44" rx="14" fill="#67b1f2"/>
-  <!-- Left grip -->
-  <path d="M8 42 L0 42 L0 60 L8 60 Z" fill="#67b1f2"/>
-  <path d="M0 42 Q-3 42 -3 51 Q-3 60 0 60" fill="#67b1f2"/>
-  <!-- Right grip -->
-  <path d="M92 42 L100 42 L100 60 L92 60 Z" fill="#67b1f2"/>
-  <path d="M100 42 Q103 42 103 51 Q103 60 100 60" fill="#67b1f2"/>
-  <!-- D-pad -->
-  <rect x="22" y="40" width="6" height="20" rx="1.5" fill="#1a1a2e"/>
-  <rect x="18" y="44" width="14" height="12" rx="1.5" fill="#1a1a2e"/>
-  <!-- Left joystick -->
-  <circle cx="35" cy="50" r="7" fill="#1a1a2e" opacity="0.6"/>
-  <circle cx="35" cy="50" r="4" fill="#1a1a2e"/>
-  <!-- Right joystick -->
-  <circle cx="65" cy="50" r="7" fill="#1a1a2e" opacity="0.6"/>
-  <circle cx="65" cy="50" r="4" fill="#1a1a2e"/>
-  <!-- ABXY buttons -->
-  <circle cx="80" cy="40" r="3.5" fill="#1a1a2e"/>
-  <circle cx="86" cy="46" r="3.5" fill="#1a1a2e"/>
-  <circle cx="80" cy="52" r="3.5" fill="#1a1a2e"/>
-  <circle cx="74" cy="46" r="3.5" fill="#1a1a2e"/>
-  <!-- Home/Steam circle -->
-  <circle cx="50" cy="46" r="3.5" fill="#1a1a2e"/>
-  <!-- Start/Select -->
-  <rect x="44" y="54" width="3" height="2" rx="1" fill="#1a1a2e" opacity="0.5"/>
-  <rect x="53" y="54" width="3" height="2" rx="1" fill="#1a1a2e" opacity="0.5"/>
-  <!-- Shoulder bumpers -->
-  <rect x="14" y="22" width="16" height="8" rx="3" fill="#4a90d9"/>
-  <rect x="70" y="22" width="16" height="8" rx="3" fill="#4a90d9"/>
+  <g fill="none" stroke="#67b1f2" stroke-width="5" stroke-linejoin="round" stroke-linecap="round">
+    <!-- Controller body -->
+    <rect x="2" y="30" width="96" height="40" rx="10"/>
+    <!-- Left grip -->
+    <path d="M2 38 Q-2 38 -2 50 Q-2 62 2 62"/>
+    <!-- Right grip -->
+    <path d="M98 38 Q102 38 102 50 Q102 62 98 62"/>
+    <!-- D-pad -->
+    <path d="M34 42v16M26 50h16" stroke-width="6"/>
+    <!-- Thumbsticks -->
+    <circle cx="52" cy="50" r="9"/>
+    <circle cx="52" cy="50" r="3" fill="#67b1f2"/>
+    <circle cx="70" cy="50" r="9"/>
+    <circle cx="70" cy="50" r="3" fill="#67b1f2"/>
+    <!-- ABXY -->
+    <circle cx="88" cy="42" r="4"/>
+    <circle cx="92" cy="50" r="4"/>
+    <circle cx="88" cy="58" r="4"/>
+    <circle cx="84" cy="50" r="4"/>
+  </g>
 </svg>
