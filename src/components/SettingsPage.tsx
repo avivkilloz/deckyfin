@@ -295,6 +295,35 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
       </Focusable>
 
       {message && <p style={{ marginTop: "12px", color: rescanned ? "#f0ad4e" : undefined }}>{message}</p>}
+
+      <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.12)", margin: "20px 0" }} />
+
+      {/* ── Feedback ────────────────────────────────────────────────────── */}
+      <h4 style={{ margin: "0 0 10px 0" }}>Feedback</h4>
+      <p style={{ fontSize: "0.85em", color: "#aaa", marginBottom: "10px" }}>
+        Found a bug or have a feature request? Open an issue on GitHub.
+      </p>
+      <Focusable
+        onActivate={() =>
+          Navigation.NavigateToExternalWeb("https://github.com/avivkilloz/deckyfin/issues")
+        }
+        onClick={() =>
+          Navigation.NavigateToExternalWeb("https://github.com/avivkilloz/deckyfin/issues")
+        }
+        focusClassName="is-focused"
+        style={{
+          padding: "8px 16px",
+          fontSize: "0.85em",
+          cursor: "pointer",
+          borderRadius: "4px",
+          border: "1px solid #0078d4",
+          background: "transparent",
+          color: "#0078d4",
+          display: "inline-block",
+        }}
+      >
+        Open an Issue
+      </Focusable>
     </Focusable>
   );
 };
