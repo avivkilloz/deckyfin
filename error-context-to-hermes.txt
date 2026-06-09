@@ -1,77 +1,61 @@
-[2026-06-09 17:23:37,972][WARNING]: vdf module not available, cannot parse loginusers.vdf
-[2026-06-09 17:23:37,972][INFO]: Multiple Steam users found, defaulting to 0
-[2026-06-09 17:23:37,973][ERROR]: ERROR get_game_card_art: name 'logger' is not defined
-Traceback (most recent call last):
-  File "/home/deck/homebrew/plugins/deckyfin/main.py", line 334, in get_game_card_art
-    info = get_steam_shortcut_info(game_name, uid)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/deck/homebrew/plugins/deckyfin/py_modules/steam_games.py", line 298, in get_steam_shortcut_info
-    shortcuts = _load_vdf_binary(shortcuts_path)
-                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/deck/homebrew/plugins/deckyfin/py_modules/steam_games.py", line 70, in _load_vdf_binary
-    import vdf
-ModuleNotFoundError: No module named 'vdf'
+[2026-06-09 17:33:41,229][INFO]: Killed Steam process pid=230429 name=steamwebhelper
+[2026-06-09 17:33:41,229][INFO]: Killed Steam process pid=230452 name=steamwebhelper
+[2026-06-09 17:33:41,229][INFO]: Killed Steam process pid=230536 name=steamwebhelper
+[2026-06-09 17:33:43,231][INFO]: Steam relaunch: machinectl shell
+[2026-06-09 17:33:44,231][INFO]: Steam relaunch output (if any): check /tmp/deckyfin_steam_launch.log
+[2026-06-09 17:33:44,231][INFO]: Steam restarted successfully with flags: ['-bigpicture']
+[2026-06-09 17:34:10,855][INFO]: Auto-detected logged in Steam user 892854676
+[2026-06-09 17:34:10,931][INFO]: Found 73 non-Steam games for user 892854676
+[2026-06-09 17:34:10,934][INFO]: Auto-detected logged in Steam user 892854676
+[2026-06-09 17:34:10,949][INFO]: Auto-detected logged in Steam user 892854676
+[2026-06-09 17:34:10,962][INFO]: Auto-detected logged in Steam user 892854676
+[2026-06-09 17:34:10,976][INFO]: Auto-detected logged in Steam user 892854676
+[2026-06-09 17:34:10,987][INFO]: Auto-detected logged in Steam user 892854676
+[2026-06-09 17:34:11,000][INFO]: Auto-detected logged in Steam user 892854676
+[2026-06-09 17:34:11,012][INFO]: Auto-detected logged in Steam user 892854676
+[2026-06-09 17:34:11,026][INFO]: Auto-detected logged in Steam user 892854676
+[2026-06-09 17:34:11,040][INFO]: Auto-detected logged in Steam user 892854676
+[2026-06-09 17:34:11,053][INFO]: Auto-detected logged in Steam user 892854676
+[2026-06-09 17:34:11,067][INFO]: Auto-detected logged in Steam user 892854676
+[2026-06-09 17:34:11,081][INFO]: Auto-detected logged in Steam user 892854676
+[2026-06-09 17:34:11,098][INFO]: Auto-detected logged in Steam user 892854676
+[2026-06-09 17:34:11,116][INFO]: Auto-detected logged in Steam user 892854676
+[2026-06-09 17:34:11,134][INFO]: Auto-detected logged in Steam user 892854676
+[2026-06-09 17:34:11,151][INFO]: Auto-detected logged in Steam user 892854676
+[2026-06-09 17:34:11,166][INFO]: Auto-detected logged in Steam user 892854676
+[2026-06-09 17:34:11,181][INFO]: Auto-detected logged in Steam user 892854676
+[2026-06-09 17:34:11,197][INFO]: Auto-detected logged in Steam user 892854676
+[2026-06-09 17:34:11,214][INFO]: Auto-detected logged in Steam user 892854676
+[2026-06-09 17:34:11,232][INFO]: Auto-detected logged in Steam user 892854676
+[2026-06-09 17:34:11,250][INFO]: Auto-detected logged in Steam user 892854676
+[2026-06-09 17:34:11,267][INFO]: Auto-detected logged in Steam user 892854676
+[2026-06-09 17:34:11,283][INFO]: Auto-detected logged in Steam user 892854676
+[2026-06-09 17:34:12,515][INFO]: Auto-detected logged in Steam user 892854676
+[2026-06-09 17:34:26,904][INFO]: Auto-detected logged in Steam user 892854676
+[2026-06-09 17:34:26,904][INFO]: Initializing Proton prefix app_id=-9621204 user_id=892854676 proton=GE-Proton10-34 reinit=False
+[2026-06-09 17:34:26,905][INFO]: Updated compat.vdf for app_id=-9621204 user_id=892854676
+[2026-06-09 17:34:26,950][INFO]: Updated local config for user=892854676 app=-9621204
+[2026-06-09 17:34:26,991][INFO]: Updated global config for app 4285346092 proton=GE-Proton10-34
+[2026-06-09 17:34:26,992][INFO]: Set Proton version for app_id=-9621204 unsigned=4285346092 to GE-Proton10-34 (user=892854676)
+[2026-06-09 17:34:32,216][INFO]: Auto-detected logged in Steam user 892854676
+[2026-06-09 17:34:32,216][INFO]: Initializing Proton prefix app_id=-9621204 user_id=892854676 proton=GE-Proton10-34 reinit=True
+[2026-06-09 17:34:32,217][INFO]: Updated compat.vdf for app_id=-9621204 user_id=892854676
+[2026-06-09 17:34:32,277][INFO]: Updated local config for user=892854676 app=-9621204
+[2026-06-09 17:34:32,328][INFO]: Updated global config for app 4285346092 proton=GE-Proton10-34
+[2026-06-09 17:34:32,328][INFO]: Set Proton version for app_id=-9621204 unsigned=4285346092 to GE-Proton10-34 (user=892854676)
+[2026-06-09 17:34:32,524][INFO]: Removed existing prefix at /home/deck/.local/share/Steam/steamapps/compatdata/4285346092
+[2026-06-09 17:34:41,240][INFO]: Prefix initialized successfully at /home/deck/.local/share/Steam/steamapps/compatdata/4285346092
+[2026-06-09 17:34:41,269][INFO]: Fixed prefix ownership to deck for /home/deck/.local/share/Steam/steamapps/compatdata/4285346092
+[2026-06-09 17:34:54,081][INFO]: SteamGridDB found 'Baldur's Gate 3 Toolkit' (ID 5464113) for query 'Baldurs Gate 3'
+[2026-06-09 17:35:25,092][INFO]: Auto-detected logged in Steam user 892854676
+[2026-06-09 17:35:25,170][INFO]: Found 73 non-Steam games for user 892854676
+[2026-06-09 17:35:25,174][INFO]: Auto-detected logged in Steam user 892854676
+[2026-06-09 17:35:25,186][INFO]: Auto-detected logged in Steam user 892854676
+[2026-06-09 17:35:25,197][INFO]: Auto-detected logged in Steam user 892854676
+[2026-06-09 17:35:25,210][INFO]: Auto-detected logged in Steam user 892854676
+[2026-06-09 17:35:25,221][INFO]: Auto-detected logged in Steam user 892854676
+[2026-06-09 17:35:25,233][INFO]: Auto-detected logged in Steam user 892854676
+[2026-06-09 17:35:25,244][INFO]: Auto-detected logged in Steam user 892854676
+[2026-06-09 17:35:25,254][INFO]: Auto-detected logged in Steam user 892854676
+[2026-06-09 17:35:25,266][INFO]: Auto-detected logged in Steam user 892854676
 
-During handling of the above exception, another exception occurred:
-
-Traceback (most recent call last):
-  File "/home/deck/homebrew/plugins/deckyfin/main.py", line 396, in wrapper
-    result = await orig(self, *args, **kwargs)
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/deck/homebrew/plugins/deckyfin/main.py", line 364, in get_game_card_art
-    logger.warning("Failed to get card art for '%s': %s", game_name, e)
-    ^^^^^^
-NameError: name 'logger' is not defined
-
-[2026-06-09 17:23:37,974][WARNING]: vdf module not available, cannot parse loginusers.vdf
-[2026-06-09 17:23:37,974][INFO]: Multiple Steam users found, defaulting to 0
-[2026-06-09 17:23:37,975][ERROR]: ERROR list_nonsteam_games: No module named 'vdf'
-Traceback (most recent call last):
-  File "/home/deck/homebrew/plugins/deckyfin/main.py", line 396, in wrapper
-    result = await orig(self, *args, **kwargs)
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/deck/homebrew/plugins/deckyfin/main.py", line 134, in list_nonsteam_games
-    return list_nonsteam_games()
-           ^^^^^^^^^^^^^^^^^^^^^
-  File "/home/deck/homebrew/plugins/deckyfin/py_modules/steam_games.py", line 117, in list_nonsteam_games
-    shortcuts = _load_vdf_binary(shortcuts_path)
-                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/deck/homebrew/plugins/deckyfin/py_modules/steam_games.py", line 70, in _load_vdf_binary
-    import vdf
-ModuleNotFoundError: No module named 'vdf'
-
-[2026-06-09 17:23:39,881][WARNING]: vdf module not available, cannot parse loginusers.vdf
-[2026-06-09 17:23:39,881][INFO]: Multiple Steam users found, defaulting to 0
-[2026-06-09 17:23:39,882][ERROR]: ERROR get_steam_shortcut: No module named 'vdf'
-Traceback (most recent call last):
-  File "/home/deck/homebrew/plugins/deckyfin/main.py", line 396, in wrapper
-    result = await orig(self, *args, **kwargs)
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/deck/homebrew/plugins/deckyfin/main.py", line 222, in get_steam_shortcut
-    info = get_steam_shortcut_info(app_name, uid)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/deck/homebrew/plugins/deckyfin/py_modules/steam_games.py", line 298, in get_steam_shortcut_info
-    shortcuts = _load_vdf_binary(shortcuts_path)
-                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/deck/homebrew/plugins/deckyfin/py_modules/steam_games.py", line 70, in _load_vdf_binary
-    import vdf
-ModuleNotFoundError: No module named 'vdf'
-
-[2026-06-09 17:23:58,671][INFO]: Updated game config 'Baldurs Gate 3' with {'name': 'Baldurs Gate 3', 'executable': 'Baldurs Gate 3/bin/bg3.exe', 'start_dir': 'Baldurs Gate 3', 'steam_app_id': None, 'proton_version': 'GE-Proton10-34', 'proton_dependencies': ['vcrun2022', 'd3dx9']}
-[2026-06-09 17:24:07,455][WARNING]: vdf module not available, cannot parse loginusers.vdf
-[2026-06-09 17:24:07,455][INFO]: Multiple Steam users found, defaulting to 0
-[2026-06-09 17:24:07,457][ERROR]: ERROR add_steam_shortcut: No module named 'vdf'
-Traceback (most recent call last):
-  File "/home/deck/homebrew/plugins/deckyfin/main.py", line 396, in wrapper
-    result = await orig(self, *args, **kwargs)
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/deck/homebrew/plugins/deckyfin/main.py", line 172, in add_steam_shortcut
-    app_id = add_nonsteam_game(str(exe), app_name, resolved_start, launch_options)
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/deck/homebrew/plugins/deckyfin/py_modules/steam_games.py", line 215, in add_nonsteam_game
-    _save_vdf_binary(shortcuts, shortcuts_path)
-  File "/home/deck/homebrew/plugins/deckyfin/py_modules/steam_games.py", line 77, in _save_vdf_binary
-    import vdf
-ModuleNotFoundError: No module named 'vdf'
-
-(deck@steamdeck deckyfin)$
