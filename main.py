@@ -89,7 +89,38 @@ class Plugin:
         return {"running": is_steam_running()}
 
     async def restart_steam(self) -> dict:
-        return restart_steam()
+        result = restart_steam()
+        # Clear the needs-restart flag after restarting
+        try:
+            self._set_needs_restart_flag(False)
+        except Exception:
+            pass
+        return result
+
+    async def get_needs_restart(self) -> bool:
+        try:
+            flag_file = self._needs_restart_file()
+            return flag_file.exists()
+        except Exception:
+            return False
+
+    async def set_needs_restart(self, value: bool) -> dict:
+        try:
+            self._set_needs_restart_flag(value)
+            return {"success": True}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def _needs_restart_file(self) -> Path:
+        from deckyfin_config import get_app_folder
+        return get_app_folder() / "needs_restart"
+
+    def _set_needs_restart_flag(self, value: bool):
+        flag_file = self._needs_restart_file()
+        if value:
+            flag_file.touch(exist_ok=True)
+        else:
+            flag_file.unlink(missing_ok=True)
 
     async def list_steam_users(self) -> list:
         return list_steam_users()

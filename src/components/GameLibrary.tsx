@@ -11,6 +11,8 @@ const getGames = callable<[], GameConfig[]>("get_games");
 const getGamesFolder = callable<[], string | null>("get_games_folder");
 const listNonSteamGames = callable<[], { name: string }[]>("list_nonsteam_games");
 const restartSteam = callable<[], { success: boolean; message?: string }>("restart_steam");
+const getNeedsRestart = callable<[], boolean>("get_needs_restart");
+const setNeedsRestart = callable<[value: boolean], { success: boolean }>("set_needs_restart");
 
 const BTN_RESTART: React.CSSProperties = {
   padding: "6px 10px",
@@ -43,16 +45,23 @@ export const GameLibrary: VFC = () => {
   const [selectedGame, setSelectedGame] = useState<GameConfig | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [restarting, setRestarting] = useState(false);
-  const [needsRestart, setNeedsRestart] = useState(false);
+  const [needsRestart, setNeedsRestartState] = useState(false);
 
   const handleRestartSteam = useCallback(async () => {
     setRestarting(true);
     try {
       await restartSteam();
+      // Backend clears the flag on restart — sync local state
+      setNeedsRestartState(false);
     } catch (_) {
       // Steam will close this UI as part of the restart — errors here are expected
     }
     setRestarting(false);
+  }, []);
+
+  // Restore persisted needs-restart state on mount
+  useEffect(() => {
+    getNeedsRestart().then((val) => setNeedsRestartState(val)).catch(() => {});
   }, []);
 
   const loadData = useCallback(async () => {
@@ -103,7 +112,10 @@ export const GameLibrary: VFC = () => {
           loadData();
           setView("library");
         }}
-        onNeedsRestart={() => setNeedsRestart(true)}
+        onNeedsRestart={() => {
+          setNeedsRestartState(true);
+          setNeedsRestart(true).catch(() => {});
+        }}
       />
     );
   }
