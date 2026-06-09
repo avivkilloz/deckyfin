@@ -213,10 +213,10 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
             marginBottom: "10px",
             border: "1px solid #555",
             borderRadius: "4px",
-            padding: "6px 8px",
+            padding: "2px 0",
           }}
         >
-          <div style={{ fontSize: "0.85em", color: "#aaa", marginBottom: "6px", wordBreak: "break-all" }}>
+          <div style={{ fontSize: "0.85em", color: "#aaa", padding: "4px 10px 2px", wordBreak: "break-all" }}>
             {browsePath}
           </div>
           {browseLoading && (
@@ -232,6 +232,7 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
                   onClick={handleGoUp}
                   focusClassName="is-focused"
                   style={{
+                    margin: "0 2px",
                     padding: "4px 10px",
                     cursor: "pointer",
                     fontSize: "0.85em",
@@ -256,6 +257,7 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
                   onClick={() => handleFolderClick(name)}
                   focusClassName="is-focused"
                   style={{
+                    margin: "0 2px",
                     padding: "4px 10px",
                     cursor: "pointer",
                     fontSize: "0.85em",
@@ -272,6 +274,7 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
                 onClick={handleSelectFolder}
                 focusClassName="is-focused"
                 style={{
+                  margin: "0 2px",
                   padding: "8px 10px",
                   cursor: "pointer",
                   fontSize: "0.85em",

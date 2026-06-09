@@ -189,16 +189,27 @@ class Plugin:
         """List subdirectory names under the given path. Used by the folder browser."""
         try:
             root = Path(path)
+            _debug(f"list_subfolders: path={path!r}, exists={root.exists()}, is_dir={root.is_dir() if root.exists() else 'N/A'}")
             if not root.exists() or not root.is_dir():
                 return []
             items = []
-            for item in sorted(root.iterdir()):
-                if item.is_dir() and not item.name.startswith("."):
-                    items.append(item.name)
+            try:
+                entries = list(root.iterdir())
+            except PermissionError as pe:
+                _debug(f"list_subfolders: PermissionError iterating {path}: {pe}")
+                return []
+            for item in sorted(entries):
+                if item.name.startswith("."):
+                    continue
+                try:
+                    if item.is_dir():
+                        items.append(item.name)
+                except PermissionError:
+                    continue
+            _debug(f"list_subfolders: found {len(items)} subdirs: {items}")
             return items
-        except PermissionError:
-            return []
-        except Exception:
+        except Exception as e:
+            _debug(f"list_subfolders: unexpected error for {path!r}: {e}")
             return []
 
     # ── Steam Actions ─────────────────────────────────────────────────────
