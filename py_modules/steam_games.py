@@ -161,7 +161,12 @@ def add_nonsteam_game(
     launch_options: str = "",
     user_id: Optional[str] = None,
 ) -> int:
-    """Add a non-Steam game to Steam shortcuts. Returns the calculated app_id."""
+    """Add a non-Steam game to Steam shortcuts. Returns the calculated app_id.
+
+    If a shortcut with the same AppName already exists, updates it in-place
+    instead of creating a duplicate. This is idempotent — the Steam library
+    never gets multiple entries with the same game name.
+    """
     steam_root = find_steam_root()
     user_id_actual = user_id or get_user_id()
     shortcuts_path = (
@@ -182,7 +187,35 @@ def add_nonsteam_game(
     if "shortcuts" not in shortcuts:
         shortcuts["shortcuts"] = {}
 
-    existing_indices = [int(k) for k in shortcuts["shortcuts"].keys() if k.isdigit()]
+    # ── Check for existing shortcut with the same name ────────────────
+    shortcuts_dict = shortcuts["shortcuts"]
+    for idx, shortcut in list(shortcuts_dict.items()):
+        if not idx.isdigit():
+            continue
+        if shortcut.get("AppName") == app_name:
+            # Found existing — update in-place
+            if start_dir is None:
+                start_dir = str(Path(exe_path).parent)
+            exe_formatted = f'"{exe_path}"'
+            app_id = calc_shortcut_app_id(app_name, exe_formatted)
+
+            shortcuts_dict[idx]["AppName"] = app_name
+            shortcuts_dict[idx]["Exe"] = exe_formatted
+            shortcuts_dict[idx]["StartDir"] = start_dir
+            shortcuts_dict[idx]["LaunchOptions"] = launch_options
+            shortcuts_dict[idx]["appid"] = app_id
+
+            shortcuts["shortcuts"] = shortcuts_dict
+            _save_vdf_binary(shortcuts, shortcuts_path)
+
+            logger.info(
+                "Updated existing non-Steam game '%s' (app_id=%s) exe=%s",
+                app_name, app_id, exe_path,
+            )
+            return app_id
+
+    # ── No existing shortcut — add new ────────────────────────────────
+    existing_indices = [int(k) for k in shortcuts_dict.keys() if k.isdigit()]
     next_index = str(max(existing_indices, default=-1) + 1)
 
     if start_dir is None:
