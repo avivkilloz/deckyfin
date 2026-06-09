@@ -94,27 +94,36 @@ def get_steam_vdf_compat_tool_mapping(vdf_file: dict) -> dict:
 
 def list_nonsteam_games(user_id: Optional[str] = None) -> list[dict]:
     """List all non-Steam games with their calculated app IDs."""
-    steam_root = find_steam_root()
-    user_id_actual = user_id or get_user_id()
-    shortcuts_path = (
-        steam_root / STEAM_USERDATA_FOLDER / user_id_actual
-        / STEAM_CONFIG_FOLDER / SHORTCUTS_VDF
-    )
-
-    config_vdf_file = (
-        steam_root / STEAM_USERDATA_FOLDER / user_id_actual
-        / STEAM_CONFIG_FOLDER / LOCALCONFIG_VDF
-    )
-    if not config_vdf_file.exists():
-        config_vdf_file = (
-            steam_root / STEAM_USERDATA_FOLDER / user_id_actual
-            / STEAM_CONFIG_FOLDER / CONFIG_VDF
-        )
-
-    if not shortcuts_path.exists():
+    try:
+        steam_root = find_steam_root()
+        user_id_actual = user_id or get_user_id()
+    except Exception as e:
+        logger.warning("Failed to determine Steam root or user: %s", e)
         return []
 
-    shortcuts = _load_vdf_binary(shortcuts_path)
+    try:
+        shortcuts_path = (
+            steam_root / STEAM_USERDATA_FOLDER / user_id_actual
+            / STEAM_CONFIG_FOLDER / SHORTCUTS_VDF
+        )
+
+        config_vdf_file = (
+            steam_root / STEAM_USERDATA_FOLDER / user_id_actual
+            / STEAM_CONFIG_FOLDER / LOCALCONFIG_VDF
+        )
+        if not config_vdf_file.exists():
+            config_vdf_file = (
+                steam_root / STEAM_USERDATA_FOLDER / user_id_actual
+                / STEAM_CONFIG_FOLDER / CONFIG_VDF
+            )
+
+        if not shortcuts_path.exists():
+            return []
+
+        shortcuts = _load_vdf_binary(shortcuts_path)
+    except Exception as e:
+        logger.warning("Failed to load shortcuts.vdf for user %s: %s", user_id_actual, e)
+        return []
 
     compat_mapping = {}
     if config_vdf_file.exists():
@@ -320,15 +329,21 @@ def update_nonsteam_game(
 
 def get_steam_shortcut_info(app_name: str, user_id: Optional[str] = None) -> Optional[dict]:
     """Look up a non-Steam game shortcut by name and return its info."""
-    steam_root = find_steam_root()
-    user_id_actual = user_id or get_user_id()
-    shortcuts_path = (
-        steam_root / STEAM_USERDATA_FOLDER / user_id_actual
-        / STEAM_CONFIG_FOLDER / SHORTCUTS_VDF
-    )
-    if not shortcuts_path.exists():
+    uid = "?"
+    try:
+        steam_root = find_steam_root()
+        uid = user_id or get_user_id()
+        shortcuts_path = (
+            steam_root / STEAM_USERDATA_FOLDER / uid
+            / STEAM_CONFIG_FOLDER / SHORTCUTS_VDF
+        )
+        if not shortcuts_path.exists():
+            return None
+        shortcuts = _load_vdf_binary(shortcuts_path)
+    except Exception as e:
+        logger.warning("Failed to load shortcuts.vdf for user %s: %s", uid, e)
         return None
-    shortcuts = _load_vdf_binary(shortcuts_path)
+
     for idx, shortcut in shortcuts.get("shortcuts", {}).items():
         if not idx.isdigit():
             continue
