@@ -25,6 +25,7 @@ export const CompactTextField: VFC<Props> = ({
     el.style.height = "auto";
     el.style.minWidth = "0";
     el.style.boxSizing = "border-box";
+    el.style.borderRadius = "4px";
   }, []);
 
   return (
