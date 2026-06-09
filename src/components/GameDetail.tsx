@@ -20,6 +20,10 @@ const removeSteamShortcut = callable<
   [app_name: string],
   { success: boolean; error?: string }
 >("remove_steam_shortcut");
+const purgeSteamGameData = callable<
+  [app_name: string],
+  { success: boolean; removed_shortcut?: boolean; removed_prefix?: boolean; removed_grid?: boolean; unsigned_appid?: number; errors?: string[] }
+>("purge_steam_game_data");
 const updateSteamShortcut = callable<
   [app_name: string, exe_path: string, start_dir?: string, launch_options?: string],
   { success: boolean; app_id?: number; unsigned_appid?: number; error?: string }
@@ -304,6 +308,25 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         onNeedsRestart?.();
       } else {
         setFeedback({ ok: false, msg: res.error || "Not found in Steam shortcuts" });
+      }
+    } catch (err: any) {
+      setFeedback({ ok: false, msg: err?.message || "Error" });
+    }
+    setLoading(null);
+  };
+
+  const handlePurgeSteam = async () => {
+    setLoading("purge");
+    setFeedback(null);
+    try {
+      const res = await purgeSteamGameData(name);
+      if (res.success) {
+        setSteamInfo(null);
+        setFeedback({ ok: true, msg: "All Steam data purged — restart Steam to apply" });
+        onNeedsRestart?.();
+      } else {
+        const detail = res.errors?.length ? res.errors.join("; ") : res.error || "Not found";
+        setFeedback({ ok: false, msg: `Purge failed: ${detail}` });
       }
     } catch (err: any) {
       setFeedback({ ok: false, msg: err?.message || "Error" });
@@ -840,6 +863,74 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
               }}
             >
               {loading === "remove" ? "Removing…" : "Remove from Steam"}
+            </Focusable>
+          )}
+        </div>
+      )}
+
+      {/* ── Purge All Steam Data ────────────────────────────────────────── */}
+      {steamInfo && (
+        <div>
+          {confirming === "purge" ? (
+            <div
+              style={{
+                border: "1px solid #9b59b6",
+                borderRadius: "4px",
+                padding: "10px",
+                marginBottom: "8px",
+                textAlign: "center",
+                fontSize: "0.85em",
+                color: "#9b59b6",
+              }}
+            >
+              <div style={{ marginBottom: "6px" }}>
+                Purge all Steam data for this game? This removes the shortcut,
+                prefix, config, and grid art. Cannot be undone.
+              </div>
+              <div style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
+                <Focusable
+                  onActivate={() => { setConfirming(null); handlePurgeSteam(); }}
+                  onClick={() => { setConfirming(null); handlePurgeSteam(); }}
+                  focusClassName="is-focused"
+                  style={{
+                    ...BTN_STYLE,
+                    border: "1px solid #9b59b6",
+                    background: "#9b59b6",
+                    color: "white",
+                  }}
+                >
+                  Yes, Purge Everything
+                </Focusable>
+                <Focusable
+                  onActivate={() => setConfirming(null)}
+                  onClick={() => setConfirming(null)}
+                  focusClassName="is-focused"
+                  style={BTN_STYLE}
+                >
+                  Cancel
+                </Focusable>
+              </div>
+            </div>
+          ) : (
+            <Focusable
+              onActivate={() => setConfirming("purge")}
+              onClick={() => setConfirming("purge")}
+              focusClassName="is-focused"
+              style={{
+                width: "100%",
+                padding: "10px 0",
+                fontSize: "0.85em",
+                cursor: "pointer",
+                borderRadius: "4px",
+                border: "1px solid #9b59b6",
+                background: "transparent",
+                color: "#9b59b6",
+                marginBottom: "8px",
+                textAlign: "center",
+                opacity: loading === "purge" ? 0.5 : 1,
+              }}
+            >
+              {loading === "purge" ? "Purging…" : "Purge All Steam Data"}
             </Focusable>
           )}
         </div>

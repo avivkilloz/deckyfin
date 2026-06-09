@@ -381,3 +381,186 @@ def remove_nonsteam_game(app_name: str, user_id: Optional[str] = None) -> bool:
 
     logger.info("Removed non-Steam game '%s' from shortcuts", app_name)
     return True
+
+
+# ── Purge Non-Steam Game Data ──────────────────────────────────────────────
+
+
+def purge_nonsteam_game_data(app_name: str, user_id: Optional[str] = None) -> dict:
+    """Remove a non-Steam game and ALL its associated data from Steam.
+
+    Removes:
+    - Shortcut entry from shortcuts.vdf
+    - platform_overrides from compat.vdf
+    - CompatToolMapping from localconfig.vdf / config.vdf
+    - CompatToolMapping from global config.vdf
+    - Proton prefix directory (compatdata/<unsigned_appid>/)
+    - Grid art files (config/grid/<unsigned_appid>.*)
+
+    Returns a dict with keys removed_shortcut, removed_compat_vdf,
+    removed_local_config, removed_global_config, removed_prefix,
+    removed_grid, unsigned_appid, errors.
+    """
+    import shutil
+
+    from deckyfin_proton_compat import (
+        _load_or_create_vdf,
+        _save_vdf,
+    )
+    from deckyfin_consts import (
+        COMPATDATA_FOLDER,
+        COMPAT_VDF,
+        CONFIG_VDF,
+        LOCALCONFIG_VDF,
+        STEAM_CONFIG_FOLDER,
+        STEAM_STEAMAPPS_FOLDER,
+        STEAM_USERDATA_FOLDER,
+        VDF_COMPAT_TOOL_MAPPING,
+        VDF_INSTALL_CONFIG_STORE,
+        VDF_PLATFORM_OVERRIDES,
+        VDF_SOFTWARE,
+        VDF_STEAM,
+        VDF_USER_LOCAL_CONFIG_STORE,
+        VDF_VALVE,
+    )
+
+    result = {
+        "removed_shortcut": False,
+        "removed_compat_vdf": False,
+        "removed_local_config": False,
+        "removed_global_config": False,
+        "removed_prefix": False,
+        "removed_grid": False,
+        "unsigned_appid": None,
+        "errors": [],
+    }
+
+    steam_root = find_steam_root()
+    user_id_actual = user_id or get_user_id()
+
+    # 1. Get shortcut info BEFORE removal (need app_ids)
+    info = get_steam_shortcut_info(app_name, user_id_actual)
+    if info is None:
+        result["errors"].append(f"'{app_name}' not found in Steam shortcuts")
+        return result
+
+    app_id = info["app_id"]
+    unsigned_appid = info["unsigned_appid"]
+    config_appid = convert_appid_to_config_format(app_id)
+    result["unsigned_appid"] = unsigned_appid
+
+    # 2. Remove shortcut from shortcuts.vdf
+    try:
+        result["removed_shortcut"] = remove_nonsteam_game(app_name, user_id_actual)
+    except Exception as e:
+        result["errors"].append(f"remove shortcut: {e}")
+
+    # 3. Remove from compat.vdf (platform_overrides)
+    try:
+        compat_path = (
+            steam_root / STEAM_USERDATA_FOLDER / user_id_actual
+            / STEAM_CONFIG_FOLDER / COMPAT_VDF
+        )
+        if compat_path.exists():
+            config = _load_or_create_vdf(compat_path, {})
+            if VDF_PLATFORM_OVERRIDES in config:
+                entry_key = str(app_id)
+                if entry_key in config[VDF_PLATFORM_OVERRIDES]:
+                    del config[VDF_PLATFORM_OVERRIDES][entry_key]
+                    _save_vdf(compat_path, config)
+                    result["removed_compat_vdf"] = True
+                    logger.info("Purged compat.vdf entry for app_id=%s", entry_key)
+    except Exception as e:
+        result["errors"].append(f"compat.vdf: {e}")
+
+    # 4. Remove from user-specific localconfig.vdf (CompatToolMapping)
+    try:
+        # Try localconfig.vdf first, fall back to config.vdf
+        localconfig_path = (
+            steam_root / STEAM_USERDATA_FOLDER / user_id_actual
+            / STEAM_CONFIG_FOLDER / LOCALCONFIG_VDF
+        )
+        user_cfg_path = localconfig_path if localconfig_path.exists() else (
+            steam_root / STEAM_USERDATA_FOLDER / user_id_actual
+            / STEAM_CONFIG_FOLDER / CONFIG_VDF
+        )
+        if user_cfg_path.exists():
+            config = _load_or_create_vdf(user_cfg_path, {})
+            ctm = config.get(VDF_USER_LOCAL_CONFIG_STORE, {})
+            ctm = ctm.get(VDF_SOFTWARE, {})
+            ctm = ctm.get(VDF_VALVE, {})
+            ctm = ctm.get(VDF_STEAM, {})
+            ctm = ctm.get(VDF_COMPAT_TOOL_MAPPING, {})
+            if config_appid in ctm:
+                del ctm[config_appid]
+                _save_vdf(user_cfg_path, config)
+                result["removed_local_config"] = True
+                logger.info("Purged user config CompatToolMapping for app=%s", config_appid)
+    except Exception as e:
+        result["errors"].append(f"local config: {e}")
+
+    # 5. Remove from global config.vdf (CompatToolMapping, unsigned_appid)
+    try:
+        global_config_paths = [
+            steam_root / STEAM_CONFIG_FOLDER / CONFIG_VDF,
+            Path.home() / ".steam" / "steam" / STEAM_CONFIG_FOLDER / CONFIG_VDF,
+            Path.home() / ".steam" / "debian-installation" / STEAM_CONFIG_FOLDER / CONFIG_VDF,
+        ]
+        for gcp in global_config_paths:
+            if gcp.exists():
+                config = _load_or_create_vdf(gcp, {})
+                ics = config.get(VDF_INSTALL_CONFIG_STORE, {})
+                sw = ics.get(VDF_SOFTWARE, {})
+                vv = sw.get(VDF_VALVE, {})
+                st = vv.get(VDF_STEAM, {})
+                ctm = st.get(VDF_COMPAT_TOOL_MAPPING, {})
+                key = str(unsigned_appid)
+                if key in ctm:
+                    del ctm[key]
+                    _save_vdf(gcp, config)
+                    result["removed_global_config"] = True
+                    logger.info("Purged global config CompatToolMapping for app=%s", key)
+                break
+    except Exception as e:
+        result["errors"].append(f"global config: {e}")
+
+    # 6. Remove prefix directory
+    try:
+        prefix_path = (
+            steam_root / STEAM_STEAMAPPS_FOLDER / COMPATDATA_FOLDER / str(unsigned_appid)
+        )
+        if prefix_path.exists():
+            shutil.rmtree(prefix_path)
+            result["removed_prefix"] = True
+            logger.info("Removed prefix at %s", prefix_path)
+    except Exception as e:
+        result["errors"].append(f"prefix dir: {e}")
+
+    # 7. Remove grid art files
+    try:
+        grid_dir = (
+            steam_root / STEAM_USERDATA_FOLDER / user_id_actual
+            / STEAM_CONFIG_FOLDER / "grid"
+        )
+        if grid_dir.exists():
+            pattern = f"{unsigned_appid}.*"
+            removed_any = False
+            for f in grid_dir.iterdir():
+                if f.name.startswith(str(unsigned_appid)):
+                    f.unlink()
+                    removed_any = True
+            result["removed_grid"] = removed_any
+            if removed_any:
+                logger.info("Removed grid art for app=%s", unsigned_appid)
+    except Exception as e:
+        result["errors"].append(f"grid art: {e}")
+
+    logger.info(
+        "Purged all Steam data for '%s' (unsigned_appid=%s): "
+        "shortcut=%s compat=%s local=%s global=%s prefix=%s grid=%s",
+        app_name, unsigned_appid,
+        result["removed_shortcut"], result["removed_compat_vdf"],
+        result["removed_local_config"], result["removed_global_config"],
+        result["removed_prefix"], result["removed_grid"],
+    )
+    return result
