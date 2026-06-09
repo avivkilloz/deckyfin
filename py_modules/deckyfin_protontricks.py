@@ -447,8 +447,12 @@ def install_protontricks_dependencies(
             logger.info("Trying %s for %s in prefix %s", method_name, dep, pfxid)
 
             try:
-                # Kill stale wineserver before each method
-                _kill_wineservers()
+                # Kill stale wineserver before each method.
+                # Skipped for flatpak — its wineserver runs inside the sandbox
+                # and killing a host wineserver can leave stale registry locks
+                # that corrupt the prefix for the flatpak's wine process.
+                if "flatpak" not in method_name:
+                    _kill_wineservers()
 
                 result = attempt_fn(timeout or _METHOD_TIMEOUT)
 
