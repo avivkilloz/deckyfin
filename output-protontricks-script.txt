@@ -1,0 +1,753 @@
+(deck@steamdeck deckyfin)$ ptti 3225169897 vcrun2022,d3dx9
+Installing dependencies for Proton prefix: 3225169897
+Dependencies: vcrun2022,d3dx9
+
+Installing vcrun2022...
+steam-runtime-launcher-service[61]: W: The --socket option is deprecated. Prefer to use --session or --bus-name.
+Executing cd /app/bin
+                     Using winetricks 20260125 (protontricks) - sha256sum: 8b2d90a1df27c829f27ee0d1ba3dc8c8f7c81e4c107127d85082ec06dc6bf4c8 with wine-10.0 (Staging) and WINEARCH=win64
+          Executing w_do_call vcrun2022
+                                       Executing load_vcrun2022 
+                                                                Using native,builtin override for following DLLs: concrt140 msvcp140 msvcp140_1 msvcp140_2 msvcp140_atomic_wait msvcp140_codecvt_ids vcamp140 vccorlib140 vcomp140 vcruntime140
+                                                                  Executing /home/deck/.var/app/com.github.Matoking.protontricks/cache/protontricks/proton/GE-Proton10-25/bin/wine C:\windows\syswow64\regedit.exe /S C:\windows\Temp\_vcrun2022\override-dll.reg
+                                                                                    steam-runtime-launch-client[1551]: W: The --socket option is deprecated. Prefer to use the session bus.
+fsync: up and running.
+002c:fixme:winediag:loader_init wine-staging 10.0 is a testing version containing experimental patches.
+002c:fixme:winediag:loader_init Please mention your exact version when filing bug reports on winehq.org.
+0040:fixme:ntoskrnl:driver_stub 0000000000249930 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\pci" stub!
+0040:fixme:ntoskrnl:driver_stub 0000000000249B80 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\hidusb" stub!
+0040:fixme:ntoskrnl:driver_stub 000000000024A720 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\Disk" stub!
+0050:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+0098:fixme:ntoskrnl:driver_stub 0000000000249930 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\pci" stub!
+0098:fixme:ntoskrnl:driver_stub 0000000000249B80 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\hidusb" stub!
+0098:fixme:ntoskrnl:driver_stub 000000000024A720 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\Disk" stub!
+00a4:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+00bc:err:hid:get_container_id_for_usb_udev_device Failed to get parent device.
+00bc:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00bc:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00c0:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00c0:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00d4:fixme:wineusb:add_usb_device Interface 1 has 6 alternate settings; using the first one.
+00d4:fixme:wineusb:add_usb_device Interface 0 has 2 alternate settings; using the first one.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+Executing /home/deck/.var/app/com.github.Matoking.protontricks/cache/protontricks/proton/GE-Proton10-25/bin/wine64 C:\windows\regedit.exe /S C:\windows\Temp\_vcrun2022\override-dll.reg
+           steam-runtime-launch-client[1610]: W: The --socket option is deprecated. Prefer to use the session bus.
+wineserver: using server-side synchronization.
+002c:fixme:winediag:loader_init wine-staging 10.0 is a testing version containing experimental patches.
+002c:fixme:winediag:loader_init Please mention your exact version when filing bug reports on winehq.org.
+0040:fixme:ntoskrnl:driver_stub 0000000000249930 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\pci" stub!
+0040:fixme:ntoskrnl:driver_stub 0000000000249B80 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\hidusb" stub!
+0040:fixme:ntoskrnl:driver_stub 000000000024A720 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\Disk" stub!
+0050:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+0094:fixme:ntoskrnl:driver_stub 0000000000249930 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\pci" stub!
+0094:fixme:ntoskrnl:driver_stub 0000000000249B80 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\hidusb" stub!
+0094:fixme:ntoskrnl:driver_stub 000000000024A720 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\Disk" stub!
+00a0:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+00b4:err:hid:get_container_id_for_usb_udev_device Failed to get parent device.
+00b4:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00b4:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00b8:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00b8:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00d8:fixme:wineusb:add_usb_device Interface 1 has 6 alternate settings; using the first one.
+00d8:fixme:wineusb:add_usb_device Interface 0 has 2 alternate settings; using the first one.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+grep: warning: stray \ before /
+                               Executing cabextract -q --directory=/home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_vcrun2022/win32 /home/deck/.var/app/com.github.Matoking.protontricks/cache/winetricks/vcrun2022/vc_redist.x86.exe -F a10
+                                                                                                            Executing cabextract -q --directory=/home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/syswow64 /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_vcrun2022/win32/a10 -F msvcp140.dll
+                        /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_vcrun2022/win32/a10: WARNING; possible 10368 extra bytes at end of file.
+                 Executing cd /home/deck/.var/app/com.github.Matoking.protontricks/cache/winetricks/vcrun2022
+                                                                                                             Executing /home/deck/.var/app/com.github.Matoking.protontricks/cache/protontricks/proton/GE-Proton10-25/bin/wine vc_redist.x86.exe /q
+                                                                     steam-runtime-launch-client[1785]: W: The --socket option is deprecated. Prefer to use the session bus.
+fsync: up and running.
+002c:fixme:winediag:loader_init wine-staging 10.0 is a testing version containing experimental patches.
+002c:fixme:winediag:loader_init Please mention your exact version when filing bug reports on winehq.org.
+0040:fixme:ntoskrnl:driver_stub 0000000000249930 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\pci" stub!
+0040:fixme:ntoskrnl:driver_stub 0000000000249B80 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\hidusb" stub!
+0040:fixme:ntoskrnl:driver_stub 000000000024A720 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\Disk" stub!
+0050:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+0094:fixme:ntoskrnl:driver_stub 0000000000249930 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\pci" stub!
+0094:fixme:ntoskrnl:driver_stub 0000000000249B80 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\hidusb" stub!
+0094:fixme:ntoskrnl:driver_stub 000000000024A720 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\Disk" stub!
+00a0:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+00b8:err:hid:get_container_id_for_usb_udev_device Failed to get parent device.
+00b8:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00b8:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00bc:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00bc:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00d4:fixme:wineusb:add_usb_device Interface 1 has 6 alternate settings; using the first one.
+00d4:fixme:wineusb:add_usb_device Interface 0 has 2 alternate settings; using the first one.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+0024:fixme:heap:RtlSetHeapInformation HEAP_INFORMATION_CLASS 1 not implemented!
+0128:fixme:oleacc:find_class_data unhandled window class: L"#32769"
+0128:fixme:uiautomation:uia_get_providers_for_hwnd Override provider callback currently unimplemented.
+0128:fixme:uiautomation:default_uia_provider_callback Default ProviderType_NonClientArea provider unimplemented.
+0024:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+0128:fixme:oleacc:find_class_data unhandled window class: L"#32769"
+0024:fixme:advapi:DecryptFileW (L"C:\\users\\steamuser\\AppData\\Local\\Temp\\{E3B22AE2-7C6D-4D7C-902A-94F18BE66BF1}\\", 00000000): stub
+0128:fixme:uiautomation:base_hwnd_fragment_get_FragmentRoot 000000000081DAD8, 000000000021F9D0: stub!
+0128:fixme:uiautomation:base_hwnd_fragment_GetEmbeddedFragmentRoots 000000000081DAD8, 000000000021F9E0: stub!
+0140:fixme:heap:RtlSetHeapInformation HEAP_INFORMATION_CLASS 1 not implemented!
+0140:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+0140:fixme:advapi:DecryptFileW (L"C:\\users\\steamuser\\AppData\\Local\\Temp\\{E74B7C00-1996-4A8F-AE25-01554BC848FE}\\", 00000000): stub
+0138:fixme:uiautomation:msaa_provider_GetPatternProvider Unimplemented patternId 10002
+0138:fixme:uiautomation:base_hwnd_provider_GetPatternProvider 0000000000884000, 10002, 000000000192F8A0: stub
+0050:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+0158:fixme:shell:SHAutoComplete stub
+0140:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+0140:fixme:advapi:DecryptFileW (L"C:\\users\\steamuser\\AppData\\Local\\Temp\\{E74B7C00-1996-4A8F-AE25-01554BC848FE}\\", 00000000): stub
+0140:fixme:exec:SHELL_execute flags ignored: 0x00000100
+0168:fixme:heap:RtlSetHeapInformation HEAP_INFORMATION_CLASS 1 not implemented!
+0168:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+0168:fixme:ole:CoInitializeSecurity 0077F608, -1, 00000000, 00000000, 6, 2, 00000000, 12288, 00000000 stub
+0168:fixme:wuapi:automatic_updates_Pause 
+0168:fixme:sfc:SRSetRestorePointW 0077F4D0 0077F6E0
+0138:fixme:uiautomation:msaa_provider_GetPatternProvider Unimplemented patternId 10002
+0138:fixme:uiautomation:base_hwnd_provider_GetPatternProvider 000000000087C9C0, 10002, 000000000192F8A0: stub
+0178:fixme:advapi:DecryptFileW (L"C:\\ProgramData\\Package Cache\\{922480B5-CAEB-4B1B-AAA4-9716EFDCE26B}v14.44.35211\\packages\\vcRuntimeMinimum_x86\\vc_runtimeMinimum_x86.msi", 00000000): stub
+0178:fixme:advapi:DecryptFileW (L"C:\\ProgramData\\Package Cache\\{922480B5-CAEB-4B1B-AAA4-9716EFDCE26B}v14.44.35211\\packages\\vcRuntimeMinimum_x86\\cab1.cab", 00000000): stub
+0178:fixme:advapi:DecryptFileW (L"C:\\ProgramData\\Package Cache\\{C18FB403-1E88-43C8-AD8A-CED50F23DE8B}v14.44.35211\\packages\\vcRuntimeAdditional_x86\\vc_runtimeAdditional_x86.msi", 00000000): stub
+0178:fixme:advapi:DecryptFileW (L"C:\\ProgramData\\Package Cache\\{C18FB403-1E88-43C8-AD8A-CED50F23DE8B}v14.44.35211\\packages\\vcRuntimeAdditional_x86\\cab1.cab", 00000000): stub
+0168:fixme:file:NtLockFile I/O completion on lock not implemented yet
+0168:fixme:ntdll:NtQuerySystemInformation info_class SYSTEM_PERFORMANCE_INFORMATION
+0168:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+0168:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+0168:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+0168:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+0168:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+0168:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+0168:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+0168:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+0168:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+0168:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+0168:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+0168:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+0168:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+0168:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+0168:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+0168:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+0168:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+0168:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+0168:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+0050:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+0168:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+0168:fixme:wuapi:automatic_updates_Resume 
+0168:fixme:kernelbase:AppPolicyGetProcessTerminationMethod FFFFFFFA, 0077FEB8
+0140:fixme:kernelbase:AppPolicyGetProcessTerminationMethod FFFFFFFA, 0077FEB8
+0024:fixme:kernelbase:AppPolicyGetProcessTerminationMethod FFFFFFFA, 0057FEB8
+Using native,builtin override for following DLLs: vcruntime140_1
+                                                                Executing /home/deck/.var/app/com.github.Matoking.protontricks/cache/protontricks/proton/GE-Proton10-25/bin/wine C:\windows\syswow64\regedit.exe /S C:\windows\Temp\_vcrun2022\override-dll.reg
+                                                                                  steam-runtime-launch-client[1888]: W: The --socket option is deprecated. Prefer to use the session bus.
+wineserver: using server-side synchronization.
+002c:fixme:winediag:loader_init wine-staging 10.0 is a testing version containing experimental patches.
+002c:fixme:winediag:loader_init Please mention your exact version when filing bug reports on winehq.org.
+0040:fixme:ntoskrnl:driver_stub 0000000000249930 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\pci" stub!
+0040:fixme:ntoskrnl:driver_stub 0000000000249B80 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\hidusb" stub!
+0040:fixme:ntoskrnl:driver_stub 000000000024A720 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\Disk" stub!
+0050:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+0094:fixme:ntoskrnl:driver_stub 0000000000249930 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\pci" stub!
+0094:fixme:ntoskrnl:driver_stub 0000000000249B80 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\hidusb" stub!
+0094:fixme:ntoskrnl:driver_stub 000000000024A720 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\Disk" stub!
+00a0:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+00b4:err:hid:get_container_id_for_usb_udev_device Failed to get parent device.
+00b4:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00b4:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00b8:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00b8:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00d8:fixme:wineusb:add_usb_device Interface 1 has 6 alternate settings; using the first one.
+00d8:fixme:wineusb:add_usb_device Interface 0 has 2 alternate settings; using the first one.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+Executing /home/deck/.var/app/com.github.Matoking.protontricks/cache/protontricks/proton/GE-Proton10-25/bin/wine64 C:\windows\regedit.exe /S C:\windows\Temp\_vcrun2022\override-dll.reg
+           steam-runtime-launch-client[2046]: W: The --socket option is deprecated. Prefer to use the session bus.
+wineserver: using server-side synchronization.
+002c:fixme:winediag:loader_init wine-staging 10.0 is a testing version containing experimental patches.
+002c:fixme:winediag:loader_init Please mention your exact version when filing bug reports on winehq.org.
+0040:fixme:ntoskrnl:driver_stub 0000000000249930 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\pci" stub!
+0040:fixme:ntoskrnl:driver_stub 0000000000249B80 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\hidusb" stub!
+0040:fixme:ntoskrnl:driver_stub 000000000024A720 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\Disk" stub!
+0050:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+0094:fixme:ntoskrnl:driver_stub 0000000000249930 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\pci" stub!
+0094:fixme:ntoskrnl:driver_stub 0000000000249B80 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\hidusb" stub!
+0094:fixme:ntoskrnl:driver_stub 000000000024A720 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\Disk" stub!
+00a0:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+00b4:err:hid:get_container_id_for_usb_udev_device Failed to get parent device.
+00b4:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00b4:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00b8:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00b8:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00d8:fixme:wineusb:add_usb_device Interface 1 has 6 alternate settings; using the first one.
+00d8:fixme:wineusb:add_usb_device Interface 0 has 2 alternate settings; using the first one.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+grep: warning: stray \ before /
+                               Executing cabextract -q --directory=/home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_vcrun2022/win64 /home/deck/.var/app/com.github.Matoking.protontricks/cache/winetricks/vcrun2022/vc_redist.x64.exe -F a12
+                                                                                                            Executing cabextract -q --directory=/home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/system32 /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_vcrun2022/win64/a12 -F msvcp140.dll
+                        /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_vcrun2022/win64/a12: WARNING; possible 10368 extra bytes at end of file.
+                 Executing /home/deck/.var/app/com.github.Matoking.protontricks/cache/protontricks/proton/GE-Proton10-25/bin/wine vc_redist.x64.exe /q
+                                                                                                                                                      steam-runtime-launch-client[2217]: W: The --socket option is deprecated. Prefer to use the session bus.
+fsync: up and running.
+002c:fixme:winediag:loader_init wine-staging 10.0 is a testing version containing experimental patches.
+002c:fixme:winediag:loader_init Please mention your exact version when filing bug reports on winehq.org.
+0040:fixme:ntoskrnl:driver_stub 0000000000249930 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\pci" stub!
+0040:fixme:ntoskrnl:driver_stub 0000000000249B80 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\hidusb" stub!
+0040:fixme:ntoskrnl:driver_stub 000000000024A720 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\Disk" stub!
+0050:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+0098:fixme:ntoskrnl:driver_stub 0000000000249930 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\pci" stub!
+0098:fixme:ntoskrnl:driver_stub 0000000000249B80 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\hidusb" stub!
+0098:fixme:ntoskrnl:driver_stub 000000000024A720 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\Disk" stub!
+00a4:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+00bc:err:hid:get_container_id_for_usb_udev_device Failed to get parent device.
+00bc:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00bc:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00c0:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00c0:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00d4:fixme:wineusb:add_usb_device Interface 1 has 6 alternate settings; using the first one.
+00d4:fixme:wineusb:add_usb_device Interface 0 has 2 alternate settings; using the first one.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+0024:fixme:heap:RtlSetHeapInformation HEAP_INFORMATION_CLASS 1 not implemented!
+012c:fixme:oleacc:find_class_data unhandled window class: L"#32769"
+012c:fixme:uiautomation:uia_get_providers_for_hwnd Override provider callback currently unimplemented.
+012c:fixme:uiautomation:default_uia_provider_callback Default ProviderType_NonClientArea provider unimplemented.
+0024:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+012c:fixme:oleacc:find_class_data unhandled window class: L"#32769"
+0024:fixme:advapi:DecryptFileW (L"C:\\users\\steamuser\\AppData\\Local\\Temp\\{ADB2395C-F05B-451E-8336-A719AEF9DFFB}\\", 00000000): stub
+012c:fixme:uiautomation:base_hwnd_fragment_get_FragmentRoot 000000000081DAD8, 000000000021F9D0: stub!
+012c:fixme:uiautomation:base_hwnd_fragment_GetEmbeddedFragmentRoots 000000000081DAD8, 000000000021F9E0: stub!
+0144:fixme:heap:RtlSetHeapInformation HEAP_INFORMATION_CLASS 1 not implemented!
+0144:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+0144:fixme:advapi:DecryptFileW (L"C:\\users\\steamuser\\AppData\\Local\\Temp\\{24A411B4-A40B-4B97-9806-078B3FDF9EE8}\\", 00000000): stub
+013c:fixme:uiautomation:msaa_provider_GetPatternProvider Unimplemented patternId 10002
+013c:fixme:uiautomation:base_hwnd_provider_GetPatternProvider 0000000000884000, 10002, 000000000192F8A0: stub
+0050:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+0158:fixme:shell:SHAutoComplete stub
+0144:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+0144:fixme:advapi:DecryptFileW (L"C:\\users\\steamuser\\AppData\\Local\\Temp\\{24A411B4-A40B-4B97-9806-078B3FDF9EE8}\\", 00000000): stub
+0144:fixme:exec:SHELL_execute flags ignored: 0x00000100
+016c:fixme:heap:RtlSetHeapInformation HEAP_INFORMATION_CLASS 1 not implemented!
+013c:fixme:oleacc:find_class_data unhandled window class: L"#32769"
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+013c:fixme:uiautomation:msaa_provider_GetPatternProvider Unimplemented patternId 10002
+013c:fixme:uiautomation:base_hwnd_provider_GetPatternProvider 000000000087C9C0, 10002, 000000000192F8A0: stub
+013c:fixme:oleacc:find_class_data unhandled window class: L"#32769"
+016c:fixme:ole:CoInitializeSecurity 0077F608, -1, 00000000, 00000000, 6, 2, 00000000, 12288, 00000000 stub
+016c:fixme:wuapi:automatic_updates_Pause 
+016c:fixme:sfc:SRSetRestorePointW 0077F4D0 0077F6E0
+013c:fixme:uiautomation:msaa_provider_GetPatternProvider Unimplemented patternId 10002
+013c:fixme:uiautomation:base_hwnd_provider_GetPatternProvider 000000000086CA70, 10002, 000000000192F8A0: stub
+018c:fixme:advapi:DecryptFileW (L"C:\\ProgramData\\Package Cache\\{43B0D101-A022-48F4-9D04-BA404CEB1D53}v14.44.35211\\packages\\vcRuntimeMinimum_amd64\\vc_runtimeMinimum_x64.msi", 00000000): stub
+018c:fixme:advapi:DecryptFileW (L"C:\\ProgramData\\Package Cache\\{43B0D101-A022-48F4-9D04-BA404CEB1D53}v14.44.35211\\packages\\vcRuntimeMinimum_amd64\\cab1.cab", 00000000): stub
+018c:fixme:advapi:DecryptFileW (L"C:\\ProgramData\\Package Cache\\{86AB2CC9-08BD-4643-B0F9-F82D006D72FF}v14.44.35211\\packages\\vcRuntimeAdditional_amd64\\vc_runtimeAdditional_x64.msi", 00000000): stub
+018c:fixme:advapi:DecryptFileW (L"C:\\ProgramData\\Package Cache\\{86AB2CC9-08BD-4643-B0F9-F82D006D72FF}v14.44.35211\\packages\\vcRuntimeAdditional_amd64\\cab1.cab", 00000000): stub
+016c:fixme:file:NtLockFile I/O completion on lock not implemented yet
+016c:fixme:ntdll:NtQuerySystemInformation info_class SYSTEM_PERFORMANCE_INFORMATION
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+0050:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+016c:err:ver:GetFileVersionInfoSizeExW HACK: not exposing version info.
+016c:fixme:wuapi:automatic_updates_Resume 
+016c:fixme:kernelbase:AppPolicyGetProcessTerminationMethod FFFFFFFA, 0077FEB8
+0144:fixme:kernelbase:AppPolicyGetProcessTerminationMethod FFFFFFFA, 0077FEB8
+0024:fixme:kernelbase:AppPolicyGetProcessTerminationMethod FFFFFFFA, 0057FEB8
+✓ Successfully installed vcrun2022
+
+Installing d3dx9...
+steam-runtime-launcher-service[61]: W: The --socket option is deprecated. Prefer to use --session or --bus-name.
+Executing cd /app/bin
+                     Using winetricks 20260125 (protontricks) - sha256sum: 8b2d90a1df27c829f27ee0d1ba3dc8c8f7c81e4c107127d85082ec06dc6bf4c8 with wine-10.0 (Staging) and WINEARCH=win64
+          Executing w_do_call d3dx9
+                                   Executing load_d3dx9 
+                                                        grep: warning: stray \ before /
+                                                                                       Executing cabextract -q -d /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9 -L -F *d3dx9*x86* /home/deck/.var/app/com.github.Matoking.protontricks/cache/winetricks/directx9/directx_Jun2010_redist.exe
+                                                                                                                                                                    Executing cabextract -q -d /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/syswow64 -L -F d3dx9*.dll /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/apr2005_d3dx9_25_x86.cab
+                                                                                   /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/apr2005_d3dx9_25_x86.cab: WARNING; possible 5960 extra bytes at end of file.
+                                                                                      Executing cabextract -q -d /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/syswow64 -L -F d3dx9*.dll /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/apr2006_d3dx9_30_x86.cab
+     /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/apr2006_d3dx9_30_x86.cab: WARNING; possible 5960 extra bytes at end of file.
+        Executing cabextract -q -d /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/syswow64 -L -F d3dx9*.dll /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/apr2007_d3dx9_33_x86.cab
+                                                                                                    /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/apr2007_d3dx9_33_x86.cab: WARNING; possible 5960 extra bytes at end of file.
+                                                                                                       Executing cabextract -q -d /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/syswow64 -L -F d3dx9*.dll /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/aug2005_d3dx9_27_x86.cab
+                      /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/aug2005_d3dx9_27_x86.cab: WARNING; possible 5960 extra bytes at end of file.
+                         Executing cabextract -q -d /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/syswow64 -L -F d3dx9*.dll /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/aug2007_d3dx9_35_x86.cab
+                                                                                                                     /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/aug2007_d3dx9_35_x86.cab: WARNING; possible 5960 extra bytes at end of file.
+                                                                                                                        Executing cabextract -q -d /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/syswow64 -L -F d3dx9*.dll /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/aug2008_d3dx9_39_x86.cab
+                                       /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/aug2008_d3dx9_39_x86.cab: WARNING; possible 5960 extra bytes at end of file.
+                                          Executing cabextract -q -d /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/syswow64 -L -F d3dx9*.dll /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/aug2009_d3dx9_42_x86.cab
+                                                                                                                                      /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/aug2009_d3dx9_42_x86.cab: WARNING; possible 5960 extra bytes at end of file.
+                                                                                                                                         Executing cabextract -q -d /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/syswow64 -L -F d3dx9*.dll /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/dec2005_d3dx9_28_x86.cab
+                                                        /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/dec2005_d3dx9_28_x86.cab: WARNING; possible 5960 extra bytes at end of file.
+                                                           Executing cabextract -q -d /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/syswow64 -L -F d3dx9*.dll /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/dec2006_d3dx9_32_x86.cab
+                                                                                                                                                       /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/dec2006_d3dx9_32_x86.cab: WARNING; possible 5960 extra bytes at end of file.
+                                                                                                                                                          Executing cabextract -q -d /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/syswow64 -L -F d3dx9*.dll /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/feb2005_d3dx9_24_x86.cab
+                                                                         /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/feb2005_d3dx9_24_x86.cab: WARNING; possible 5960 extra bytes at end of file.
+                                                                            Executing cabextract -q -d /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/syswow64 -L -F d3dx9*.dll /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/feb2006_d3dx9_29_x86.cab
+                                                                                                                                                                        /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/feb2006_d3dx9_29_x86.cab: WARNING; possible 5960 extra bytes at end of file.
+                                                                                                                                                                           Executing cabextract -q -d /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/syswow64 -L -F d3dx9*.dll /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/jun2005_d3dx9_26_x86.cab
+                                                                                          /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/jun2005_d3dx9_26_x86.cab: WARNING; possible 5960 extra bytes at end of file.
+                                                                                             Executing cabextract -q -d /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/syswow64 -L -F d3dx9*.dll /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/jun2007_d3dx9_34_x86.cab
+            /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/jun2007_d3dx9_34_x86.cab: WARNING; possible 5960 extra bytes at end of file.
+               Executing cabextract -q -d /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/syswow64 -L -F d3dx9*.dll /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/jun2008_d3dx9_38_x86.cab
+                                                                                                           /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/jun2008_d3dx9_38_x86.cab: WARNING; possible 5960 extra bytes at end of file.
+                                                                                                              Executing cabextract -q -d /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/syswow64 -L -F d3dx9*.dll /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/jun2010_d3dx9_43_x86.cab
+                             /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/jun2010_d3dx9_43_x86.cab: WARNING; possible 5960 extra bytes at end of file.
+                                Executing cabextract -q -d /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/syswow64 -L -F d3dx9*.dll /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/mar2008_d3dx9_37_x86.cab
+                                                                                                                            /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/mar2008_d3dx9_37_x86.cab: WARNING; possible 5960 extra bytes at end of file.
+                                                                                                                               Executing cabextract -q -d /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/syswow64 -L -F d3dx9*.dll /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/mar2009_d3dx9_41_x86.cab
+                                              /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/mar2009_d3dx9_41_x86.cab: WARNING; possible 5960 extra bytes at end of file.
+                                                 Executing cabextract -q -d /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/syswow64 -L -F d3dx9*.dll /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/nov2007_d3dx9_36_x86.cab
+                                                                                                                                             /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/nov2007_d3dx9_36_x86.cab: WARNING; possible 5960 extra bytes at end of file.
+                                                                                                                                                Executing cabextract -q -d /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/syswow64 -L -F d3dx9*.dll /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/nov2008_d3dx9_40_x86.cab
+                                                               /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/nov2008_d3dx9_40_x86.cab: WARNING; possible 5960 extra bytes at end of file.
+                                                                  Executing cabextract -q -d /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/syswow64 -L -F d3dx9*.dll /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/oct2006_d3dx9_31_x86.cab
+                                                                                                                                                              /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/oct2006_d3dx9_31_x86.cab: WARNING; possible 5960 extra bytes at end of file.
+                                                                                                                                                                 Executing cabextract -q -d /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9 -L -F *d3dx9*x64* /home/deck/.var/app/com.github.Matoking.protontricks/cache/winetricks/directx9/directx_Jun2010_redist.exe
+                                                                 Executing cabextract -q -d /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/system32 -L -F d3dx9*.dll /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/apr2005_d3dx9_25_x64.cab
+                                                                                                                                                             /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/apr2005_d3dx9_25_x64.cab: WARNING; possible 5960 extra bytes at end of file.
+                                                                                                                                                                Executing cabextract -q -d /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/system32 -L -F d3dx9*.dll /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/apr2006_d3dx9_30_x64.cab
+                                                                               /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/apr2006_d3dx9_30_x64.cab: WARNING; possible 5960 extra bytes at end of file.
+                                                                                  Executing cabextract -q -d /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/system32 -L -F d3dx9*.dll /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/apr2007_d3dx9_33_x64.cab
+ /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/apr2007_d3dx9_33_x64.cab: WARNING; possible 5960 extra bytes at end of file.
+    Executing cabextract -q -d /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/system32 -L -F d3dx9*.dll /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/aug2005_d3dx9_27_x64.cab
+                                                                                                /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/aug2005_d3dx9_27_x64.cab: WARNING; possible 5960 extra bytes at end of file.
+                                                                                                   Executing cabextract -q -d /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/system32 -L -F d3dx9*.dll /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/aug2007_d3dx9_35_x64.cab
+                  /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/aug2007_d3dx9_35_x64.cab: WARNING; possible 5960 extra bytes at end of file.
+                     Executing cabextract -q -d /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/system32 -L -F d3dx9*.dll /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/aug2008_d3dx9_39_x64.cab
+                                                                                                                 /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/aug2008_d3dx9_39_x64.cab: WARNING; possible 5960 extra bytes at end of file.
+                                                                                                                    Executing cabextract -q -d /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/system32 -L -F d3dx9*.dll /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/aug2009_d3dx9_42_x64.cab
+                                   /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/aug2009_d3dx9_42_x64.cab: WARNING; possible 5960 extra bytes at end of file.
+                                      Executing cabextract -q -d /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/system32 -L -F d3dx9*.dll /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/dec2005_d3dx9_28_x64.cab
+                                                                                                                                  /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/dec2005_d3dx9_28_x64.cab: WARNING; possible 5960 extra bytes at end of file.
+                                                                                                                                     Executing cabextract -q -d /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/system32 -L -F d3dx9*.dll /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/dec2006_d3dx9_32_x64.cab
+                                                    /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/dec2006_d3dx9_32_x64.cab: WARNING; possible 5960 extra bytes at end of file.
+                                                       Executing cabextract -q -d /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/system32 -L -F d3dx9*.dll /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/feb2005_d3dx9_24_x64.cab
+                                                                                                                                                   /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/feb2005_d3dx9_24_x64.cab: WARNING; possible 5960 extra bytes at end of file.
+                                                                                                                                                      Executing cabextract -q -d /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/system32 -L -F d3dx9*.dll /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/feb2006_d3dx9_29_x64.cab
+                                                                     /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/feb2006_d3dx9_29_x64.cab: WARNING; possible 5960 extra bytes at end of file.
+                                                                        Executing cabextract -q -d /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/system32 -L -F d3dx9*.dll /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/jun2005_d3dx9_26_x64.cab
+                                                                                                                                                                    /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/jun2005_d3dx9_26_x64.cab: WARNING; possible 5960 extra bytes at end of file.
+                                                                                                                                                                       Executing cabextract -q -d /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/system32 -L -F d3dx9*.dll /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/jun2007_d3dx9_34_x64.cab
+                                                                                      /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/jun2007_d3dx9_34_x64.cab: WARNING; possible 5960 extra bytes at end of file.
+                                                                                         Executing cabextract -q -d /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/system32 -L -F d3dx9*.dll /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/jun2008_d3dx9_38_x64.cab
+        /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/jun2008_d3dx9_38_x64.cab: WARNING; possible 5960 extra bytes at end of file.
+           Executing cabextract -q -d /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/system32 -L -F d3dx9*.dll /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/jun2010_d3dx9_43_x64.cab
+                                                                                                       /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/jun2010_d3dx9_43_x64.cab: WARNING; possible 5960 extra bytes at end of file.
+                                                                                                          Executing cabextract -q -d /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/system32 -L -F d3dx9*.dll /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/mar2008_d3dx9_37_x64.cab
+                         /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/mar2008_d3dx9_37_x64.cab: WARNING; possible 5960 extra bytes at end of file.
+                            Executing cabextract -q -d /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/system32 -L -F d3dx9*.dll /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/mar2009_d3dx9_41_x64.cab
+                                                                                                                        /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/mar2009_d3dx9_41_x64.cab: WARNING; possible 5960 extra bytes at end of file.
+                                                                                                                           Executing cabextract -q -d /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/system32 -L -F d3dx9*.dll /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/nov2007_d3dx9_36_x64.cab
+                                          /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/nov2007_d3dx9_36_x64.cab: WARNING; possible 5960 extra bytes at end of file.
+                                             Executing cabextract -q -d /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/system32 -L -F d3dx9*.dll /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/nov2008_d3dx9_40_x64.cab
+                                                                                                                                         /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/nov2008_d3dx9_40_x64.cab: WARNING; possible 5960 extra bytes at end of file.
+                                                                                                                                            Executing cabextract -q -d /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/system32 -L -F d3dx9*.dll /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/oct2006_d3dx9_31_x64.cab
+                                                           /home/deck/.local/share/Steam/steamapps/compatdata/3225169897/pfx/dosdevices/c:/windows/temp/_d3dx9/oct2006_d3dx9_31_x64.cab: WARNING; possible 5960 extra bytes at end of file.
+                                                              Using native override for following DLLs: d3dx9_24 d3dx9_25 d3dx9_26 d3dx9_27 d3dx9_28 d3dx9_29 d3dx9_30
+                                                                                                                                                                      Executing /home/deck/.var/app/com.github.Matoking.protontricks/cache/protontricks/proton/GE-Proton10-25/bin/wine C:\windows\syswow64\regedit.exe /S C:\windows\Temp\_d3dx9\override-dll.reg
+       steam-runtime-launch-client[1738]: W: The --socket option is deprecated. Prefer to use the session bus.
+fsync: up and running.
+002c:fixme:winediag:loader_init wine-staging 10.0 is a testing version containing experimental patches.
+002c:fixme:winediag:loader_init Please mention your exact version when filing bug reports on winehq.org.
+0040:fixme:ntoskrnl:driver_stub 0000000000249930 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\pci" stub!
+0040:fixme:ntoskrnl:driver_stub 0000000000249B80 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\hidusb" stub!
+0040:fixme:ntoskrnl:driver_stub 000000000024A720 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\Disk" stub!
+0050:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+0094:fixme:ntoskrnl:driver_stub 0000000000249930 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\pci" stub!
+0094:fixme:ntoskrnl:driver_stub 0000000000249B80 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\hidusb" stub!
+0094:fixme:ntoskrnl:driver_stub 000000000024A720 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\Disk" stub!
+00a0:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+00b8:err:hid:get_container_id_for_usb_udev_device Failed to get parent device.
+00b8:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00b8:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00bc:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00bc:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00d4:fixme:wineusb:add_usb_device Interface 1 has 6 alternate settings; using the first one.
+00d4:fixme:wineusb:add_usb_device Interface 0 has 2 alternate settings; using the first one.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+Executing /home/deck/.var/app/com.github.Matoking.protontricks/cache/protontricks/proton/GE-Proton10-25/bin/wine64 C:\windows\regedit.exe /S C:\windows\Temp\_d3dx9\override-dll.reg
+       steam-runtime-launch-client[1796]: W: The --socket option is deprecated. Prefer to use the session bus.
+wineserver: using server-side synchronization.
+002c:fixme:winediag:loader_init wine-staging 10.0 is a testing version containing experimental patches.
+002c:fixme:winediag:loader_init Please mention your exact version when filing bug reports on winehq.org.
+0040:fixme:ntoskrnl:driver_stub 0000000000249930 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\pci" stub!
+0040:fixme:ntoskrnl:driver_stub 0000000000249B80 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\hidusb" stub!
+0040:fixme:ntoskrnl:driver_stub 000000000024A720 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\Disk" stub!
+0050:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+0094:fixme:ntoskrnl:driver_stub 0000000000249930 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\pci" stub!
+0094:fixme:ntoskrnl:driver_stub 0000000000249B80 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\hidusb" stub!
+0094:fixme:ntoskrnl:driver_stub 000000000024A720 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\Disk" stub!
+00a0:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+00b4:err:hid:get_container_id_for_usb_udev_device Failed to get parent device.
+00b4:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00b4:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00b8:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00b8:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00d0:fixme:wineusb:add_usb_device Interface 1 has 6 alternate settings; using the first one.
+00d0:fixme:wineusb:add_usb_device Interface 0 has 2 alternate settings; using the first one.
+00d0:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d0:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d0:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d0:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d0:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d0:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d0:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d0:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d0:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d0:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d0:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d0:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d0:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d0:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d0:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d0:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d0:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d0:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d0:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d0:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d0:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d0:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d0:fixme:wineusb:query_id Unhandled ID query type 0x5.
+Using native override for following DLLs: d3dx9_31 d3dx9_32 d3dx9_33 d3dx9_34 d3dx9_35 d3dx9_36 d3dx9_37
+                                                                                                        Executing /home/deck/.var/app/com.github.Matoking.protontricks/cache/protontricks/proton/GE-Proton10-25/bin/wine C:\windows\syswow64\regedit.exe /S C:\windows\Temp\_d3dx9\override-dll.reg
+                                                                                                                      steam-runtime-launch-client[1949]: W: The --socket option is deprecated. Prefer to use the session bus.
+wineserver: using server-side synchronization.
+002c:fixme:winediag:loader_init wine-staging 10.0 is a testing version containing experimental patches.
+002c:fixme:winediag:loader_init Please mention your exact version when filing bug reports on winehq.org.
+0040:fixme:ntoskrnl:driver_stub 0000000000249930 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\pci" stub!
+0040:fixme:ntoskrnl:driver_stub 0000000000249B80 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\hidusb" stub!
+0040:fixme:ntoskrnl:driver_stub 000000000024A720 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\Disk" stub!
+0050:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+0094:fixme:ntoskrnl:driver_stub 0000000000249930 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\pci" stub!
+0094:fixme:ntoskrnl:driver_stub 0000000000249B80 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\hidusb" stub!
+0094:fixme:ntoskrnl:driver_stub 000000000024A720 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\Disk" stub!
+00a0:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+00b4:err:hid:get_container_id_for_usb_udev_device Failed to get parent device.
+00b4:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00b4:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00b8:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00b8:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00d4:fixme:wineusb:add_usb_device Interface 1 has 6 alternate settings; using the first one.
+00d4:fixme:wineusb:add_usb_device Interface 0 has 2 alternate settings; using the first one.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+Executing /home/deck/.var/app/com.github.Matoking.protontricks/cache/protontricks/proton/GE-Proton10-25/bin/wine64 C:\windows\regedit.exe /S C:\windows\Temp\_d3dx9\override-dll.reg
+       steam-runtime-launch-client[2102]: W: The --socket option is deprecated. Prefer to use the session bus.
+wineserver: using server-side synchronization.
+002c:fixme:winediag:loader_init wine-staging 10.0 is a testing version containing experimental patches.
+002c:fixme:winediag:loader_init Please mention your exact version when filing bug reports on winehq.org.
+0040:fixme:ntoskrnl:driver_stub 0000000000249930 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\pci" stub!
+0040:fixme:ntoskrnl:driver_stub 0000000000249B80 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\hidusb" stub!
+0040:fixme:ntoskrnl:driver_stub 000000000024A720 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\Disk" stub!
+0050:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+0094:fixme:ntoskrnl:driver_stub 0000000000249930 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\pci" stub!
+0094:fixme:ntoskrnl:driver_stub 0000000000249B80 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\hidusb" stub!
+0094:fixme:ntoskrnl:driver_stub 000000000024A720 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\Disk" stub!
+00a0:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+00b4:err:hid:get_container_id_for_usb_udev_device Failed to get parent device.
+00b4:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00b4:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00b8:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00b8:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00d4:fixme:wineusb:add_usb_device Interface 1 has 6 alternate settings; using the first one.
+00d4:fixme:wineusb:add_usb_device Interface 0 has 2 alternate settings; using the first one.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d4:fixme:wineusb:query_id Unhandled ID query type 0x5.
+Using native override for following DLLs: d3dx9_38 d3dx9_39 d3dx9_40 d3dx9_41 d3dx9_42 d3dx9_43
+                                                                                               Executing /home/deck/.var/app/com.github.Matoking.protontricks/cache/protontricks/proton/GE-Proton10-25/bin/wine C:\windows\syswow64\regedit.exe /S C:\windows\Temp\_d3dx9\override-dll.reg
+                                                                                                             steam-runtime-launch-client[2255]: W: The --socket option is deprecated. Prefer to use the session bus.
+wineserver: using server-side synchronization.
+002c:fixme:winediag:loader_init wine-staging 10.0 is a testing version containing experimental patches.
+002c:fixme:winediag:loader_init Please mention your exact version when filing bug reports on winehq.org.
+0040:fixme:ntoskrnl:driver_stub 0000000000249930 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\pci" stub!
+0040:fixme:ntoskrnl:driver_stub 0000000000249B80 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\hidusb" stub!
+0040:fixme:ntoskrnl:driver_stub 000000000024A720 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\Disk" stub!
+0050:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+0094:fixme:ntoskrnl:driver_stub 0000000000249930 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\pci" stub!
+0094:fixme:ntoskrnl:driver_stub 0000000000249B80 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\hidusb" stub!
+0094:fixme:ntoskrnl:driver_stub 000000000024A720 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\Disk" stub!
+00a0:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+00b4:err:hid:get_container_id_for_usb_udev_device Failed to get parent device.
+00b4:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00b4:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00b8:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00b8:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00d8:fixme:wineusb:add_usb_device Interface 1 has 6 alternate settings; using the first one.
+00d8:fixme:wineusb:add_usb_device Interface 0 has 2 alternate settings; using the first one.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+Executing /home/deck/.var/app/com.github.Matoking.protontricks/cache/protontricks/proton/GE-Proton10-25/bin/wine64 C:\windows\regedit.exe /S C:\windows\Temp\_d3dx9\override-dll.reg
+       steam-runtime-launch-client[2408]: W: The --socket option is deprecated. Prefer to use the session bus.
+wineserver: using server-side synchronization.
+002c:fixme:winediag:loader_init wine-staging 10.0 is a testing version containing experimental patches.
+002c:fixme:winediag:loader_init Please mention your exact version when filing bug reports on winehq.org.
+0040:fixme:ntoskrnl:driver_stub 0000000000249930 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\pci" stub!
+0040:fixme:ntoskrnl:driver_stub 0000000000249B80 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\hidusb" stub!
+0040:fixme:ntoskrnl:driver_stub 000000000024A720 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\Disk" stub!
+0050:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+0094:fixme:ntoskrnl:driver_stub 0000000000249930 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\pci" stub!
+0094:fixme:ntoskrnl:driver_stub 0000000000249B80 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\hidusb" stub!
+0094:fixme:ntoskrnl:driver_stub 000000000024A720 L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\Disk" stub!
+00a0:fixme:ntoskrnl:kernel_object_from_handle No constructor for type L"Token"
+00b4:err:hid:get_container_id_for_usb_udev_device Failed to get parent device.
+00b4:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00b4:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00b8:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00b8:fixme:xinput:pdo_pnp code 0xc, not implemented!
+00d8:fixme:wineusb:add_usb_device Interface 1 has 6 alternate settings; using the first one.
+00d8:fixme:wineusb:add_usb_device Interface 0 has 2 alternate settings; using the first one.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+00d8:fixme:wineusb:query_id Unhandled ID query type 0x5.
+✓ Successfully installed d3dx9
+
+Installation complete!
+(deck@steamdeck deckyfin)$ 
+
