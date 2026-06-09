@@ -479,12 +479,20 @@ def _build_methods(pfxid, dep, pfx_path, proton_wine, steam_root):
                 real_user = _get_real_user()
                 if real_user:
                     full_cmd = ["runuser", "-u", real_user, "--"] + cmd
-                    return _run_with_clean_env(
+                    result = _run_with_clean_env(
                         full_cmd, capture_output=True, text=True, timeout=t,
                     )
-                return _run_with_clean_env(
-                    cmd, capture_output=True, text=True, timeout=t,
-                )
+                else:
+                    result = _run_with_clean_env(
+                        cmd, capture_output=True, text=True, timeout=t,
+                    )
+                # Flatpak emits F:/W: deprecation warnings on stderr even on
+                # success — override returncode when no real error is present
+                if result.returncode != 0 and not _flatpak_has_real_error(
+                    (result.stderr or "") + "\n" + (result.stdout or "")
+                ):
+                    result.returncode = 0
+                return result
             methods.append(("flatpak protontricks", _flatpak))
 
     # ── Method 2: Native protontricks CLI ───────────────────────────────
@@ -605,6 +613,31 @@ def _build_methods(pfxid, dep, pfx_path, proton_wine, steam_root):
         methods.append(("system winetricks", _sys_winetricks))
 
     return methods
+
+
+def _flatpak_has_real_error(output: str) -> bool:
+    """Check if flatpak output contains a real error.
+
+    Flatpak emits F:/W: info messages on stderr even on success,
+    and wine outputs harmless fixme/err messages. This function
+    uses error-keyword detection to tell real failures from noise.
+
+    Returns True only if a genuine error keyword is found.
+    """
+    error_keywords = [
+        "Traceback", "error:", "Error:", "ERROR:",
+        "failed:", "Failed:", "FAILED:",
+        "not found", "No such file",
+        "Permission denied", "Access is denied",
+        "ModuleNotFoundError", "cannot find",
+        "wine client error", "version mismatch",
+        "err:module:", "err:ole:",
+        "err:mscoree:", "err:msi:",
+    ]
+    for keyword in error_keywords:
+        if keyword in output:
+            return True
+    return False
 
 
 def detect_protontricks_status() -> dict:
