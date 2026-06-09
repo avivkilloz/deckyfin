@@ -435,11 +435,13 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           alignItems: "center",
         }}
       >
-        <CompactTextField
-          value={executable}
-          onChange={(e) => setExecutable(e.target.value)}
-          style={{ flex: 1, minWidth: 0 }}
-        />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <CompactTextField
+            value={executable}
+            onChange={(e) => setExecutable(e.target.value)}
+            style={{ width: "100%" }}
+          />
+        </div>
         <Focusable
           onActivate={handleOpenExePicker}
           onClick={handleOpenExePicker}
