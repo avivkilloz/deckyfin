@@ -1,6 +1,6 @@
-import { VFC, useState, useEffect, useRef, useCallback } from "react";
+import { VFC, useState, useEffect, useRef } from "react";
 import { callable } from "@decky/api";
-import { Navigation, Focusable } from "@decky/ui";
+import { Navigation, Focusable, TextField } from "@decky/ui";
 import { GameConfig } from "../types";
 import { useArtwork } from "../hooks/useArtwork";
 
@@ -77,12 +77,6 @@ const LABEL_STYLE: React.CSSProperties = {
   color: "#aaa",
 };
 
-const FIELD_STYLE: React.CSSProperties = {
-  width: "100%",
-  padding: "6px",
-  boxSizing: "border-box",
-};
-
 const BTN_STYLE: React.CSSProperties = {
   padding: "8px 12px",
   fontSize: "0.85em",
@@ -94,102 +88,11 @@ const BTN_STYLE: React.CSSProperties = {
 };
 
 export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
-  // ── Refs for text inputs (controller focus) ──────────────────────────
-  const nameRef = useRef<HTMLInputElement>(null);
-  const exeRef = useRef<HTMLInputElement>(null);
-  const startDirRef = useRef<HTMLInputElement>(null);
-  const steamAppIdRef = useRef<HTMLInputElement>(null);
-  const customDepsRef = useRef<HTMLInputElement>(null);
+  // ── Refs ─────────────────────────────────────────────────────────────
   const rootRef = useRef<HTMLDivElement>(null);
   const backRef = useRef<HTMLDivElement>(null);
-  const nameWrapRef = useRef<HTMLDivElement>(null);
-  const exeWrapRef = useRef<HTMLDivElement>(null);
-  const startDirWrapRef = useRef<HTMLDivElement>(null);
-  const steamAppIdWrapRef = useRef<HTMLDivElement>(null);
-  const customDepsWrapRef = useRef<HTMLDivElement>(null);
 
-  // ── Steam opens virtual keyboard only on real click events ──
-  const activateInput = useCallback(
-    (ref: React.RefObject<HTMLInputElement | null>) => {
-      ref.current?.focus();
-      ref.current?.click();
-    },
-    []
-  );
-
-  // ── Return focus to wrapper when B pressed inside input ──
-  useEffect(() => {
-    const el = nameRef.current;
-    if (!el) return;
-    const handler = (e: Event) => {
-      e.stopPropagation();
-      nameWrapRef.current?.focus();
-    };
-    el.addEventListener("vgp_oncancel", handler);
-    el.addEventListener("vgp_onok", handler);
-    return () => {
-      el.removeEventListener("vgp_oncancel", handler);
-      el.removeEventListener("vgp_onok", handler);
-    };
-  }, []);
-  useEffect(() => {
-    const el = exeRef.current;
-    if (!el) return;
-    const handler = (e: Event) => {
-      e.stopPropagation();
-      exeWrapRef.current?.focus();
-    };
-    el.addEventListener("vgp_oncancel", handler);
-    el.addEventListener("vgp_onok", handler);
-    return () => {
-      el.removeEventListener("vgp_oncancel", handler);
-      el.removeEventListener("vgp_onok", handler);
-    };
-  }, []);
-  useEffect(() => {
-    const el = startDirRef.current;
-    if (!el) return;
-    const handler = (e: Event) => {
-      e.stopPropagation();
-      startDirWrapRef.current?.focus();
-    };
-    el.addEventListener("vgp_oncancel", handler);
-    el.addEventListener("vgp_onok", handler);
-    return () => {
-      el.removeEventListener("vgp_oncancel", handler);
-      el.removeEventListener("vgp_onok", handler);
-    };
-  }, []);
-  useEffect(() => {
-    const el = steamAppIdRef.current;
-    if (!el) return;
-    const handler = (e: Event) => {
-      e.stopPropagation();
-      steamAppIdWrapRef.current?.focus();
-    };
-    el.addEventListener("vgp_oncancel", handler);
-    el.addEventListener("vgp_onok", handler);
-    return () => {
-      el.removeEventListener("vgp_oncancel", handler);
-      el.removeEventListener("vgp_onok", handler);
-    };
-  }, []);
-  useEffect(() => {
-    const el = customDepsRef.current;
-    if (!el) return;
-    const handler = (e: Event) => {
-      e.stopPropagation();
-      customDepsWrapRef.current?.focus();
-    };
-    el.addEventListener("vgp_oncancel", handler);
-    el.addEventListener("vgp_onok", handler);
-    return () => {
-      el.removeEventListener("vgp_oncancel", handler);
-      el.removeEventListener("vgp_onok", handler);
-    };
-  }, []);
-
-  // ── Auto-focus root on mount so B-button works immediately ──
+  // ── Auto-focus Back button on mount so B-button works immediately ──
   useEffect(() => {
     const timer = setTimeout(() => backRef.current?.focus(), 150);
     return () => clearTimeout(timer);
@@ -515,14 +418,11 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
 
       {/* Name */}
       <label style={LABEL_STYLE}>Name</label>
-      <Focusable onActivate={() => activateInput(nameRef)} focusClassName="is-focused" ref={nameWrapRef} style={{ marginBottom: "10px" }}>
-        <input
-          ref={nameRef}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          style={FIELD_STYLE}
-        />
-      </Focusable>
+      <TextField
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        style={{ width: "100%", marginBottom: "10px" }}
+      />
 
       {/* Executable */}
       <label style={LABEL_STYLE}>Executable</label>
@@ -534,14 +434,11 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           alignItems: "center",
         }}
       >
-        <Focusable onActivate={() => activateInput(exeRef)} focusClassName="is-focused" ref={exeWrapRef} style={{ flex: 1, marginBottom: 0 }}>
-          <input
-            ref={exeRef}
-            value={executable}
-            onChange={(e) => setExecutable(e.target.value)}
-            style={{ width: "100%", padding: "6px", boxSizing: "border-box" }}
-          />
-        </Focusable>
+        <TextField
+          value={executable}
+          onChange={(e) => setExecutable(e.target.value)}
+          style={{ flex: 1 }}
+        />
         <Focusable
           onActivate={handleOpenExePicker}
           onClick={handleOpenExePicker}
@@ -593,30 +490,23 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
 
       {/* Start Dir */}
       <label style={LABEL_STYLE}>Start Dir</label>
-      <Focusable onActivate={() => activateInput(startDirRef)} focusClassName="is-focused" ref={startDirWrapRef} style={{ marginBottom: "10px" }}>
-        <input
-          ref={startDirRef}
-          value={startDir}
-          onChange={(e) => setStartDir(e.target.value)}
-          style={FIELD_STYLE}
-        />
-      </Focusable>
+      <TextField
+        value={startDir}
+        onChange={(e) => setStartDir(e.target.value)}
+        style={{ width: "100%", marginBottom: "10px" }}
+      />
 
       {/* Steam App ID */}
       <label style={LABEL_STYLE}>Steam App ID</label>
-      <Focusable onActivate={() => activateInput(steamAppIdRef)} focusClassName="is-focused" ref={steamAppIdWrapRef} style={{ marginBottom: "10px" }}>
-        <input
-          ref={steamAppIdRef}
-          value={steamAppIdInput}
-          onChange={(e) => {
-            setSteamAppIdInput(e.target.value);
-            const parsed = parseInt(e.target.value, 10);
-            setSteamAppId(isNaN(parsed) ? undefined : parsed);
-          }}
-          placeholder="e.g. 730 for CS:GO"
-          style={FIELD_STYLE}
-        />
-      </Focusable>
+      <TextField
+        value={steamAppIdInput}
+        onChange={(e) => {
+          setSteamAppIdInput(e.target.value);
+          const parsed = parseInt(e.target.value, 10);
+          setSteamAppId(isNaN(parsed) ? undefined : parsed);
+        }}
+        style={{ width: "100%", marginBottom: "10px" }}
+      />
 
       {/* Proton Version: inline picker */}
       <label style={LABEL_STYLE}>Proton Version</label>
@@ -726,24 +616,11 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         <label style={{ fontSize: "0.82em", color: "#888", display: "block", marginBottom: "2px" }}>
           Custom (comma-separated)
         </label>
-        <Focusable onActivate={() => activateInput(customDepsRef)} focusClassName="is-focused" ref={customDepsWrapRef}>
-          <input
-            ref={customDepsRef}
-            value={customDeps}
-            onChange={(e) => setCustomDeps(e.target.value)}
-            placeholder="e.g. dotnet_core,faudio"
-            style={{
-              width: "100%",
-              padding: "4px 6px",
-              boxSizing: "border-box",
-              fontSize: "0.95em",
-              border: "1px solid #555",
-              borderRadius: "3px",
-              background: "transparent",
-              color: "#e0e0e0",
-            }}
-          />
-        </Focusable>
+        <TextField
+          value={customDeps}
+          onChange={(e) => setCustomDeps(e.target.value)}
+          style={{ width: "100%" }}
+        />
       </div>
 
       {/* ── SteamDB lookup ──────────────────────────────────────────────── */}

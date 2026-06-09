@@ -1,4 +1,4 @@
-import { VFC, useState, useEffect, useRef, useCallback } from "react";
+import { VFC, useState, useEffect, useRef } from "react";
 import { callable } from "@decky/api";
 import { Navigation, Focusable, TextField } from "@decky/ui";
 
@@ -34,52 +34,7 @@ const BTN_STYLE: React.CSSProperties = {
 };
 
 export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
-  const folderRef = useRef<HTMLInputElement>(null);
-  const sgKeyRef = useRef<HTMLInputElement>(null);
-  const rootRef = useRef<HTMLDivElement>(null);
   const backRef = useRef<HTMLDivElement>(null);
-  const folderWrapRef = useRef<HTMLDivElement>(null);
-  const sgKeyWrapRef = useRef<HTMLDivElement>(null);
-
-  // ── Steam opens virtual keyboard only on real click events ──
-  const activateInput = useCallback(
-    (ref: React.RefObject<HTMLInputElement | null>) => {
-      ref.current?.focus();
-      ref.current?.click();
-    },
-    []
-  );
-
-  // ── Return focus to the Focusable wrapper when B pressed inside input ──
-  useEffect(() => {
-    const el = folderRef.current;
-    if (!el) return;
-    const handler = (e: Event) => {
-      e.stopPropagation();
-      folderWrapRef.current?.focus();
-    };
-    el.addEventListener("vgp_oncancel", handler);
-    el.addEventListener("vgp_onok", handler);
-    return () => {
-      el.removeEventListener("vgp_oncancel", handler);
-      el.removeEventListener("vgp_onok", handler);
-    };
-  }, []);
-
-  useEffect(() => {
-    const el = sgKeyRef.current;
-    if (!el) return;
-    const handler = (e: Event) => {
-      e.stopPropagation();
-      sgKeyWrapRef.current?.focus();
-    };
-    el.addEventListener("vgp_oncancel", handler);
-    el.addEventListener("vgp_onok", handler);
-    return () => {
-      el.removeEventListener("vgp_oncancel", handler);
-      el.removeEventListener("vgp_onok", handler);
-    };
-  }, []);
 
   // ── Auto-focus Back button on mount so B-button works immediately ──
   useEffect(() => {
@@ -152,7 +107,6 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
 
   return (
     <Focusable
-      ref={rootRef}
       onCancel={onBack}
       onCancelButton={onBack}
       focusClassName="is-focused"
@@ -181,21 +135,11 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
         Path to the root directory containing your game folders. Each
         subdirectory is treated as a separate game with its own config.
       </p>
-      <Focusable
-        ref={folderWrapRef}
-        onActivate={() => activateInput(folderRef)}
-        focusClassName="is-focused"
-        style={{ marginBottom: "12px" }}
-      >
-        <input
-          ref={folderRef}
-          type="text"
-          value={folderPath}
-          onChange={(e) => setFolderPath(e.target.value)}
-          placeholder="/home/deck/games"
-          style={{ width: "100%", padding: "8px", boxSizing: "border-box" }}
-        />
-      </Focusable>
+      <TextField
+        value={folderPath}
+        onChange={(e) => setFolderPath(e.target.value)}
+        style={{ width: "100%", marginBottom: "12px" }}
+      />
 
       <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
         <Focusable
@@ -230,21 +174,11 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
         </Focusable>
         .
       </p>
-      <Focusable
-        ref={sgKeyWrapRef}
-        onActivate={() => activateInput(sgKeyRef)}
-        focusClassName="is-focused"
-        style={{ marginBottom: "8px" }}
-      >
-        <input
-          ref={sgKeyRef}
-          type="text"
-          value={sgKey}
-          onChange={(e) => setSgKey(e.target.value)}
-          placeholder="Enter your API key or leave empty for default"
-          style={{ width: "100%", padding: "8px", boxSizing: "border-box" }}
-        />
-      </Focusable>
+      <TextField
+        value={sgKey}
+        onChange={(e) => setSgKey(e.target.value)}
+        style={{ width: "100%", marginBottom: "8px" }}
+      />
 
       <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
         <Focusable
