@@ -141,7 +141,13 @@ def list_nonsteam_games(user_id: Optional[str] = None) -> list[dict]:
         app_name = shortcut.get("AppName") or shortcut.get("appname") or "Unknown"
         exe = shortcut.get("Exe") or shortcut.get("exe") or ""
 
-        app_id = calc_shortcut_app_id(app_name, exe)
+        # Prefer the stored appid — recalculating may differ from what
+        # Steam uses for shortcuts created by other tools.
+        stored_appid = shortcut.get("appid")
+        if stored_appid is not None:
+            app_id = stored_appid
+        else:
+            app_id = calc_shortcut_app_id(app_name, exe)
         config_appid = convert_appid_to_config_format(app_id)
 
         current_proton = None
@@ -365,7 +371,12 @@ def get_steam_shortcut_info(app_name: str, user_id: Optional[str] = None) -> Opt
         shortcut_name = shortcut.get("AppName") or shortcut.get("appname")
         if shortcut_name == app_name:
             exe = shortcut.get("Exe") or shortcut.get("exe") or ""
-            app_id = calc_shortcut_app_id(app_name, exe)
+
+            # Prefer the stored appid — recalculating may differ from what
+            # Steam uses for shortcuts created by other tools.
+            app_id = shortcut.get("appid")
+            if app_id is None:
+                app_id = calc_shortcut_app_id(app_name, exe)
             unsigned_appid = convert_appid_to_unsigned_32bit(app_id)
             return {
                 "index": idx,
