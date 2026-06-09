@@ -165,7 +165,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   const [forceReinit, setForceReinit] = useState(false);
 
   // ── Confirmation state (inline, CEF confirm() is blocked) ──────────────
-  const [confirming, setConfirming] = useState<"steam" | "deckyfin" | null>(null);
+  const [confirming, setConfirming] = useState<"steam" | "deckyfin" | "purge" | null>(null);
 
   // ── Executable picker ───────────────────────────────────────────────────
   const [showExePicker, setShowExePicker] = useState(false);
@@ -325,7 +325,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         setFeedback({ ok: true, msg: "All Steam data purged — restart Steam to apply" });
         onNeedsRestart?.();
       } else {
-        const detail = res.errors?.length ? res.errors.join("; ") : res.error || "Not found";
+        const detail = res.errors?.length ? res.errors.join("; ") : "Not found";
         setFeedback({ ok: false, msg: `Purge failed: ${detail}` });
       }
     } catch (err: any) {
