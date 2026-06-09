@@ -127,6 +127,7 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
       if (result.success) {
         setMessage("✅ Settings saved!");
         await initialize(folderPath);
+        setTimeout(() => setMessage(null), 3000);
       } else {
         setMessage(`❌ ${result.error || "Save failed"}`);
       }
@@ -301,6 +302,11 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
         >
           Save
         </Focusable>
+        {message && (
+          <span style={{ fontSize: "0.85em", color: message.startsWith("✅") ? "#2ecc71" : "tomato" }}>
+            {message}
+          </span>
+        )}
       </div>
 
       <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.12)", margin: "20px 0" }} />
