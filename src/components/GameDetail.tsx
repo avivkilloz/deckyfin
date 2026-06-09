@@ -238,9 +238,9 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   const handleSelectExe = (exe: string) => {
     const full = scanRoot ? `${scanRoot}/${exe}` : exe;
     setExecutable(full);
-    if (scanRoot) {
-      setStartDir(scanRoot);
-    }
+    const lastSlash = full.lastIndexOf("/");
+    const dir = lastSlash > 0 ? full.substring(0, lastSlash) : full;
+    setStartDir(dir);
     setShowExePicker(false);
   };
 
