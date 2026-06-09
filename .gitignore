@@ -12,7 +12,7 @@ dist/
 
 # Build
 .DS_Store
-*.log
+#*.log
 
 # IDE
 .vscode/
