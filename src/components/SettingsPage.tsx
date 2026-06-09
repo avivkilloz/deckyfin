@@ -171,7 +171,7 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
           marginBottom: "12px",
         }}
       >
-        ❮ Back
+        ← Back
       </Focusable>
       <h3 style={{ margin: "0 0 10px 0" }}>Settings</h3>
 
