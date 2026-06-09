@@ -466,13 +466,24 @@ def _build_methods(pfxid, dep, pfx_path, proton_wine, steam_root):
         fp = _ensure_flatpak_protontricks()
         if fp:
             def _flatpak(t):
+                cmd = [
+                    "flatpak", "run",
+                    "--filesystem=host",
+                ]
+                if steam_root:
+                    cmd.append(f"--env=STEAM_DIR={str(steam_root)}")
+                cmd.extend([
+                    PROTONTRICKS_FLATPAK,
+                    pfxid, "--", "--force", "--unattended", dep,
+                ])
+                real_user = _get_real_user()
+                if real_user:
+                    full_cmd = ["runuser", "-u", real_user, "--"] + cmd
+                    return _run_with_clean_env(
+                        full_cmd, capture_output=True, text=True, timeout=t,
+                    )
                 return _run_with_clean_env(
-                    [
-                        "flatpak", "run",
-                        PROTONTRICKS_FLATPAK,
-                        pfxid, "--", "--force", "--unattended", dep,
-                    ],
-                    capture_output=True, text=True, timeout=t,
+                    cmd, capture_output=True, text=True, timeout=t,
                 )
             methods.append(("flatpak protontricks", _flatpak))
 
@@ -594,3 +605,93 @@ def _build_methods(pfxid, dep, pfx_path, proton_wine, steam_root):
         methods.append(("system winetricks", _sys_winetricks))
 
     return methods
+
+
+def detect_protontricks_status() -> dict:
+    """Check availability of Flatpak and Native protontricks.
+
+    Returns:
+        dict with keys:
+            flatpak_available (bool): flatpak CLI on PATH
+            flatpak_installed (bool): flatpak protontricks installed
+            native_available (bool): native protontricks on PATH
+            status (str): summary string
+    """
+    result = {
+        "flatpak_available": False,
+        "flatpak_installed": False,
+        "native_available": False,
+    }
+
+    # Check flatpak CLI
+    if shutil.which("flatpak"):
+        result["flatpak_available"] = True
+        # Check if flatpak protontricks is installed
+        check = _run_with_clean_env(
+            ["flatpak", "info", PROTONTRICKS_FLATPAK],
+            capture_output=True, text=True, timeout=15,
+        )
+        if check.returncode == 0:
+            result["flatpak_installed"] = True
+        else:
+            # Fallback: check wrapper binary on disk
+            for export_dir in [
+                Path.home() / ".local/share/flatpak/exports/bin",
+                Path("/var/lib/flatpak/exports/bin"),
+            ]:
+                if (export_dir / PROTONTRICKS_FLATPAK).exists():
+                    result["flatpak_installed"] = True
+                    break
+
+    # Check native protontricks
+    if shutil.which("protontricks"):
+        result["native_available"] = True
+
+    # Build summary
+    parts = []
+    if result["flatpak_installed"]:
+        parts.append("Flatpak protontricks available")
+    elif result["flatpak_available"]:
+        parts.append("Flatpak available, protontricks not installed")
+    else:
+        parts.append("Flatpak not available")
+    if result["native_available"]:
+        parts.append("Native protontricks available")
+
+    result["status"] = " — ".join(parts) if parts else "No protontricks available"
+    return result
+
+
+def install_protontricks_flatpak() -> dict:
+    """Install protontricks via flatpak from Flathub.
+
+    Returns:
+        dict with keys: success (bool), message (str)
+    """
+    if not shutil.which("flatpak"):
+        return {"success": False, "message": "Flatpak is not installed on this system"}
+
+    try:
+        # Add flathub remote if needed
+        _run_with_clean_env(
+            ["flatpak", "remote-add", "--if-not-exists",
+             "flathub", "https://flathub.org/repo/flathub.flatpakrepo"],
+            capture_output=True, text=True, timeout=30,
+        )
+
+        # Install protontricks
+        install = _run_with_clean_env(
+            ["flatpak", "install", "-y", "--noninteractive",
+             PROTONTRICKS_FLATPAK],
+            capture_output=True, text=True, timeout=120,
+        )
+
+        if install.returncode == 0:
+            return {"success": True, "message": "Protontricks installed successfully"}
+        else:
+            return {
+                "success": False,
+                "message": f"Install failed: {install.stderr or install.stdout or 'unknown error'}",
+            }
+    except Exception as e:
+        return {"success": False, "message": f"Install error: {str(e)}"}

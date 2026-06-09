@@ -33,7 +33,11 @@ from steam_games import add_nonsteam_game, list_nonsteam_games, remove_nonsteam_
 from deckyfin_proton import list_available_proton, ensure_proton_available, get_proton_version_for_game
 from deckyfin_proton_compat import set_proton_version
 from deckyfin_prefix import init_proton_prefix
-from deckyfin_protontricks import install_protontricks_dependencies
+from deckyfin_protontricks import (
+    install_protontricks_dependencies,
+    detect_protontricks_status as _detect_protontricks_status,
+    install_protontricks_flatpak as _install_protontricks_flatpak,
+)
 from deckyfin_steamgrid import apply_steam_grid as _apply_steam_grid, set_api_key as _set_steamgrid_key, get_configured_api_key as _get_steamgrid_key, fetch_steamgrid_art_urls as _fetch_steamgrid_art_urls
 from deckyfin_steam_ctl import is_steam_running, restart_steam
 from steam_utils import get_user_id, list_steam_users
@@ -360,6 +364,14 @@ class Plugin:
 
     async def install_dependencies(self, pfxid: str, dependencies: str) -> dict:
         return install_protontricks_dependencies(pfxid, dependencies, timeout=1200)
+
+    async def get_protontricks_status(self) -> dict:
+        """Check protontricks availability — flatpak and native."""
+        return _detect_protontricks_status()
+
+    async def install_protontricks(self) -> dict:
+        """Install protontricks via flatpak from Flathub."""
+        return _install_protontricks_flatpak()
 
     async def get_game_proton(self, app_id: int, user_id: Optional[str] = None) -> dict:
         """Get the current Proton version configured for a Steam app."""

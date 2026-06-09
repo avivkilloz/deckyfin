@@ -20,6 +20,15 @@ const setSteamGridKey = callable<
 >("set_steamgrid_key");
 const listSubfolders = callable<[path: string], string[]>("list_subfolders");
 
+const getProtontricksStatus = callable<
+  [],
+  { flatpak_available: boolean; flatpak_installed: boolean; native_available: boolean; status: string }
+>("get_protontricks_status");
+const installProtontricks = callable<
+  [],
+  { success: boolean; message: string }
+>("install_protontricks");
+
 interface Props {
   gamesFolder: string | null;
   onBack: () => void;
@@ -118,6 +127,47 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
   };
 
   // ── End SteamGridDB ──────────────────────────────────────────────────
+
+  // ── Protontricks Status ─────────────────────────────────────────────
+  const [ptStatus, setPtStatus] = useState<{
+    flatpak_available: boolean;
+    flatpak_installed: boolean;
+    native_available: boolean;
+    status: string;
+  } | null>(null);
+  const [ptInstalling, setPtInstalling] = useState(false);
+  const [ptMessage, setPtMessage] = useState<string | null>(null);
+
+  const loadPtStatus = useCallback(async () => {
+    try {
+      const s = await getProtontricksStatus();
+      setPtStatus(s);
+    } catch {
+      setPtStatus(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadPtStatus();
+  }, [loadPtStatus]);
+
+  const handleInstallProto = async () => {
+    setPtInstalling(true);
+    setPtMessage(null);
+    try {
+      const res = await installProtontricks();
+      if (res.success) {
+        setPtMessage("✅ Protontricks installed");
+        await loadPtStatus(); // Refresh status
+      } else {
+        setPtMessage(`❌ ${res.message}`);
+      }
+    } catch (err: any) {
+      setPtMessage(`❌ ${err?.message || "Install failed"}`);
+    }
+    setPtInstalling(false);
+  };
+  // ── End Protontricks ────────────────────────────────────────────────
 
   const handleSave = async () => {
     setMessage(null);
@@ -356,6 +406,63 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
       {sgMessage && (
         <p style={{ marginTop: "8px", fontSize: "0.9em", color: sgMessage.startsWith("✅") ? "lightgreen" : "tomato" }}>
           {sgMessage}
+        </p>
+      )}
+
+      <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.12)", margin: "20px 0" }} />
+
+      {/* ── Protontricks ─────────────────────────────────────────────────── */}
+      <h4 style={{ margin: "0 0 10px 0" }}>Protontricks</h4>
+
+      <p style={{ fontSize: "0.85em", color: "#aaa", marginBottom: "10px" }}>
+        Protontricks installs Windows DLLs (VC++, DirectX, .NET) into Proton game prefixes. On Steam Deck, flatpak is the only option.
+      </p>
+
+      {ptStatus ? (
+        <div style={{ fontSize: "0.85em", marginBottom: "10px" }}>
+          <div style={{ marginBottom: "4px" }}>
+            <span>{ptStatus.flatpak_installed ? "✅" : "❌"}</span>{" "}
+            <span style={{ color: "#e0e0e0" }}>Flatpak protontricks</span>
+            {ptStatus.flatpak_available && !ptStatus.flatpak_installed && (
+              <span style={{ color: "#888", marginLeft: "8px" }}>(flatpak CLI available)</span>
+            )}
+          </div>
+          <div>
+            <span>{ptStatus.native_available ? "✅" : "❌"}</span>{" "}
+            <span style={{ color: "#e0e0e0" }}>Native protontricks</span>
+          </div>
+        </div>
+      ) : (
+        <p style={{ fontSize: "0.85em", color: "#888", marginBottom: "10px" }}>Checking…</p>
+      )}
+
+      {ptStatus && ptStatus.flatpak_available && !ptStatus.flatpak_installed && !ptStatus.native_available && (
+        <div style={{ display: "flex", gap: "6px", alignItems: "center", marginBottom: "8px" }}>
+          <Focusable
+            onActivate={handleInstallProto}
+            onClick={handleInstallProto}
+            focusClassName="is-focused"
+            style={{
+              ...BTN_STYLE,
+              border: "1px solid #0078d4",
+              color: "#0078d4",
+              opacity: ptInstalling ? 0.6 : 1,
+            }}
+          >
+            {ptInstalling ? "Installing…" : "Install Protontricks (flatpak)"}
+          </Focusable>
+        </div>
+      )}
+
+      {ptStatus && ptStatus.flatpak_available && ptStatus.flatpak_installed && !ptStatus.native_available && (
+        <p style={{ fontSize: "0.85em", color: "#2ecc71", marginBottom: "8px" }}>
+          ✅ Ready — protontricks is installed via flatpak
+        </p>
+      )}
+
+      {ptMessage && (
+        <p style={{ marginTop: "8px", fontSize: "0.9em", color: ptMessage.startsWith("✅") ? "lightgreen" : "tomato" }}>
+          {ptMessage}
         </p>
       )}
 
