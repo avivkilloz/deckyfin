@@ -209,12 +209,22 @@ class Plugin:
             if games_folder:
                 resolved_start = str(Path(games_folder) / resolved_start)
         app_id = add_nonsteam_game(str(exe), app_name, resolved_start, launch_options)
+        _debug(
+            f"add_steam_shortcut: app_id={app_id}, proton_version={proton_version!r}, "
+            f"app_name={app_name}, exe={exe}"
+        )
         # Also apply Proton version if provided
         if proton_version:
             try:
                 user_id = get_user_id()
+                _debug(
+                    f"add_steam_shortcut: calling set_proton_version("
+                    f"app_id={app_id}, proton={proton_version!r}, user={user_id})"
+                )
                 set_proton_version(app_id, proton_version, user_id, app_name)
+                _debug("add_steam_shortcut: set_proton_version OK")
             except Exception as e:
+                _debug(f"add_steam_shortcut: set_proton_version FAILED: {e}")
                 self.logger.warning("Failed to set Proton version: %s", e)
         return {
             "success": True,
