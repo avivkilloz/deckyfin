@@ -138,8 +138,8 @@ def list_nonsteam_games(user_id: Optional[str] = None) -> list[dict]:
         if not idx.isdigit():
             continue
 
-        app_name = shortcut.get("AppName", "Unknown")
-        exe = shortcut.get("Exe", "")
+        app_name = shortcut.get("AppName") or shortcut.get("appname") or "Unknown"
+        exe = shortcut.get("Exe") or shortcut.get("exe") or ""
 
         app_id = calc_shortcut_app_id(app_name, exe)
         config_appid = convert_appid_to_config_format(app_id)
@@ -201,7 +201,8 @@ def add_nonsteam_game(
     for idx, shortcut in list(shortcuts_dict.items()):
         if not idx.isdigit():
             continue
-        if shortcut.get("AppName") == app_name:
+        shortcut_name = shortcut.get("AppName") or shortcut.get("appname")
+        if shortcut_name == app_name:
             # Found existing — update in-place
             if start_dir is None:
                 start_dir = str(Path(exe_path).parent)
@@ -295,7 +296,8 @@ def update_nonsteam_game(
     for idx, shortcut in shortcuts_dict.items():
         if not idx.isdigit():
             continue
-        if shortcut.get("AppName") == app_name:
+        shortcut_name = shortcut.get("AppName") or shortcut.get("appname")
+        if shortcut_name == app_name:
             target_idx = idx
             break
 
@@ -347,8 +349,9 @@ def get_steam_shortcut_info(app_name: str, user_id: Optional[str] = None) -> Opt
     for idx, shortcut in shortcuts.get("shortcuts", {}).items():
         if not idx.isdigit():
             continue
-        if shortcut.get("AppName") == app_name:
-            exe = shortcut.get("Exe", "")
+        shortcut_name = shortcut.get("AppName") or shortcut.get("appname")
+        if shortcut_name == app_name:
+            exe = shortcut.get("Exe") or shortcut.get("exe") or ""
             app_id = calc_shortcut_app_id(app_name, exe)
             unsigned_appid = convert_appid_to_unsigned_32bit(app_id)
             return {
@@ -378,7 +381,8 @@ def remove_nonsteam_game(app_name: str, user_id: Optional[str] = None) -> bool:
 
     to_delete = None
     for idx, shortcut in shortcuts_dict.items():
-        if shortcut.get("AppName") == app_name:
+        shortcut_name = shortcut.get("AppName") or shortcut.get("appname")
+        if shortcut_name == app_name:
             to_delete = idx
             break
 
