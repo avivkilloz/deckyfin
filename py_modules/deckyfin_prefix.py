@@ -158,6 +158,18 @@ def init_proton_prefix(
         )
 
         if result.returncode == 0:
+            # Gracefully shut down the wineserver spawned by wineboot --init.
+            # Proton's wineserver stays alive as a daemon after wineboot exits,
+            # and a second wineserver (e.g. from flatpak protontricks) writing
+            # to the same registry via --filesystem=host will corrupt the prefix.
+            try:
+                subprocess.run(
+                    [str(proton_script), "run", "wineserver", "-k"],
+                    env=env, capture_output=True, timeout=30,
+                )
+                logger.debug("Wineserver shut down gracefully after prefix init")
+            except Exception as e:
+                logger.warning("Failed to shut down wineserver: %s", e)
             logger.info("Prefix initialized successfully at %s", compatdata_path)
             # Fix ownership if we ran as root
             real_user = _get_real_user()
