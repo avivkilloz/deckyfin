@@ -168,6 +168,28 @@ class Plugin:
         except GameConfigError as e:
             return {"success": False, "error": str(e)}
 
+    async def set_game_processing_state(self, name: str, state: dict | None) -> dict:
+        """Persist the current processing state for a game (e.g. installing deps).
+
+        Pass None to clear the state after processing completes.
+        """
+        try:
+            update_game_config(name, {"processing_state": state})
+            return {"success": True}
+        except GameConfigError as e:
+            return {"success": False, "error": str(e)}
+
+    async def get_game_processing_state(self, name: str) -> dict | None:
+        """Check if a game has a persisted processing state.
+
+        Returns the state dict (e.g. {status: "installing", ...}) or None.
+        """
+        try:
+            game = get_game_config(name)
+            return game.get("processing_state") if game else None
+        except Exception:
+            return None
+
     async def remove_game(self, name: str) -> dict:
         removed = remove_game_config(name)
         return {"success": removed, "error": None if removed else f"Game '{name}' not found"}

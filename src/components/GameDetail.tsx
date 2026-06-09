@@ -46,6 +46,14 @@ const updateGameConfig = callable<
   { success: boolean }
 >("update_game_config");
 const scanExes = callable<[subfolder: string], string[]>("scan_game_exes");
+const setGameProcessingState = callable<
+  [name: string, state: Record<string, any> | null],
+  { success: boolean }
+>("set_game_processing_state");
+const getGameProcessingState = callable<
+  [name: string],
+  Record<string, any> | null
+>("get_game_processing_state");
 
 /** Popular Proton dependencies shown as toggle chips. */
 const POPULAR_DEPS = [
@@ -190,6 +198,18 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
       .then((res) => {
         if (res.success && res.app_id && res.unsigned_appid) {
           setSteamInfo({ app_id: res.app_id, unsigned_appid: res.unsigned_appid });
+        }
+      })
+      .catch(() => {});
+  }, [game.name]);
+
+  // ── Restore processing state on mount (e.g. Installing… survived navigation) ──
+  useEffect(() => {
+    getGameProcessingState(game.name)
+      .then((state: any) => {
+        if (state?.status === "installing") {
+          setLoading("deps");
+          setFeedback({ ok: false, msg: "Installing dependencies — this can take a few minutes" });
         }
       })
       .catch(() => {});
@@ -358,14 +378,22 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   };
 
   const handleInstallDeps = async () => {
-    if (!steamInfo || mergedDeps.length === 0) return;
+    if (!steamInfo || mergedDeps.length === 0 || loading === "deps") return;
     setLoading("deps");
     setFeedback(null);
+    // Persist processing state so it survives navigation away
+    setGameProcessingState(game.name, {
+      status: "installing",
+      deps: mergedDeps,
+      pfxid: String(steamInfo.unsigned_appid),
+    }).catch(() => {});
     try {
       const res = await installDeps(
         String(steamInfo.unsigned_appid),
         mergedDeps.join(", ")
       );
+      // Clear processing state on completion
+      setGameProcessingState(game.name, null).catch(() => {});
       if (res.success) {
         const installed = (res.installed || []).join(", ");
         setFeedback({ ok: true, msg: `Installed: ${installed}` });
@@ -377,6 +405,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         });
       }
     } catch (err: any) {
+      setGameProcessingState(game.name, null).catch(() => {});
       setFeedback({ ok: false, msg: err?.message || "Error" });
     }
     setLoading(null);
