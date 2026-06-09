@@ -189,6 +189,7 @@ class Plugin:
         exe_path: str,
         start_dir: Optional[str] = None,
         launch_options: str = "",
+        proton_version: Optional[str] = None,
     ) -> dict:
         """Update an existing Steam shortcut in-place. Returns error if not found."""
         # Resolve relative paths against the configured games folder
@@ -210,6 +211,14 @@ class Plugin:
                 "success": False,
                 "error": f"'{app_name}' not found in Steam shortcuts — add it first",
             }
+        # Also update Proton version if provided
+        if proton_version:
+            try:
+                user_id = get_user_id()
+                from deckyfin_proton_compat import set_proton_version
+                set_proton_version(app_id, proton_version, user_id, app_name)
+            except Exception as e:
+                self.logger.warning("Failed to set Proton version: %s", e)
         return {
             "success": True,
             "app_id": app_id,

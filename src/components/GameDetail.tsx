@@ -25,7 +25,7 @@ const purgeSteamGameData = callable<
   { success: boolean; removed_shortcut?: boolean; removed_prefix?: boolean; removed_grid?: boolean; unsigned_appid?: number; errors?: string[] }
 >("purge_steam_game_data");
 const updateSteamShortcut = callable<
-  [app_name: string, exe_path: string, start_dir?: string, launch_options?: string],
+  [app_name: string, exe_path: string, start_dir?: string, launch_options?: string, proton_version?: string],
   { success: boolean; app_id?: number; unsigned_appid?: number; error?: string }
 >("update_steam_shortcut");
 const listProtonVersions = callable<[], string[]>("list_proton_versions");
@@ -238,7 +238,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   const handleSelectExe = (exe: string) => {
     const full = scanRoot ? `${scanRoot}/${exe}` : exe;
     setExecutable(full);
-    if (!startDir && scanRoot) {
+    if (scanRoot) {
       setStartDir(scanRoot);
     }
     setShowExePicker(false);
@@ -279,7 +279,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         name,
         executable,
         startDir || undefined,
-        game.launch_options || ""
+        game.launch_options || "",
+        protonVersion || undefined
       );
       if (res.success && res.app_id && res.unsigned_appid) {
         setSteamInfo({ app_id: res.app_id, unsigned_appid: res.unsigned_appid });
