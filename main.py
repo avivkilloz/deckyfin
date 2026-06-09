@@ -162,6 +162,7 @@ class Plugin:
         app_name: str,
         start_dir: Optional[str] = None,
         launch_options: str = "",
+        proton_version: Optional[str] = None,
     ) -> dict:
         if not exe_path:
             return {"success": False, "error": "Executable path is required"}
@@ -177,6 +178,13 @@ class Plugin:
             if games_folder:
                 resolved_start = str(Path(games_folder) / resolved_start)
         app_id = add_nonsteam_game(str(exe), app_name, resolved_start, launch_options)
+        # Also apply Proton version if provided
+        if proton_version:
+            try:
+                user_id = get_user_id()
+                set_proton_version(app_id, proton_version, user_id, app_name)
+            except Exception as e:
+                self.logger.warning("Failed to set Proton version: %s", e)
         return {
             "success": True,
             "app_id": app_id,

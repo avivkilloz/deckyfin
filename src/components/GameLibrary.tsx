@@ -152,7 +152,6 @@ export const GameLibrary: VFC = () => {
       />
 
       {/* Game list */}
-      {loading && <p>Loading...</p>}
       {error && <p style={{ color: "red" }}>{error}</p>}
       {!loading && !error && !gamesFolder && (
         <div>

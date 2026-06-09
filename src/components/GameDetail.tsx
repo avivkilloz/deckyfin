@@ -9,7 +9,7 @@ const removeGame = callable<[name: string], { success: boolean }>(
   "remove_game"
 );
 const addSteamShortcut = callable<
-  [exe_path: string, app_name: string, start_dir?: string, launch_options?: string],
+  [exe_path: string, app_name: string, start_dir?: string, launch_options?: string, proton_version?: string],
   { success: boolean; app_id?: number; unsigned_appid?: number; error?: string }
 >("add_steam_shortcut");
 const getSteamShortcut = callable<
@@ -224,7 +224,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
       setShowExePicker(false);
       return;
     }
-    const root = startDir || game.name;
+    const root = game.path || game.name;
     try {
       const exes = await scanExes(root);
       setExeOptions(exes);
@@ -253,7 +253,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         executable,
         name,
         startDir || undefined,
-        game.launch_options || ""
+        game.launch_options || "",
+        protonVersion || undefined
       );
       if (res.success && res.app_id && res.unsigned_appid) {
         setSteamInfo({ app_id: res.app_id, unsigned_appid: res.unsigned_appid });
