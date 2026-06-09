@@ -138,6 +138,41 @@ def _chown_prefix(prefix_dir: str, username: str) -> None:
         logger.warning("Failed to fix prefix ownership: %s", e)
 
 
+def _resolve_xdg_runtime_dir() -> Optional[str]:
+    """Resolve the correct XDG_RUNTIME_DIR for the target user.
+
+    When Decky's plugin_loader runs as root, XDG_RUNTIME_DIR is either
+    unset or points to root's runtime dir (/run/user/0). Flatpak needs
+    the desktop user's real XDG_RUNTIME_DIR (e.g. /run/user/1000 for
+    uid 1000) to set up the sandbox correctly.
+
+    Returns the path string (e.g. '/run/user/1000') or None if unresolvable.
+    """
+    try:
+        uid = os.geteuid()
+        if uid == 0:
+            # Running as root — find the real user's UID by scanning /home
+            for home_dir in sorted(Path("/home").iterdir()):
+                if home_dir.is_dir():
+                    try:
+                        stat_info = home_dir.stat()
+                        real_uid = stat_info.st_uid
+                        if real_uid > 0:
+                            runtime_dir = f"/run/user/{real_uid}"
+                            if Path(runtime_dir).exists():
+                                return runtime_dir
+                    except Exception:
+                        continue
+        else:
+            # Already running as the user — use existing env
+            existing = os.environ.get("XDG_RUNTIME_DIR")
+            if existing and Path(existing).exists():
+                return existing
+    except Exception:
+        pass
+    return None
+
+
 def _runuser_cmd(cmd: list[str], username: str,
                  extra_env: Optional[dict[str, str]] = None) -> list[str]:
     """Wrap a command to run as a specific user via runuser.
@@ -148,15 +183,22 @@ def _runuser_cmd(cmd: list[str], username: str,
 
     runuser -u <user> creates a clean env with correct HOME/USER/LOGNAME.
     Extra env vars (WINEPREFIX, WINELOADER, etc.) are passed via `env`.
+    Also sets XDG_RUNTIME_DIR so flatpak sandboxing works correctly.
     """
     if not username:
         return cmd
 
+    env_vars: dict[str, str] = dict(extra_env or {})
+    # Flatpak needs the correct XDG_RUNTIME_DIR for the desktop user
+    xdg_dir = _resolve_xdg_runtime_dir()
+    if xdg_dir:
+        env_vars["XDG_RUNTIME_DIR"] = xdg_dir
+
     wrapper: list[str] = ["runuser", "-u", username, "--"]
 
-    if extra_env:
+    if env_vars:
         env_parts = ["env"]
-        for k, v in extra_env.items():
+        for k, v in env_vars.items():
             env_parts.append(f"{k}={v}")
         wrapper.extend(env_parts)
 
@@ -478,7 +520,7 @@ def _build_methods(pfxid, dep, pfx_path, proton_wine, steam_root):
                 ])
                 real_user = _get_real_user()
                 if real_user:
-                    full_cmd = ["runuser", "-u", real_user, "--"] + cmd
+                    full_cmd = _runuser_cmd(cmd, real_user)
                     result = _run_with_clean_env(
                         full_cmd, capture_output=True, text=True, timeout=t,
                     )
