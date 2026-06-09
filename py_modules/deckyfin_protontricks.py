@@ -173,6 +173,37 @@ def _resolve_xdg_runtime_dir() -> Optional[str]:
     return None
 
 
+def _detect_display() -> Optional[str]:
+    """Detect the X11 display number by scanning /tmp/.X11-unix/.
+
+    The runuser wrapper creates a clean environment that drops DISPLAY.
+    VC++ redistributable installers (vc_redist.*.exe) try to create a
+    hidden window even in /q (quiet) mode and fail with status 120 when
+    wine has no display driver. Detecting and passing DISPLAY fixes this.
+
+    On Steam Deck (gamescope), the display is typically :1 (gamescope's
+    embedded Xwayland). On CachyOS and regular desktops, it's :0.
+    We scan /tmp/.X11-unix/ for X* sockets and use the highest-numbered
+    one, which handles both single- and multi-display setups.
+    """
+    try:
+        x11_dir = Path("/tmp/.X11-unix")
+        if not x11_dir.is_dir():
+            return None
+        max_num = -1
+        for sock in x11_dir.iterdir():
+            name = sock.name
+            if name.startswith("X") and name[1:].isdigit():
+                num = int(name[1:])
+                if num > max_num:
+                    max_num = num
+        if max_num >= 0:
+            return f":{max_num}"
+    except Exception:
+        pass
+    return None
+
+
 def _runuser_cmd(cmd: list[str], username: str,
                  extra_env: Optional[dict[str, str]] = None) -> list[str]:
     """Wrap a command to run as a specific user via runuser.
@@ -193,6 +224,10 @@ def _runuser_cmd(cmd: list[str], username: str,
     xdg_dir = _resolve_xdg_runtime_dir()
     if xdg_dir:
         env_vars["XDG_RUNTIME_DIR"] = xdg_dir
+    # VC++ redistributable installers need a display even in quiet mode
+    display = _detect_display()
+    if display:
+        env_vars["DISPLAY"] = display
 
     wrapper: list[str] = ["runuser", "-u", username, "--"]
 
