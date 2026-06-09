@@ -185,6 +185,8 @@ def _detect_display() -> Optional[str]:
     embedded Xwayland). On CachyOS and regular desktops, it's :0.
     We scan /tmp/.X11-unix/ for X* sockets and use the highest-numbered
     one, which handles both single- and multi-display setups.
+
+    Falls back to :0 if detection fails (almost always correct on desktops).
     """
     try:
         x11_dir = Path("/tmp/.X11-unix")
@@ -201,7 +203,7 @@ def _detect_display() -> Optional[str]:
             return f":{max_num}"
     except Exception:
         pass
-    return None
+    return ":0"
 
 
 def _runuser_cmd(cmd: list[str], username: str,
