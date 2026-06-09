@@ -412,11 +412,15 @@ def install_protontricks_dependencies(
             else:
                 logger.warning("Prefix directory not found at %s", compatdata)
                 # ── Try to create prefix so protontricks can find it ──
-                try:
-                    _init_prefix_for_deps(compatdata, steam_root)
-                    prefix_dir = str(compatdata)
-                except Exception as e2:
-                    logger.error("Failed to auto-create prefix: %s", e2)
+                # But only when flatpak isn't available — flatpak protontricks
+                # auto-creates the prefix using its own cached wine, avoiding
+                # version mismatch with _find_proton_wine() (see #prefix-init)
+                if not shutil.which("flatpak"):
+                    try:
+                        _init_prefix_for_deps(compatdata, steam_root)
+                        prefix_dir = str(compatdata)
+                    except Exception as e2:
+                        logger.error("Failed to auto-create prefix: %s", e2)
     except Exception as e:
         logger.warning("Could not derive prefix directory: %s", e)
 
