@@ -1,6 +1,7 @@
 import { VFC, useState, useEffect, useRef } from "react";
 import { callable } from "@decky/api";
-import { Navigation, Focusable, TextField } from "@decky/ui";
+import { Navigation, Focusable } from "@decky/ui";
+import { CompactTextField } from "../components/CompactTextField";
 
 const setGamesFolder = callable<
   [path: string],
@@ -135,10 +136,9 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
         Path to the root directory containing your game folders. Each
         subdirectory is treated as a separate game with its own config.
       </p>
-      <TextField
+      <CompactTextField
         value={folderPath}
         onChange={(e) => setFolderPath(e.target.value)}
-        className="deckyfin-field"
         style={{ width: "100%", marginBottom: "12px" }}
       />
 
@@ -175,10 +175,9 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
         </Focusable>
         .
       </p>
-      <TextField
+      <CompactTextField
         value={sgKey}
         onChange={(e) => setSgKey(e.target.value)}
-        className="deckyfin-field"
         style={{ width: "100%", marginBottom: "8px" }}
       />
 

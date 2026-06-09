@@ -1,10 +1,11 @@
-import { VFC, useState, useEffect, useCallback, useRef } from "react";
+import { VFC, useState, useEffect, useCallback } from "react";
 import { callable } from "@decky/api";
 import { Focusable } from "@decky/ui";
 import { GameConfig } from "../types";
 import { GameCard } from "../components/GameCard";
 import { SettingsPage } from "../components/SettingsPage";
 import { GameDetail } from "../components/GameDetail";
+import { CompactTextField } from "../components/CompactTextField";
 
 const getGames = callable<[], GameConfig[]>("get_games");
 const getGamesFolder = callable<[], string | null>("get_games_folder");
@@ -43,7 +44,6 @@ export const GameLibrary: VFC = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [restarting, setRestarting] = useState(false);
   const [needsRestart, setNeedsRestart] = useState(false);
-  const searchRef = useRef<HTMLInputElement>(null);
 
   const handleRestartSteam = useCallback(async () => {
     setRestarting(true);
@@ -144,20 +144,11 @@ export const GameLibrary: VFC = () => {
       </div>
 
       {/* Search */}
-      <Focusable onActivate={() => searchRef.current?.focus()} focusClassName="is-focused" style={{ marginBottom: "12px" }}>
-        <input
-          ref={searchRef}
-          type="text"
-          placeholder="Search games..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          style={{
-            width: "100%",
-            padding: "8px",
-            boxSizing: "border-box",
-          }}
-        />
-      </Focusable>
+      <CompactTextField
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        style={{ width: "100%", marginBottom: "12px" }}
+      />
 
       {/* Game list */}
       {loading && <p>Loading...</p>}

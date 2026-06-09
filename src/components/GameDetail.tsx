@@ -1,8 +1,9 @@
 import { VFC, useState, useEffect, useRef } from "react";
 import { callable } from "@decky/api";
-import { Navigation, Focusable, TextField } from "@decky/ui";
+import { Navigation, Focusable } from "@decky/ui";
 import { GameConfig } from "../types";
 import { useArtwork } from "../hooks/useArtwork";
+import { CompactTextField } from "../components/CompactTextField";
 
 const removeGame = callable<[name: string], { success: boolean }>(
   "remove_game"
@@ -418,10 +419,9 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
 
       {/* Name */}
       <label style={LABEL_STYLE}>Name</label>
-      <TextField
+      <CompactTextField
         value={name}
         onChange={(e) => setName(e.target.value)}
-        className="deckyfin-field"
         style={{ width: "100%", marginBottom: "10px" }}
       />
 
@@ -435,10 +435,9 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           alignItems: "center",
         }}
       >
-        <TextField
+        <CompactTextField
           value={executable}
           onChange={(e) => setExecutable(e.target.value)}
-          className="deckyfin-field"
           style={{ flex: 1, minWidth: 0 }}
         />
         <Focusable
@@ -492,23 +491,21 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
 
       {/* Start Dir */}
       <label style={LABEL_STYLE}>Start Dir</label>
-      <TextField
+      <CompactTextField
         value={startDir}
         onChange={(e) => setStartDir(e.target.value)}
-        className="deckyfin-field"
         style={{ width: "100%", marginBottom: "10px" }}
       />
 
       {/* Steam App ID */}
       <label style={LABEL_STYLE}>Steam App ID</label>
-      <TextField
+      <CompactTextField
         value={steamAppIdInput}
         onChange={(e) => {
           setSteamAppIdInput(e.target.value);
           const parsed = parseInt(e.target.value, 10);
           setSteamAppId(isNaN(parsed) ? undefined : parsed);
         }}
-        className="deckyfin-field"
         style={{ width: "100%", marginBottom: "10px" }}
       />
 
@@ -620,10 +617,9 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         <label style={{ fontSize: "0.82em", color: "#888", display: "block", marginBottom: "2px" }}>
           Custom (comma-separated)
         </label>
-        <TextField
+        <CompactTextField
           value={customDeps}
           onChange={(e) => setCustomDeps(e.target.value)}
-          className="deckyfin-field"
           style={{ width: "100%" }}
         />
       </div>
