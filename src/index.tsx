@@ -24,7 +24,12 @@ export default definePlugin(() => {
         width="24"
         height="24"
       >
-        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+        <path d="M19 7v10H5V7h14zm0-2H5c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2z"
+          fill="currentColor" />
+        <circle cx="8.5" cy="12" r="1.5" fill="currentColor" />
+        <circle cx="15.5" cy="12" r="1.5" fill="currentColor" />
+        <path d="M12 8c-1.1 0-2 .9-2 2h4c0-1.1-.9-2-2-2z"
+          fill="currentColor" />
       </svg>
     ),
     onDismount() {
