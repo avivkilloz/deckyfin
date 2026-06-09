@@ -446,7 +446,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           onActivate={handleOpenExePicker}
           onClick={handleOpenExePicker}
           focusClassName="is-focused"
-          style={{ ...BTN_STYLE, alignSelf: "center", padding: "6px 12px" }}
+          style={{ ...BTN_STYLE, alignSelf: "center", padding: "4px 12px" }}
         >
           {showExePicker ? "✕" : "Browse"}
         </Focusable>
