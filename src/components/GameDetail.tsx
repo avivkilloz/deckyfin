@@ -421,6 +421,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
       <TextField
         value={name}
         onChange={(e) => setName(e.target.value)}
+        className="deckyfin-field"
         style={{ width: "100%", marginBottom: "10px" }}
       />
 
@@ -437,7 +438,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         <TextField
           value={executable}
           onChange={(e) => setExecutable(e.target.value)}
-          style={{ flex: 1 }}
+          className="deckyfin-field"
+          style={{ flex: 1, minWidth: 0 }}
         />
         <Focusable
           onActivate={handleOpenExePicker}
@@ -493,6 +495,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
       <TextField
         value={startDir}
         onChange={(e) => setStartDir(e.target.value)}
+        className="deckyfin-field"
         style={{ width: "100%", marginBottom: "10px" }}
       />
 
@@ -505,6 +508,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           const parsed = parseInt(e.target.value, 10);
           setSteamAppId(isNaN(parsed) ? undefined : parsed);
         }}
+        className="deckyfin-field"
         style={{ width: "100%", marginBottom: "10px" }}
       />
 
@@ -619,6 +623,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         <TextField
           value={customDeps}
           onChange={(e) => setCustomDeps(e.target.value)}
+          className="deckyfin-field"
           style={{ width: "100%" }}
         />
       </div>

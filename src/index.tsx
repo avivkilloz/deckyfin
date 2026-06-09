@@ -12,6 +12,13 @@ export default definePlugin(() => {
           .is-focused {
             box-shadow: 0 0 0 2px #0078d4 !important;
           }
+          /* Compact Steam TextField inputs for Deckyfin */
+          #deckyfin-wrap .deckyfin-field input {
+            padding: 4px 6px !important;
+            font-size: 0.85em !important;
+            min-height: unset !important;
+            height: auto !important;
+          }
         `}</style>
         <GameLibrary />
       </div>

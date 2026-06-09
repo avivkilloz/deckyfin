@@ -138,6 +138,7 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
       <TextField
         value={folderPath}
         onChange={(e) => setFolderPath(e.target.value)}
+        className="deckyfin-field"
         style={{ width: "100%", marginBottom: "12px" }}
       />
 
@@ -177,6 +178,7 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
       <TextField
         value={sgKey}
         onChange={(e) => setSgKey(e.target.value)}
+        className="deckyfin-field"
         style={{ width: "100%", marginBottom: "8px" }}
       />
 
