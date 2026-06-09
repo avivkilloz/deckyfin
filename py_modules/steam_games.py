@@ -56,6 +56,26 @@ def convert_appid_to_config_format(appid: int) -> str:
     return str(full_id)
 
 
+# ── VDF Field Helpers ───────────────────────────────────────────────────────
+
+
+def _remove_case_variants(shortcut: dict, canonical_name: str):
+    """Remove case-variant keys from a shortcut dict before setting the canonical one.
+
+    Tools like Heroic create shortcuts with lowercase field names (e.g. 'exe',
+    'appname'), while deckyfin uses uppercase ('Exe', 'AppName'). If both
+    variants exist, Steam may read the wrong one. This helper deletes the
+    opposite-case key (if any) before setting the intended field, so Steam
+    always sees the correct value.
+    """
+    # Generate the opposite-case key: e.g. "Exe" → "exe", "appname" → "AppName"
+    if canonical_name[0].isupper():
+        variant = canonical_name[0].lower() + canonical_name[1:]
+    else:
+        variant = canonical_name[0].upper() + canonical_name[1:]
+    shortcut.pop(variant, None)
+
+
 # ── VDF Parsing Helpers ────────────────────────────────────────────────────
 
 def _load_vdf_text(path: Path):
@@ -221,6 +241,13 @@ def add_nonsteam_game(
             else:
                 app_id = calc_shortcut_app_id(app_name, exe_formatted)
 
+            # Remove lowercase variants before writing uppercase fields
+            # (Heroic creates shortcuts with lowercase field names)
+            _remove_case_variants(shortcuts_dict[idx], "Exe")
+            _remove_case_variants(shortcuts_dict[idx], "AppName")
+            _remove_case_variants(shortcuts_dict[idx], "StartDir")
+            _remove_case_variants(shortcuts_dict[idx], "LaunchOptions")
+
             shortcuts_dict[idx]["AppName"] = app_name
             shortcuts_dict[idx]["Exe"] = exe_formatted
             shortcuts_dict[idx]["StartDir"] = start_dir
@@ -329,6 +356,12 @@ def update_nonsteam_game(
         app_id = existing_app_id
     else:
         app_id = calc_shortcut_app_id(app_name, exe_formatted)
+
+    # Remove lowercase variants before writing uppercase fields
+    # (Heroic creates shortcuts with lowercase field names)
+    _remove_case_variants(shortcuts_dict[target_idx], "Exe")
+    _remove_case_variants(shortcuts_dict[target_idx], "StartDir")
+    _remove_case_variants(shortcuts_dict[target_idx], "LaunchOptions")
 
     shortcuts_dict[target_idx]["Exe"] = exe_formatted
     shortcuts_dict[target_idx]["StartDir"] = start_dir
