@@ -4,7 +4,6 @@ import subprocess
 import os
 import shutil
 import logging
-import urllib.request
 from pathlib import Path
 from typing import Optional
 
@@ -408,23 +407,6 @@ def install_protontricks_dependencies(
                 result = attempt_fn(timeout or _METHOD_TIMEOUT)
 
                 if result and result.returncode == 0:
-                    # ── Verify VC++ deps are actually native ─────────────
-                    dep_lower = dep.lower()
-                    needs_verify = any(
-                        d in dep_lower for d in ["vcrun", "vcredist"]
-                    )
-                    if needs_verify and not _verify_vc_native(pfx_path):
-                        logger.warning(
-                            "Flatpak protontricks reported success for %s "
-                            "but native DLLs not found — retrying with next method",
-                            dep,
-                        )
-                        last_error = (
-                            f"(flatpak protontricks) Returned success but "
-                            f"native DLLs not verified"
-                        )
-                        # Don't mark as installed, try next method
-                        continue
                     results["installed"].append(dep)
                     results["output"].append(
                         f"✓ Successfully installed {dep} (via {method_name})"
@@ -630,14 +612,6 @@ def _build_methods(pfxid, dep, pfx_path, proton_wine, steam_root):
                 )
         methods.append(("system winetricks", _sys_winetricks))
 
-    # ── Method 5: Direct VC++ redistributable via Proton ─────────────────
-    # Last resort: download the official Microsoft installer and run it
-    # via Proton. Flatpak protontricks often fails silently on Steam Deck.
-    methods.append((
-        "direct vc_redist",
-        lambda t: _install_vc_direct(pfxid, dep, pfx_path, steam_root, t),
-    ))
-
     return methods
 
 
@@ -664,142 +638,6 @@ def _flatpak_has_real_error(output: str) -> bool:
         if keyword in output:
             return True
     return False
-
-
-# ── DLL Verification ──────────────────────────────────────────────────────
-
-_VC_DLLS = {
-    "vcruntime140.dll": 80000,  # native > 80KB, builtin < 70KB
-    "vcruntime140_1.dll": 40000,
-    "msvcp140_1.dll": 25000,
-}
-
-
-def _verify_vc_native(pfx_path: Optional[str]) -> bool:
-    """Check whether native Microsoft VC++ DLLs are actually installed.
-
-    Flatpak protontricks often reports success but leaves Wine builtins
-    in place. Reads the PE headers of key DLLs to distinguish Microsoft
-    originals from Wine reimplementations.
-    """
-    if not pfx_path:
-        return False
-    sys32 = Path(pfx_path) / "drive_c" / "windows" / "system32"
-    if not sys32.exists():
-        return False
-
-    for dll, min_size in _VC_DLLS.items():
-        dll_path = sys32 / dll
-        if not dll_path.exists():
-            logger.warning("VC verify: %s not found", dll)
-            return False
-        size = dll_path.stat().st_size
-        if size < min_size:
-            logger.warning("VC verify: %s too small (%d bytes, need >%d)",
-                           dll, size, min_size)
-            return False
-        try:
-            data = dll_path.read_bytes()
-            # Wine-builtin DLLs contain "wine" somewhere in the binary;
-            # native Microsoft ones contain "Microsoft" but not "wine".
-            if b"wine" in data.lower():
-                logger.warning("VC verify: %s is a Wine builtin, not native", dll)
-                return False
-        except Exception:
-            return False
-
-    logger.info("VC verification passed: all native Microsoft DLLs present")
-    return True
-
-
-# ── Direct VC++ Redist Install via Proton ─────────────────────────────────
-
-_VC_REDIST_URLS = {
-    "vcrun2022": "https://aka.ms/vs/17/release/vc_redist.x64.exe",
-    "d3dx9": "https://download.microsoft.com/download/8/4/A/84A35BF1-DAFE-4AE8-82AF-AD2AE20B6B14/directx_Jun2010_redist.exe",
-}
-
-
-def _install_vc_direct(
-    pfxid: str, dep: str, pfx_path: Optional[str],
-    steam_root: Optional[Path],
-    timeout: int,
-) -> Optional[subprocess.CompletedProcess]:
-    """Download and install the official Microsoft VC++ redistributable
-    using Proton's bundled wine (not system wine / flatpak wine).
-
-    This is more reliable than protontricks on Steam Deck because:
-      1. Uses the exact same Wine/Proton version that runs the game
-      2. Downloads the official Microsoft installer directly
-      3. Avoids flatpak sandboxing issues
-    """
-    if dep not in _VC_REDIST_URLS:
-        logger.info("No direct URL for %s, skipping direct method", dep)
-        return None
-
-    # Find Proton wine
-    pw = _find_proton_wine()
-    if not pw or not steam_root:
-        return None
-
-    # Resolve the Proton script (parent of wine64 binary's grandparent)
-    wine_loader = Path(pw[0])
-    proton_script = wine_loader.parent.parent.parent / "proton"
-    if not proton_script.exists():
-        logger.warning("Proton script not found at %s", proton_script)
-        return None
-
-    # Download the VC++ redistributable
-    installer_path = Path("/tmp") / f"vc_redist_{dep}.exe"
-    url = _VC_REDIST_URLS[dep]
-    logger.info("Downloading %s from %s", dep, url)
-    try:
-        urllib.request.urlretrieve(url, str(installer_path))
-        logger.info("Downloaded %s (%d bytes)", dep, installer_path.stat().st_size)
-    except Exception as e:
-        logger.error("Failed to download %s: %s", dep, e)
-        return None
-
-    # Run the installer via Proton
-    compatdata = steam_root / "steamapps" / "compatdata" / pfxid
-    env = os.environ.copy()
-    env["STEAM_COMPAT_DATA_PATH"] = str(compatdata)
-    env["STEAM_COMPAT_CLIENT_INSTALL_PATH"] = str(steam_root)
-    if pfx_path:
-        env["WINEPREFIX"] = str(Path(pfx_path))
-
-    _kill_wineservers()
-
-    # Try the official /install /quiet /norestart flags first
-    for flags in [
-        ["/install", "/quiet", "/norestart"],
-        ["/install", "/passive", "/norestart"],
-    ]:
-        logger.info("Running %s via Proton with flags: %s", dep, flags)
-        try:
-            real_user = _get_real_user()
-            cmd = [str(proton_script), "run", str(installer_path)] + flags
-            if real_user:
-                cmd = _runuser_cmd(cmd, real_user, env)
-                result = subprocess.run(
-                    cmd, capture_output=True, text=True, timeout=timeout,
-                )
-            else:
-                result = subprocess.run(
-                    cmd, capture_output=True, text=True, timeout=timeout,
-                    env=env,
-                )
-            if result.returncode == 0:
-                logger.info("Direct %s install succeeded (flags: %s)", dep, flags)
-                return result
-            logger.info("Direct %s install with flags %s: exit %d",
-                        dep, flags, result.returncode)
-        except subprocess.TimeoutExpired:
-            logger.warning("Direct %s install timed out with flags: %s", dep, flags)
-        except Exception as e:
-            logger.warning("Direct %s install error: %s", dep, e)
-
-    return None
 
 
 def detect_protontricks_status() -> dict:
