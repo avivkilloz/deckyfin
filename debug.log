@@ -1082,3 +1082,396 @@
 [2026-06-10 00:09:04.908132] CALL OK install_dependencies
 [2026-06-10 00:09:04.915874] CALL set_game_processing_state(args=('Clair Obscur - Expedition 33', None), kwargs={})
 [2026-06-10 00:09:04.919132] CALL OK set_game_processing_state
+[2026-06-10 00:18:36.947982] _unload called
+[2026-06-10 00:18:46.343704] MODULE LOAD START
+[2026-06-10 00:18:46.344343] WRAPPER: wrapped 40 methods: ['add_game', 'add_steam_shortcut', 'apply_steam_grid', 'download_as_base64', 'ensure_proton', 'fetch_steamgrid_art_urls', 'get_game', 'get_game_card_art', 'get_game_processing_state', 'get_game_proton', 'get_games', 'get_games_folder', 'get_needs_restart', 'get_plugin_info', 'get_protontricks_status', 'get_steam_running', 'get_steam_shortcut', 'get_steamgrid_key', 'init_prefix', 'initialize', 'install_dependencies', 'install_protontricks', 'list_nonsteam_games', 'list_proton_versions', 'list_steam_users', 'list_subfolders', 'purge_steam_game_data', 'read_file_as_base64', 'remove_game', 'remove_steam_shortcut', 'restart_steam', 'scan_game_exes', 'scan_games_folder', 'set_game_processing_state', 'set_game_proton', 'set_games_folder', 'set_needs_restart', 'set_steamgrid_key', 'update_game_config', 'update_steam_shortcut']
+[2026-06-10 00:18:46.344481] Plugin.__init__
+[2026-06-10 00:18:46.344779] _main called
+[2026-06-10 00:18:46.345738] _main OK
+[2026-06-10 00:19:03.722533] CALL get_needs_restart(args=(), kwargs={})
+[2026-06-10 00:19:03.723997] CALL OK get_needs_restart
+[2026-06-10 00:19:03.724838] CALL get_games(args=(), kwargs={})
+[2026-06-10 00:19:03.725746] CALL OK get_games
+[2026-06-10 00:19:03.726351] CALL get_games_folder(args=(), kwargs={})
+[2026-06-10 00:19:03.726863] CALL OK get_games_folder
+[2026-06-10 00:19:03.755674] CALL list_nonsteam_games(args=(), kwargs={})
+[2026-06-10 00:19:03.853961] CALL OK list_nonsteam_games
+[2026-06-10 00:19:03.855991] CALL get_game_card_art(args=('Abiotic Factor',), kwargs={})
+[2026-06-10 00:19:03.869815] CALL OK get_game_card_art
+[2026-06-10 00:19:03.870212] CALL get_game_card_art(args=('Baldurs Gate 3',), kwargs={})
+[2026-06-10 00:19:03.882433] CALL OK get_game_card_art
+[2026-06-10 00:19:03.882791] CALL get_game_card_art(args=('CULTIC',), kwargs={})
+[2026-06-10 00:19:03.895653] CALL OK get_game_card_art
+[2026-06-10 00:19:03.895931] CALL get_game_card_art(args=('Clair Obscur - Expedition 33',), kwargs={})
+[2026-06-10 00:19:03.906345] CALL OK get_game_card_art
+[2026-06-10 00:19:03.906641] CALL get_game_card_art(args=('Cyberpunk 2077',), kwargs={})
+[2026-06-10 00:19:03.919371] CALL OK get_game_card_art
+[2026-06-10 00:19:03.922335] CALL get_game_card_art(args=('Dead Island 2',), kwargs={})
+[2026-06-10 00:19:03.934220] CALL OK get_game_card_art
+[2026-06-10 00:19:03.939820] CALL get_game_card_art(args=('ENDER LILIES - Quietus of the Knights',), kwargs={})
+[2026-06-10 00:19:03.952175] CALL OK get_game_card_art
+[2026-06-10 00:19:03.953367] CALL get_game_card_art(args=('Fallout New Vegas',), kwargs={})
+[2026-06-10 00:19:03.964862] CALL OK get_game_card_art
+[2026-06-10 00:19:03.965910] CALL get_game_card_art(args=('Gabbys Dollhouse Ready To Party',), kwargs={})
+[2026-06-10 00:19:03.976742] CALL OK get_game_card_art
+[2026-06-10 00:19:03.977070] CALL get_game_card_art(args=('Hades II',), kwargs={})
+[2026-06-10 00:19:03.987618] CALL OK get_game_card_art
+[2026-06-10 00:19:03.987944] CALL get_game_card_art(args=('Hollow Knight Silksong',), kwargs={})
+[2026-06-10 00:19:03.999690] CALL OK get_game_card_art
+[2026-06-10 00:19:03.999910] CALL get_game_card_art(args=('It Takes Two',), kwargs={})
+[2026-06-10 00:19:04.011035] CALL OK get_game_card_art
+[2026-06-10 00:19:04.012471] CALL get_game_card_art(args=('LEGO Voyagers',), kwargs={})
+[2026-06-10 00:19:04.024589] CALL OK get_game_card_art
+[2026-06-10 00:19:04.026966] CALL get_game_card_art(args=('Life is Strange Remastered',), kwargs={})
+[2026-06-10 00:19:04.039838] CALL OK get_game_card_art
+[2026-06-10 00:19:04.040924] CALL get_game_card_art(args=('Little Nightmares Enhanced Edition',), kwargs={})
+[2026-06-10 00:19:04.050279] CALL OK get_game_card_art
+[2026-06-10 00:19:04.050628] CALL get_game_card_art(args=('NINJA GAIDEN - Ragebound',), kwargs={})
+[2026-06-10 00:19:04.063100] CALL OK get_game_card_art
+[2026-06-10 00:19:04.066682] CALL get_game_card_art(args=('Resident Evil 4',), kwargs={})
+[2026-06-10 00:19:04.078062] CALL OK get_game_card_art
+[2026-06-10 00:19:04.078806] CALL get_game_card_art(args=('Rise of the Tomb Raider',), kwargs={})
+[2026-06-10 00:19:04.089090] CALL OK get_game_card_art
+[2026-06-10 00:19:04.089923] CALL get_game_card_art(args=('Schedule I',), kwargs={})
+[2026-06-10 00:19:04.101506] CALL OK get_game_card_art
+[2026-06-10 00:19:04.104722] CALL get_game_card_art(args=('Split Fiction',), kwargs={})
+[2026-06-10 00:19:04.117220] CALL OK get_game_card_art
+[2026-06-10 00:19:04.122173] CALL get_game_card_art(args=('TEKKEN 8',), kwargs={})
+[2026-06-10 00:19:04.134479] CALL OK get_game_card_art
+[2026-06-10 00:19:04.136653] CALL get_game_card_art(args=('The Alters',), kwargs={})
+[2026-06-10 00:19:04.148508] CALL OK get_game_card_art
+[2026-06-10 00:19:04.151416] CALL get_game_card_art(args=('The Wolf Among Us',), kwargs={})
+[2026-06-10 00:19:04.161526] CALL OK get_game_card_art
+[2026-06-10 00:19:04.162695] CALL get_game_card_art(args=('Uncharted Legacy of Thieves Collection',), kwargs={})
+[2026-06-10 00:19:04.177068] CALL OK get_game_card_art
+[2026-06-10 00:19:05.580128] CALL list_proton_versions(args=(), kwargs={})
+[2026-06-10 00:19:05.583657] CALL OK list_proton_versions
+[2026-06-10 00:19:05.584382] CALL get_steam_shortcut(args=('Clair Obscur - Expedition 33',), kwargs={})
+[2026-06-10 00:19:05.599229] CALL OK get_steam_shortcut
+[2026-06-10 00:19:05.599611] CALL get_game_processing_state(args=('Clair Obscur - Expedition 33',), kwargs={})
+[2026-06-10 00:19:05.600655] CALL OK get_game_processing_state
+[2026-06-10 00:19:07.895369] CALL init_prefix(args=(-1069797399, 'GE-Proton10-25', True), kwargs={})
+[2026-06-10 00:19:21.131421] CALL OK init_prefix
+[2026-06-10 00:19:27.805189] CALL set_game_processing_state(args=('Clair Obscur - Expedition 33', {'status': 'installing', 'deps': ['vcrun2022', 'd3dx9'], 'pfxid': '3225169897'}), kwargs={})
+[2026-06-10 00:19:27.809139] CALL OK set_game_processing_state
+[2026-06-10 00:19:27.809307] CALL install_dependencies(args=('3225169897', 'vcrun2022, d3dx9'), kwargs={})
+[2026-06-10 00:20:23.025938] CALL OK install_dependencies
+[2026-06-10 00:20:23.028305] CALL set_game_processing_state(args=('Clair Obscur - Expedition 33', None), kwargs={})
+[2026-06-10 00:20:23.029648] CALL OK set_game_processing_state
+[2026-06-10 00:20:59.098484] CALL get_needs_restart(args=(), kwargs={})
+[2026-06-10 00:20:59.098893] CALL OK get_needs_restart
+[2026-06-10 00:20:59.099235] CALL get_games(args=(), kwargs={})
+[2026-06-10 00:20:59.099709] CALL OK get_games
+[2026-06-10 00:20:59.100352] CALL get_games_folder(args=(), kwargs={})
+[2026-06-10 00:20:59.100725] CALL OK get_games_folder
+[2026-06-10 00:20:59.187402] CALL list_nonsteam_games(args=(), kwargs={})
+[2026-06-10 00:20:59.269390] CALL OK list_nonsteam_games
+[2026-06-10 00:20:59.271269] CALL get_game_card_art(args=('Abiotic Factor',), kwargs={})
+[2026-06-10 00:20:59.286438] CALL OK get_game_card_art
+[2026-06-10 00:20:59.286724] CALL get_game_card_art(args=('Baldurs Gate 3',), kwargs={})
+[2026-06-10 00:20:59.301879] CALL OK get_game_card_art
+[2026-06-10 00:20:59.302216] CALL get_game_card_art(args=('CULTIC',), kwargs={})
+[2026-06-10 00:20:59.317414] CALL OK get_game_card_art
+[2026-06-10 00:20:59.317719] CALL get_game_card_art(args=('Clair Obscur - Expedition 33',), kwargs={})
+[2026-06-10 00:20:59.332619] CALL OK get_game_card_art
+[2026-06-10 00:20:59.332928] CALL get_game_card_art(args=('Cyberpunk 2077',), kwargs={})
+[2026-06-10 00:20:59.345863] CALL OK get_game_card_art
+[2026-06-10 00:20:59.349874] CALL get_game_card_art(args=('Dead Island 2',), kwargs={})
+[2026-06-10 00:20:59.368477] CALL OK get_game_card_art
+[2026-06-10 00:20:59.375420] CALL get_game_card_art(args=('ENDER LILIES - Quietus of the Knights',), kwargs={})
+[2026-06-10 00:20:59.389839] CALL OK get_game_card_art
+[2026-06-10 00:20:59.391326] CALL get_game_card_art(args=('Fallout New Vegas',), kwargs={})
+[2026-06-10 00:20:59.406205] CALL OK get_game_card_art
+[2026-06-10 00:20:59.407443] CALL get_game_card_art(args=('Gabbys Dollhouse Ready To Party',), kwargs={})
+[2026-06-10 00:20:59.418128] CALL OK get_game_card_art
+[2026-06-10 00:20:59.418494] CALL get_game_card_art(args=('Hades II',), kwargs={})
+[2026-06-10 00:20:59.430347] CALL OK get_game_card_art
+[2026-06-10 00:20:59.430593] CALL get_game_card_art(args=('Hollow Knight Silksong',), kwargs={})
+[2026-06-10 00:20:59.442557] CALL OK get_game_card_art
+[2026-06-10 00:20:59.442860] CALL get_game_card_art(args=('It Takes Two',), kwargs={})
+[2026-06-10 00:20:59.453465] CALL OK get_game_card_art
+[2026-06-10 00:20:59.454879] CALL get_game_card_art(args=('LEGO Voyagers',), kwargs={})
+[2026-06-10 00:20:59.465561] CALL OK get_game_card_art
+[2026-06-10 00:20:59.467747] CALL get_game_card_art(args=('Life is Strange Remastered',), kwargs={})
+[2026-06-10 00:20:59.482723] CALL OK get_game_card_art
+[2026-06-10 00:20:59.483881] CALL get_game_card_art(args=('Little Nightmares Enhanced Edition',), kwargs={})
+[2026-06-10 00:20:59.497344] CALL OK get_game_card_art
+[2026-06-10 00:20:59.497621] CALL get_game_card_art(args=('NINJA GAIDEN - Ragebound',), kwargs={})
+[2026-06-10 00:20:59.512188] CALL OK get_game_card_art
+[2026-06-10 00:20:59.516059] CALL get_game_card_art(args=('Resident Evil 4',), kwargs={})
+[2026-06-10 00:20:59.525778] CALL OK get_game_card_art
+[2026-06-10 00:20:59.526581] CALL get_game_card_art(args=('Rise of the Tomb Raider',), kwargs={})
+[2026-06-10 00:20:59.535760] CALL OK get_game_card_art
+[2026-06-10 00:20:59.536595] CALL get_game_card_art(args=('Schedule I',), kwargs={})
+[2026-06-10 00:20:59.544587] CALL OK get_game_card_art
+[2026-06-10 00:20:59.546561] CALL get_game_card_art(args=('Split Fiction',), kwargs={})
+[2026-06-10 00:20:59.554035] CALL OK get_game_card_art
+[2026-06-10 00:20:59.557259] CALL get_game_card_art(args=('TEKKEN 8',), kwargs={})
+[2026-06-10 00:20:59.564127] CALL OK get_game_card_art
+[2026-06-10 00:20:59.565715] CALL get_game_card_art(args=('The Alters',), kwargs={})
+[2026-06-10 00:20:59.572096] CALL OK get_game_card_art
+[2026-06-10 00:20:59.573728] CALL get_game_card_art(args=('The Wolf Among Us',), kwargs={})
+[2026-06-10 00:20:59.579896] CALL OK get_game_card_art
+[2026-06-10 00:20:59.580649] CALL get_game_card_art(args=('Uncharted Legacy of Thieves Collection',), kwargs={})
+[2026-06-10 00:20:59.588485] CALL OK get_game_card_art
+[2026-06-10 00:21:02.484447] CALL list_proton_versions(args=(), kwargs={})
+[2026-06-10 00:21:02.487237] CALL OK list_proton_versions
+[2026-06-10 00:21:02.487712] CALL get_steam_shortcut(args=('Clair Obscur - Expedition 33',), kwargs={})
+[2026-06-10 00:21:02.494486] CALL OK get_steam_shortcut
+[2026-06-10 00:21:02.494718] CALL get_game_processing_state(args=('Clair Obscur - Expedition 33',), kwargs={})
+[2026-06-10 00:21:02.495160] CALL OK get_game_processing_state
+[2026-06-10 00:21:06.613554] CALL purge_steam_game_data(args=('Clair Obscur - Expedition 33',), kwargs={})
+[2026-06-10 00:21:07.026676] CALL OK purge_steam_game_data
+[2026-06-10 00:21:07.029088] CALL set_needs_restart(args=(True,), kwargs={})
+[2026-06-10 00:21:07.030370] CALL OK set_needs_restart
+[2026-06-10 00:21:10.373161] CALL get_games(args=(), kwargs={})
+[2026-06-10 00:21:10.373591] CALL OK get_games
+[2026-06-10 00:21:10.373881] CALL get_games_folder(args=(), kwargs={})
+[2026-06-10 00:21:10.374134] CALL OK get_games_folder
+[2026-06-10 00:21:10.384692] CALL get_game_card_art(args=('Abiotic Factor',), kwargs={})
+[2026-06-10 00:21:10.392541] CALL OK get_game_card_art
+[2026-06-10 00:21:10.393233] CALL get_game_card_art(args=('Baldurs Gate 3',), kwargs={})
+[2026-06-10 00:21:10.400288] CALL OK get_game_card_art
+[2026-06-10 00:21:10.400488] CALL get_game_card_art(args=('CULTIC',), kwargs={})
+[2026-06-10 00:21:10.407727] CALL OK get_game_card_art
+[2026-06-10 00:21:10.408000] CALL get_game_card_art(args=('Clair Obscur - Expedition 33',), kwargs={})
+[2026-06-10 00:21:10.415601] CALL OK get_game_card_art
+[2026-06-10 00:21:10.415849] CALL get_game_card_art(args=('Cyberpunk 2077',), kwargs={})
+[2026-06-10 00:21:10.424329] CALL OK get_game_card_art
+[2026-06-10 00:21:10.426518] CALL get_game_card_art(args=('Dead Island 2',), kwargs={})
+[2026-06-10 00:21:10.434594] CALL OK get_game_card_art
+[2026-06-10 00:21:10.438305] CALL get_game_card_art(args=('ENDER LILIES - Quietus of the Knights',), kwargs={})
+[2026-06-10 00:21:10.444675] CALL OK get_game_card_art
+[2026-06-10 00:21:10.445356] CALL get_game_card_art(args=('Fallout New Vegas',), kwargs={})
+[2026-06-10 00:21:10.451504] CALL OK get_game_card_art
+[2026-06-10 00:21:10.452250] CALL get_game_card_art(args=('Gabbys Dollhouse Ready To Party',), kwargs={})
+[2026-06-10 00:21:10.457857] CALL OK get_game_card_art
+[2026-06-10 00:21:10.458040] CALL get_game_card_art(args=('Hades II',), kwargs={})
+[2026-06-10 00:21:10.463532] CALL OK get_game_card_art
+[2026-06-10 00:21:10.463712] CALL get_game_card_art(args=('Hollow Knight Silksong',), kwargs={})
+[2026-06-10 00:21:10.469424] CALL OK get_game_card_art
+[2026-06-10 00:21:10.469610] CALL get_game_card_art(args=('It Takes Two',), kwargs={})
+[2026-06-10 00:21:10.476068] CALL OK get_game_card_art
+[2026-06-10 00:21:10.477017] CALL get_game_card_art(args=('LEGO Voyagers',), kwargs={})
+[2026-06-10 00:21:10.483793] CALL OK get_game_card_art
+[2026-06-10 00:21:10.485366] CALL get_game_card_art(args=('Life is Strange Remastered',), kwargs={})
+[2026-06-10 00:21:10.492175] CALL OK get_game_card_art
+[2026-06-10 00:21:10.492793] CALL get_game_card_art(args=('Little Nightmares Enhanced Edition',), kwargs={})
+[2026-06-10 00:21:10.499139] CALL OK get_game_card_art
+[2026-06-10 00:21:10.499351] CALL get_game_card_art(args=('NINJA GAIDEN - Ragebound',), kwargs={})
+[2026-06-10 00:21:10.506129] CALL OK get_game_card_art
+[2026-06-10 00:21:10.508443] CALL get_game_card_art(args=('Resident Evil 4',), kwargs={})
+[2026-06-10 00:21:10.514621] CALL OK get_game_card_art
+[2026-06-10 00:21:10.515274] CALL get_game_card_art(args=('Rise of the Tomb Raider',), kwargs={})
+[2026-06-10 00:21:10.521633] CALL OK get_game_card_art
+[2026-06-10 00:21:10.522136] CALL get_game_card_art(args=('Schedule I',), kwargs={})
+[2026-06-10 00:21:10.528547] CALL OK get_game_card_art
+[2026-06-10 00:21:10.530290] CALL get_game_card_art(args=('Split Fiction',), kwargs={})
+[2026-06-10 00:21:10.536966] CALL OK get_game_card_art
+[2026-06-10 00:21:10.540283] CALL get_game_card_art(args=('TEKKEN 8',), kwargs={})
+[2026-06-10 00:21:10.546709] CALL OK get_game_card_art
+[2026-06-10 00:21:10.548385] CALL get_game_card_art(args=('The Alters',), kwargs={})
+[2026-06-10 00:21:10.554789] CALL OK get_game_card_art
+[2026-06-10 00:21:10.556805] CALL get_game_card_art(args=('The Wolf Among Us',), kwargs={})
+[2026-06-10 00:21:10.563240] CALL OK get_game_card_art
+[2026-06-10 00:21:10.563974] CALL get_game_card_art(args=('Uncharted Legacy of Thieves Collection',), kwargs={})
+[2026-06-10 00:21:10.571720] CALL OK get_game_card_art
+[2026-06-10 00:21:10.583198] CALL list_nonsteam_games(args=(), kwargs={})
+[2026-06-10 00:21:10.625987] CALL OK list_nonsteam_games
+[2026-06-10 00:21:10.964597] CALL restart_steam(args=(), kwargs={})
+[2026-06-10 00:21:14.223370] CALL OK restart_steam
+[2026-06-10 00:21:44.698610] CALL get_needs_restart(args=(), kwargs={})
+[2026-06-10 00:21:44.699310] CALL OK get_needs_restart
+[2026-06-10 00:21:44.699623] CALL get_games(args=(), kwargs={})
+[2026-06-10 00:21:44.700680] CALL OK get_games
+[2026-06-10 00:21:44.701415] CALL get_games_folder(args=(), kwargs={})
+[2026-06-10 00:21:44.701979] CALL OK get_games_folder
+[2026-06-10 00:21:44.744974] CALL list_nonsteam_games(args=(), kwargs={})
+[2026-06-10 00:21:44.862474] CALL OK list_nonsteam_games
+[2026-06-10 00:21:44.864444] CALL get_game_card_art(args=('Abiotic Factor',), kwargs={})
+[2026-06-10 00:21:44.884926] CALL OK get_game_card_art
+[2026-06-10 00:21:44.885346] CALL get_game_card_art(args=('Baldurs Gate 3',), kwargs={})
+[2026-06-10 00:21:44.905668] CALL OK get_game_card_art
+[2026-06-10 00:21:44.906070] CALL get_game_card_art(args=('CULTIC',), kwargs={})
+[2026-06-10 00:21:44.924122] CALL OK get_game_card_art
+[2026-06-10 00:21:44.924529] CALL get_game_card_art(args=('Clair Obscur - Expedition 33',), kwargs={})
+[2026-06-10 00:21:44.941012] CALL OK get_game_card_art
+[2026-06-10 00:21:44.941529] CALL get_game_card_art(args=('Cyberpunk 2077',), kwargs={})
+[2026-06-10 00:21:44.960708] CALL OK get_game_card_art
+[2026-06-10 00:21:44.965887] CALL get_game_card_art(args=('Dead Island 2',), kwargs={})
+[2026-06-10 00:21:44.984980] CALL OK get_game_card_art
+[2026-06-10 00:21:44.993772] CALL get_game_card_art(args=('ENDER LILIES - Quietus of the Knights',), kwargs={})
+[2026-06-10 00:21:45.012639] CALL OK get_game_card_art
+[2026-06-10 00:21:45.014408] CALL get_game_card_art(args=('Fallout New Vegas',), kwargs={})
+[2026-06-10 00:21:45.033056] CALL OK get_game_card_art
+[2026-06-10 00:21:45.035050] CALL get_game_card_art(args=('Gabbys Dollhouse Ready To Party',), kwargs={})
+[2026-06-10 00:21:45.052981] CALL OK get_game_card_art
+[2026-06-10 00:21:45.054905] CALL get_game_card_art(args=('Hades II',), kwargs={})
+[2026-06-10 00:21:45.073148] CALL OK get_game_card_art
+[2026-06-10 00:21:45.073564] CALL get_game_card_art(args=('Hollow Knight Silksong',), kwargs={})
+[2026-06-10 00:21:45.091137] CALL OK get_game_card_art
+[2026-06-10 00:21:45.091575] CALL get_game_card_art(args=('It Takes Two',), kwargs={})
+[2026-06-10 00:21:45.111750] CALL OK get_game_card_art
+[2026-06-10 00:21:45.115244] CALL get_game_card_art(args=('LEGO Voyagers',), kwargs={})
+[2026-06-10 00:21:45.134921] CALL OK get_game_card_art
+[2026-06-10 00:21:45.139553] CALL get_game_card_art(args=('Life is Strange Remastered',), kwargs={})
+[2026-06-10 00:21:45.160014] CALL OK get_game_card_art
+[2026-06-10 00:21:45.161787] CALL get_game_card_art(args=('Little Nightmares Enhanced Edition',), kwargs={})
+[2026-06-10 00:21:45.180890] CALL OK get_game_card_art
+[2026-06-10 00:21:45.181309] CALL get_game_card_art(args=('NINJA GAIDEN - Ragebound',), kwargs={})
+[2026-06-10 00:21:45.202846] CALL OK get_game_card_art
+[2026-06-10 00:21:45.209218] CALL get_game_card_art(args=('Resident Evil 4',), kwargs={})
+[2026-06-10 00:21:45.227621] CALL OK get_game_card_art
+[2026-06-10 00:21:45.229036] CALL get_game_card_art(args=('Rise of the Tomb Raider',), kwargs={})
+[2026-06-10 00:21:45.248094] CALL OK get_game_card_art
+[2026-06-10 00:21:45.249388] CALL get_game_card_art(args=('Schedule I',), kwargs={})
+[2026-06-10 00:21:45.267494] CALL OK get_game_card_art
+[2026-06-10 00:21:45.272475] CALL get_game_card_art(args=('Split Fiction',), kwargs={})
+[2026-06-10 00:21:45.293759] CALL OK get_game_card_art
+[2026-06-10 00:21:45.303150] CALL get_game_card_art(args=('TEKKEN 8',), kwargs={})
+[2026-06-10 00:21:45.322763] CALL OK get_game_card_art
+[2026-06-10 00:21:45.326970] CALL get_game_card_art(args=('The Alters',), kwargs={})
+[2026-06-10 00:21:45.345577] CALL OK get_game_card_art
+[2026-06-10 00:21:45.350302] CALL get_game_card_art(args=('The Wolf Among Us',), kwargs={})
+[2026-06-10 00:21:45.368682] CALL OK get_game_card_art
+[2026-06-10 00:21:45.370717] CALL get_game_card_art(args=('Uncharted Legacy of Thieves Collection',), kwargs={})
+[2026-06-10 00:21:45.394619] CALL OK get_game_card_art
+[2026-06-10 00:21:47.190119] CALL list_proton_versions(args=(), kwargs={})
+[2026-06-10 00:21:47.192064] CALL OK list_proton_versions
+[2026-06-10 00:21:47.193279] CALL get_steam_shortcut(args=('Clair Obscur - Expedition 33',), kwargs={})
+[2026-06-10 00:21:47.211329] CALL OK get_steam_shortcut
+[2026-06-10 00:21:47.211768] CALL get_game_processing_state(args=('Clair Obscur - Expedition 33',), kwargs={})
+[2026-06-10 00:21:47.212808] CALL OK get_game_processing_state
+[2026-06-10 00:21:53.558698] CALL add_steam_shortcut(args=('Clair Obscur - Expedition 33/Expedition33_Steam.exe', 'Clair Obscur - Expedition 33', 'Clair Obscur - Expedition 33/', '', 'GE-Proton10-25'), kwargs={})
+[2026-06-10 00:21:53.589181] add_steam_shortcut: app_id=-1069797399, proton_version='GE-Proton10-25', app_name=Clair Obscur - Expedition 33, exe=/home/deck/Games/Clair Obscur - Expedition 33/Expedition33_Steam.exe
+[2026-06-10 00:21:53.590570] add_steam_shortcut: calling set_proton_version(app_id=-1069797399, proton='GE-Proton10-25', user=892854676)
+[2026-06-10 00:21:53.769807] add_steam_shortcut: set_proton_version OK
+[2026-06-10 00:21:53.769916] CALL OK add_steam_shortcut
+[2026-06-10 00:21:53.773395] CALL set_needs_restart(args=(True,), kwargs={})
+[2026-06-10 00:21:53.774654] CALL OK set_needs_restart
+[2026-06-10 00:22:01.518978] CALL get_games(args=(), kwargs={})
+[2026-06-10 00:22:01.519714] CALL OK get_games
+[2026-06-10 00:22:01.520232] CALL get_games_folder(args=(), kwargs={})
+[2026-06-10 00:22:01.520657] CALL OK get_games_folder
+[2026-06-10 00:22:01.551044] CALL get_game_card_art(args=('Abiotic Factor',), kwargs={})
+[2026-06-10 00:22:01.565623] CALL OK get_game_card_art
+[2026-06-10 00:22:01.565913] CALL get_game_card_art(args=('Baldurs Gate 3',), kwargs={})
+[2026-06-10 00:22:01.578780] CALL OK get_game_card_art
+[2026-06-10 00:22:01.579075] CALL get_game_card_art(args=('CULTIC',), kwargs={})
+[2026-06-10 00:22:01.593344] CALL OK get_game_card_art
+[2026-06-10 00:22:01.593661] CALL get_game_card_art(args=('Clair Obscur - Expedition 33',), kwargs={})
+[2026-06-10 00:22:01.608445] CALL OK get_game_card_art
+[2026-06-10 00:22:01.608760] CALL get_game_card_art(args=('Cyberpunk 2077',), kwargs={})
+[2026-06-10 00:22:01.624182] CALL OK get_game_card_art
+[2026-06-10 00:22:01.627954] CALL get_game_card_art(args=('Dead Island 2',), kwargs={})
+[2026-06-10 00:22:01.644693] CALL OK get_game_card_art
+[2026-06-10 00:22:01.652160] CALL get_game_card_art(args=('ENDER LILIES - Quietus of the Knights',), kwargs={})
+[2026-06-10 00:22:01.667414] CALL OK get_game_card_art
+[2026-06-10 00:22:01.668882] CALL get_game_card_art(args=('Fallout New Vegas',), kwargs={})
+[2026-06-10 00:22:01.686356] CALL OK get_game_card_art
+[2026-06-10 00:22:01.688002] CALL get_game_card_art(args=('Gabbys Dollhouse Ready To Party',), kwargs={})
+[2026-06-10 00:22:01.704497] CALL OK get_game_card_art
+[2026-06-10 00:22:01.704837] CALL get_game_card_art(args=('Hades II',), kwargs={})
+[2026-06-10 00:22:01.719902] CALL OK get_game_card_art
+[2026-06-10 00:22:01.720262] CALL get_game_card_art(args=('Hollow Knight Silksong',), kwargs={})
+[2026-06-10 00:22:01.735265] CALL OK get_game_card_art
+[2026-06-10 00:22:01.735582] CALL get_game_card_art(args=('It Takes Two',), kwargs={})
+[2026-06-10 00:22:01.749702] CALL OK get_game_card_art
+[2026-06-10 00:22:01.751345] CALL get_game_card_art(args=('LEGO Voyagers',), kwargs={})
+[2026-06-10 00:22:01.763687] CALL OK get_game_card_art
+[2026-06-10 00:22:01.765897] CALL get_game_card_art(args=('Life is Strange Remastered',), kwargs={})
+[2026-06-10 00:22:01.775791] CALL OK get_game_card_art
+[2026-06-10 00:22:01.776651] CALL get_game_card_art(args=('Little Nightmares Enhanced Edition',), kwargs={})
+[2026-06-10 00:22:01.785347] CALL OK get_game_card_art
+[2026-06-10 00:22:01.785579] CALL get_game_card_art(args=('NINJA GAIDEN - Ragebound',), kwargs={})
+[2026-06-10 00:22:01.796686] CALL OK get_game_card_art
+[2026-06-10 00:22:01.800697] CALL get_game_card_art(args=('Resident Evil 4',), kwargs={})
+[2026-06-10 00:22:01.811520] CALL OK get_game_card_art
+[2026-06-10 00:22:01.812453] CALL get_game_card_art(args=('Rise of the Tomb Raider',), kwargs={})
+[2026-06-10 00:22:01.822672] CALL OK get_game_card_art
+[2026-06-10 00:22:01.823384] CALL get_game_card_art(args=('Schedule I',), kwargs={})
+[2026-06-10 00:22:01.833846] CALL OK get_game_card_art
+[2026-06-10 00:22:01.836155] CALL get_game_card_art(args=('Split Fiction',), kwargs={})
+[2026-06-10 00:22:01.846525] CALL OK get_game_card_art
+[2026-06-10 00:22:01.850636] CALL get_game_card_art(args=('TEKKEN 8',), kwargs={})
+[2026-06-10 00:22:01.859481] CALL OK get_game_card_art
+[2026-06-10 00:22:01.861554] CALL get_game_card_art(args=('The Alters',), kwargs={})
+[2026-06-10 00:22:01.871397] CALL OK get_game_card_art
+[2026-06-10 00:22:01.873760] CALL get_game_card_art(args=('The Wolf Among Us',), kwargs={})
+[2026-06-10 00:22:01.881737] CALL OK get_game_card_art
+[2026-06-10 00:22:01.882643] CALL get_game_card_art(args=('Uncharted Legacy of Thieves Collection',), kwargs={})
+[2026-06-10 00:22:01.893695] CALL OK get_game_card_art
+[2026-06-10 00:22:01.909287] CALL list_nonsteam_games(args=(), kwargs={})
+[2026-06-10 00:22:01.962506] CALL OK list_nonsteam_games
+[2026-06-10 00:22:02.199859] CALL restart_steam(args=(), kwargs={})
+[2026-06-10 00:22:05.421767] CALL OK restart_steam
+[2026-06-10 00:22:28.309097] CALL get_needs_restart(args=(), kwargs={})
+[2026-06-10 00:22:28.309710] CALL OK get_needs_restart
+[2026-06-10 00:22:28.309992] CALL get_games(args=(), kwargs={})
+[2026-06-10 00:22:28.310741] CALL OK get_games
+[2026-06-10 00:22:28.311303] CALL get_games_folder(args=(), kwargs={})
+[2026-06-10 00:22:28.311686] CALL OK get_games_folder
+[2026-06-10 00:22:28.347386] CALL list_nonsteam_games(args=(), kwargs={})
+[2026-06-10 00:22:28.427521] CALL OK list_nonsteam_games
+[2026-06-10 00:22:28.429357] CALL get_game_card_art(args=('Abiotic Factor',), kwargs={})
+[2026-06-10 00:22:28.443657] CALL OK get_game_card_art
+[2026-06-10 00:22:28.444076] CALL get_game_card_art(args=('Baldurs Gate 3',), kwargs={})
+[2026-06-10 00:22:28.457482] CALL OK get_game_card_art
+[2026-06-10 00:22:28.457818] CALL get_game_card_art(args=('CULTIC',), kwargs={})
+[2026-06-10 00:22:28.471075] CALL OK get_game_card_art
+[2026-06-10 00:22:28.471362] CALL get_game_card_art(args=('Clair Obscur - Expedition 33',), kwargs={})
+[2026-06-10 00:22:28.485700] CALL OK get_game_card_art
+[2026-06-10 00:22:28.486038] CALL get_game_card_art(args=('Cyberpunk 2077',), kwargs={})
+[2026-06-10 00:22:28.501146] CALL OK get_game_card_art
+[2026-06-10 00:22:28.504631] CALL get_game_card_art(args=('Dead Island 2',), kwargs={})
+[2026-06-10 00:22:28.519310] CALL OK get_game_card_art
+[2026-06-10 00:22:28.525589] CALL get_game_card_art(args=('ENDER LILIES - Quietus of the Knights',), kwargs={})
+[2026-06-10 00:22:28.538005] CALL OK get_game_card_art
+[2026-06-10 00:22:28.539299] CALL get_game_card_art(args=('Fallout New Vegas',), kwargs={})
+[2026-06-10 00:22:28.553312] CALL OK get_game_card_art
+[2026-06-10 00:22:28.554869] CALL get_game_card_art(args=('Gabbys Dollhouse Ready To Party',), kwargs={})
+[2026-06-10 00:22:28.568665] CALL OK get_game_card_art
+[2026-06-10 00:22:28.568980] CALL get_game_card_art(args=('Hades II',), kwargs={})
+[2026-06-10 00:22:28.582255] CALL OK get_game_card_art
+[2026-06-10 00:22:28.582589] CALL get_game_card_art(args=('Hollow Knight Silksong',), kwargs={})
+[2026-06-10 00:22:28.594828] CALL OK get_game_card_art
+[2026-06-10 00:22:28.595134] CALL get_game_card_art(args=('It Takes Two',), kwargs={})
+[2026-06-10 00:22:28.608740] CALL OK get_game_card_art
+[2026-06-10 00:22:28.610113] CALL get_game_card_art(args=('LEGO Voyagers',), kwargs={})
+[2026-06-10 00:22:28.622295] CALL OK get_game_card_art
+[2026-06-10 00:22:28.625108] CALL get_game_card_art(args=('Life is Strange Remastered',), kwargs={})
+[2026-06-10 00:22:28.638490] CALL OK get_game_card_art
+[2026-06-10 00:22:28.639566] CALL get_game_card_art(args=('Little Nightmares Enhanced Edition',), kwargs={})
+[2026-06-10 00:22:28.650624] CALL OK get_game_card_art
+[2026-06-10 00:22:28.650915] CALL get_game_card_art(args=('NINJA GAIDEN - Ragebound',), kwargs={})
+[2026-06-10 00:22:28.665426] CALL OK get_game_card_art
+[2026-06-10 00:22:28.670612] CALL get_game_card_art(args=('Resident Evil 4',), kwargs={})
+[2026-06-10 00:22:28.684676] CALL OK get_game_card_art
+[2026-06-10 00:22:28.685971] CALL get_game_card_art(args=('Rise of the Tomb Raider',), kwargs={})
+[2026-06-10 00:22:28.700422] CALL OK get_game_card_art
+[2026-06-10 00:22:28.701567] CALL get_game_card_art(args=('Schedule I',), kwargs={})
+[2026-06-10 00:22:28.716818] CALL OK get_game_card_art
+[2026-06-10 00:22:28.720695] CALL get_game_card_art(args=('Split Fiction',), kwargs={})
+[2026-06-10 00:22:28.736891] CALL OK get_game_card_art
+[2026-06-10 00:22:28.744585] CALL get_game_card_art(args=('TEKKEN 8',), kwargs={})
+[2026-06-10 00:22:28.760007] CALL OK get_game_card_art
+[2026-06-10 00:22:28.763403] CALL get_game_card_art(args=('The Alters',), kwargs={})
+[2026-06-10 00:22:28.778314] CALL OK get_game_card_art
+[2026-06-10 00:22:28.781253] CALL get_game_card_art(args=('The Wolf Among Us',), kwargs={})
+[2026-06-10 00:22:28.793381] CALL OK get_game_card_art
+[2026-06-10 00:22:28.794655] CALL get_game_card_art(args=('Uncharted Legacy of Thieves Collection',), kwargs={})
+[2026-06-10 00:22:28.810419] CALL OK get_game_card_art
+[2026-06-10 00:22:30.079798] CALL list_proton_versions(args=(), kwargs={})
+[2026-06-10 00:22:30.081474] CALL OK list_proton_versions
+[2026-06-10 00:22:30.082103] CALL get_steam_shortcut(args=('Clair Obscur - Expedition 33',), kwargs={})
+[2026-06-10 00:22:30.096316] CALL OK get_steam_shortcut
+[2026-06-10 00:22:30.096615] CALL get_game_processing_state(args=('Clair Obscur - Expedition 33',), kwargs={})
+[2026-06-10 00:22:30.097379] CALL OK get_game_processing_state
+[2026-06-10 00:22:57.910045] CALL init_prefix(args=(-1069797399, 'GE-Proton10-25', False), kwargs={})
+[2026-06-10 00:23:06.867541] CALL OK init_prefix
+[2026-06-10 00:23:10.461988] CALL set_game_processing_state(args=('Clair Obscur - Expedition 33', {'status': 'installing', 'deps': ['vcrun2022', 'd3dx9'], 'pfxid': '3225169897'}), kwargs={})
+[2026-06-10 00:23:10.464046] CALL OK set_game_processing_state
+[2026-06-10 00:23:10.464461] CALL install_dependencies(args=('3225169897', 'vcrun2022, d3dx9'), kwargs={})
+[2026-06-10 00:24:07.756455] CALL OK install_dependencies
+[2026-06-10 00:24:07.759010] CALL set_game_processing_state(args=('Clair Obscur - Expedition 33', None), kwargs={})
+[2026-06-10 00:24:07.760525] CALL OK set_game_processing_state
