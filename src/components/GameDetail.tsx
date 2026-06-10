@@ -870,7 +870,6 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
               ...BTN_STYLE,
               padding: "8px 10px",
               minWidth: "70px",
-              textAlign: "center",
               background: forceReinit ? "#ff6666" : "transparent",
               borderColor: forceReinit ? "#ff6666" : "#555",
               color: needsRestartAfterAdd ? "#555" : forceReinit ? "white" : "#aaa",

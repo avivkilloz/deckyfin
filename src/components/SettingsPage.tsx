@@ -387,24 +387,23 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
         style={{ width: "100%", marginBottom: "8px" }}
       />
 
-      <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-        <Focusable
-          onActivate={handleSaveKey}
-          onClick={handleSaveKey}
-          focusClassName="is-focused"
-          style={BTN_STYLE}
-        >
-          Save Key
-        </Focusable>
-        {sgHasOverride && (
-          <span style={{ fontSize: "0.8em", color: "#f0ad4e" }}>
-            (custom key active)
-          </span>
-        )}
-      </div>
+      <Focusable
+        onActivate={handleSaveKey}
+        onClick={handleSaveKey}
+        focusClassName="is-focused"
+        style={{ ...BTN_STYLE, width: "100%", marginBottom: "8px" }}
+      >
+        Save Key
+      </Focusable>
+
+      {sgHasOverride && (
+        <span style={{ display: "block", fontSize: "0.8em", color: "#f0ad4e", marginBottom: "4px" }}>
+          (custom key active)
+        </span>
+      )}
 
       {sgMessage && (
-        <p style={{ marginTop: "8px", fontSize: "0.9em", color: sgMessage.startsWith("✅") ? "lightgreen" : "tomato" }}>
+        <p style={{ marginTop: "4px", fontSize: "0.9em", color: sgMessage.startsWith("✅") ? "lightgreen" : "tomato" }}>
           {sgMessage}
         </p>
       )}
