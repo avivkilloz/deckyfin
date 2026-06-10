@@ -574,6 +574,14 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         style={{ width: "100%", marginBottom: "10px" }}
       />
 
+      {/* Launch Options */}
+      <label style={LABEL_STYLE}>Launch Options</label>
+      <CompactTextField
+        value={launchOptions}
+        onChange={(e) => setLaunchOptions(e.target.value)}
+        style={{ width: "100%", marginBottom: "10px" }}
+      />
+
       {/* Proton Version: inline picker */}
       <label style={LABEL_STYLE}>Proton Version</label>
       <Focusable
@@ -627,14 +635,6 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           ))}
         </div>
       )}
-
-      {/* Launch Options */}
-      <label style={LABEL_STYLE}>Launch Options</label>
-      <CompactTextField
-        value={launchOptions}
-        onChange={(e) => setLaunchOptions(e.target.value)}
-        style={{ width: "100%", marginBottom: "10px" }}
-      />
 
       {/* ── Dependencies: Toggle Chips + Custom ──────────────────────── */}
       <label style={LABEL_STYLE}>
