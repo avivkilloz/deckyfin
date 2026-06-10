@@ -899,7 +899,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         style={{
           display: "flex",
           gap: "6px",
-          alignItems: "center",
+          alignItems: "stretch",
           marginBottom: showSgdbPicker ? "4px" : "10px",
         }}
       >
