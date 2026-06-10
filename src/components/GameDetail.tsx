@@ -762,16 +762,14 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
       </div>
 
       {/* Apply Config */}
-      <div style={{ marginBottom: "4px" }}>
-        <Focusable
-          onActivate={handleApplyConfig}
-          onClick={handleApplyConfig}
-          focusClassName="is-focused"
-          style={BTN_STYLE}
-        >
-          Apply Config
-        </Focusable>
-      </div>
+      <Focusable
+        onActivate={handleApplyConfig}
+        onClick={handleApplyConfig}
+        focusClassName="is-focused"
+        style={{ ...BTN_STYLE, marginBottom: "8px" }}
+      >
+        Apply Config
+      </Focusable>
       {configFeedback && (
         <p
           style={{
