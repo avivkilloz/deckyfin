@@ -924,7 +924,6 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         focusClassName="is-focused"
         style={{
           ...BTN_STYLE,
-          width: "100%",
           padding: "4px 12px",
           marginBottom: "6px",
           color: selectedSgdbGame ? "#e0e0e0" : "#888",
@@ -944,6 +943,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           ...BTN_STYLE,
           width: "100%",
           padding: "10px 0",
+          textAlign: "center",
           marginBottom: "6px",
           opacity: !selectedSgdbGame || !steamInfo || needsRestartAfterAdd || loading === "art" ? 0.4 : 1,
         }}
