@@ -916,38 +916,37 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         </span>
       </label>
 
-      <Focusable
-        onActivate={handleOpenSgdbPicker}
-        onClick={handleOpenSgdbPicker}
-        focusClassName="is-focused"
-        style={{
-          ...BTN_STYLE,
-          padding: "4px 12px",
-          marginBottom: "6px",
-          color: selectedSgdbGame ? "#e0e0e0" : "#888",
-          opacity: needsRestartAfterAdd || !steamInfo ? 0.4 : 1,
-        }}
-      >
-        {selectedSgdbGame
-          ? `🎮 ${selectedSgdbGame.name} (ID: ${selectedSgdbGame.id})`
-          : "Search…"}
-      </Focusable>
+      <div style={{ display: "flex", gap: "6px", marginBottom: "6px" }}>
+        <Focusable
+          onActivate={handleOpenSgdbPicker}
+          onClick={handleOpenSgdbPicker}
+          focusClassName="is-focused"
+          style={{
+            ...BTN_STYLE,
+            flex: 1,
+            padding: "4px 12px",
+            color: selectedSgdbGame ? "#e0e0e0" : "#888",
+            opacity: needsRestartAfterAdd || !steamInfo ? 0.4 : 1,
+          }}
+        >
+          {selectedSgdbGame
+            ? `🎮 ${selectedSgdbGame.name} (ID: ${selectedSgdbGame.id})`
+            : "Search…"}
+        </Focusable>
 
-      <Focusable
-        onActivate={handleApplySgdbArt}
-        onClick={handleApplySgdbArt}
-        focusClassName="is-focused"
-        style={{
-          ...BTN_STYLE,
-          width: "100%",
-          padding: "10px 0",
-          textAlign: "center",
-          marginBottom: "6px",
-          opacity: !selectedSgdbGame || !steamInfo || needsRestartAfterAdd || loading === "art" ? 0.4 : 1,
-        }}
-      >
-        {loading === "art" ? "Applying…" : "Apply"}
-      </Focusable>
+        <Focusable
+          onActivate={handleApplySgdbArt}
+          onClick={handleApplySgdbArt}
+          focusClassName="is-focused"
+          style={{
+            ...BTN_STYLE,
+            padding: "4px 12px",
+            opacity: !selectedSgdbGame || !steamInfo || needsRestartAfterAdd || loading === "art" ? 0.4 : 1,
+          }}
+        >
+          {loading === "art" ? "Applying…" : "Apply"}
+        </Focusable>
+      </div>
 
       {/* SGDB art feedback */}
       {sgdbFeedback && (
