@@ -389,7 +389,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   const handleInstallDeps = async () => {
     if (needsRestartAfterAdd || !steamInfo || mergedDeps.length === 0 || loading === "deps") return;
     setLoading("deps");
-    setFeedback(null);
+    setFeedback({ ok: false, msg: "Installing dependencies — this can take a few minutes" });
     // Persist processing state so it survives navigation away
     setGameProcessingState(game.name, {
       status: "installing",
