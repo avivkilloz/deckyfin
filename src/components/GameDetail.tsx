@@ -205,6 +205,9 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
       .then((res) => {
         if (res.success && res.app_id && res.unsigned_appid) {
           setSteamInfo({ app_id: res.app_id, unsigned_appid: res.unsigned_appid });
+          // Clear needs_restart_after_add — Steam has restarted and the shortcut exists
+          setNeedsRestartAfterAdd(false);
+          updateGameConfig(game.name, { needs_restart_after_add: null }).catch(() => {});
         }
       })
       .catch(() => {});
