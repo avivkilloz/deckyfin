@@ -37,6 +37,11 @@ const downloadAsBase64 = callable<[url: string], string>(
   "download_as_base64"
 );
 
+const cacheCardArt = callable<
+  [game_name: string, data_uri: string],
+  { success: boolean }
+>("cache_card_art");
+
 // ── Get logo position JSON path for shortcuts ────────────────────────────────
 
 /**
@@ -107,6 +112,7 @@ export function useArtwork() {
       appId: number,
       url: string,
       assetType: SteamAssetType,
+      gameName?: string,
       appOverview?: any
     ): Promise<boolean> => {
       // Icons on shortcuts need the legacy shortcuts.vdf approach
@@ -129,6 +135,11 @@ export function useArtwork() {
         // For logos on shortcuts, init a default logo position
         if (assetType === AssetType.LOGO && appOverview?.BIsShortcut()) {
           await initDefaultLogoPosition(appOverview);
+        }
+
+        // Cache capsule art for Deckyfin's own card display
+        if (assetType === AssetType.GRID_P && gameName) {
+          cacheCardArt(gameName, b64data).catch(() => {});
         }
 
         return true;
@@ -188,7 +199,7 @@ export function useArtwork() {
           continue;
         }
 
-        const ok = await applyArtByType(appId, url, type, appOverview);
+        const ok = await applyArtByType(appId, url, type, gameName, appOverview);
         if (ok) {
           applied.push(key);
         } else {

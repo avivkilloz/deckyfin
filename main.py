@@ -645,6 +645,14 @@ class Plugin:
 
         return {"fetched": fetched, "errors": errors, "total": len(games)}
 
+    async def cache_card_art(self, game_name: str, data_uri: str) -> dict:
+        """Cache a card art data URI for a game.
+
+        Called by the frontend after Apply Art downloads the capsule image.
+        """
+        ok = _set_card_art_cache(game_name, data_uri)
+        return {"success": ok}
+
     async def fetch_card_art_uri(self, game_name: str) -> dict:
         """Fetch card art for a single game from SGDB and cache it."""
         try:
