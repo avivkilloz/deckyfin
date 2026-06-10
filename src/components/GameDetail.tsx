@@ -128,6 +128,10 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   );
   const [protonPickerOpen, setShowProtonPicker] = useState(false);
 
+  const [launchOptions, setLaunchOptions] = useState(
+    game.launch_options || ""
+  );
+
   // ── Dependencies: checkboxes + custom ────────────────────────────────────
   const existingDeps = game.proton_dependencies || [];
   const [checkedDeps, setCheckedDeps] = useState<string[]>(
@@ -226,6 +230,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         steam_app_id: steamAppId ?? null,
         proton_version: protonVersion || null,
         proton_dependencies: mergedDeps,
+        launch_options: launchOptions || null,
       });
       if (!res.success) {
         setFeedback({ ok: false, msg: "Failed to save config" });
@@ -273,7 +278,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         executable,
         name,
         startDir || undefined,
-        game.launch_options || "",
+        launchOptions || "",
         protonVersion || undefined
       );
       if (res.success && res.app_id && res.unsigned_appid) {
@@ -300,7 +305,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         name,
         executable,
         startDir || undefined,
-        game.launch_options || "",
+        launchOptions || "",
         protonVersion || undefined
       );
       if (res.success && res.app_id && res.unsigned_appid) {
@@ -618,6 +623,14 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           ))}
         </div>
       )}
+
+      {/* Launch Options */}
+      <label style={LABEL_STYLE}>Launch Options</label>
+      <CompactTextField
+        value={launchOptions}
+        onChange={(e) => setLaunchOptions(e.target.value)}
+        style={{ width: "100%", marginBottom: "10px" }}
+      />
 
       {/* ── Dependencies: Toggle Chips + Custom ──────────────────────── */}
       <label style={LABEL_STYLE}>
