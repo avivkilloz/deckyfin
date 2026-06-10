@@ -46,6 +46,10 @@ const updateGameConfig = callable<
   { success: boolean }
 >("update_game_config");
 const scanExes = callable<[subfolder: string], string[]>("scan_game_exes");
+const searchSteamgridGames = callable<
+  [game_name: string],
+  { success: boolean; games: Array<{ id: number; name: string }> }
+>("search_steamgrid_games");
 const setGameProcessingState = callable<
   [name: string, state: Record<string, any> | null],
   { success: boolean }
@@ -187,11 +191,16 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   const [exeOptions, setExeOptions] = useState<string[]>([]);
   const [scanRoot, setScanRoot] = useState(""); // subfolder scanned for exes
 
+  // ── SGDB game picker ───────────────────────────────────────────────────
+  const [sgdbGames, setSgdbGames] = useState<Array<{ id: number; name: string }>>([]);
+  const [showSgdbPicker, setShowSgdbPicker] = useState(false);
+  const [selectedSgdbGame, setSelectedSgdbGame] = useState<{ id: number; name: string } | null>(null);
+
   // ── Proton versions ─────────────────────────────────────────────────────
   const [protonVersions, setProtonVersions] = useState<string[]>([]);
 
   // ── Artwork ───────────────────────────────────────────────────────────────
-  const { applyAllArt } = useArtwork();
+  const { applyArtById } = useArtwork();
 
   // ── Init on mount ───────────────────────────────────────────────────────
   useEffect(() => {
@@ -226,6 +235,50 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   }, [game.name]);
 
   // ── Auto-save (none — use "Apply Config" button) ─────────────────────
+
+  // ── SGDB game picker ───────────────────────────────────────────────────
+  const handleOpenSgdbPicker = async () => {
+    if (showSgdbPicker) {
+      setShowSgdbPicker(false);
+      return;
+    }
+    setLoading("sgdb_search");
+    try {
+      const res = await searchSteamgridGames(name);
+      setSgdbGames(res.games || []);
+      setShowSgdbPicker(true);
+    } catch {
+      setSgdbGames([]);
+      setShowSgdbPicker(true);
+    }
+    setLoading(null);
+  };
+
+  const handleSelectSgdbGame = (game: { id: number; name: string }) => {
+    setSelectedSgdbGame(game);
+    setShowSgdbPicker(false);
+  };
+
+  const handleApplySgdbArt = async () => {
+    if (!selectedSgdbGame || !steamInfo || needsRestartAfterAdd) return;
+    setLoading("art");
+    setFeedback(null);
+    try {
+      const { applied, errors } = await applyArtById(
+        selectedSgdbGame.id,
+        steamInfo.unsigned_appid,
+        selectedSgdbGame.name
+      );
+      if (applied.length > 0) {
+        setFeedback({ ok: true, msg: `Applied ${applied.join(", ")} art from "${selectedSgdbGame.name}"` });
+      } else {
+        setFeedback({ ok: false, msg: errors.join("; ") || "No art found" });
+      }
+    } catch (err: any) {
+      setFeedback({ ok: false, msg: err?.message || "Error" });
+    }
+    setLoading(null);
+  };
 
   const handleApplyConfig = async () => {
     try {
@@ -423,31 +476,6 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
     setLoading(null);
   };
 
-  const handleAddArt = async () => {
-    if (needsRestartAfterAdd || !steamInfo) return;
-    setLoading("art");
-    setFeedback(null);
-    try {
-      const { applied, errors } = await applyAllArt(
-        name,
-        steamInfo.unsigned_appid
-      );
-      if (applied.length > 0) {
-        setFeedback({
-          ok: true,
-          msg: `Applied ${applied.join(", ")} art`,
-        });
-      } else {
-        setFeedback({
-          ok: false,
-          msg: errors.join("; ") || "No art found",
-        });
-      }
-    } catch (err: any) {
-      setFeedback({ ok: false, msg: err?.message || "Error" });
-    }
-    setLoading(null);
-  };
 
   const handleRemove = async () => {
     setFeedback(null);
@@ -701,6 +729,96 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         />
       </div>
 
+      {/* ── SGDB game picker ─────────────────────────────────────────────── */}
+      <label style={LABEL_STYLE}>
+        SteamGridDB Art
+        <span style={{ color: "#666", fontWeight: "normal" }}>
+          {" "}
+          (pick the matching game, then Apply)
+        </span>
+      </label>
+
+      <div
+        style={{
+          display: "flex",
+          gap: "6px",
+          alignItems: "center",
+          marginBottom: showSgdbPicker ? "4px" : "10px",
+        }}
+      >
+        <Focusable
+          onActivate={handleOpenSgdbPicker}
+          onClick={handleOpenSgdbPicker}
+          focusClassName="is-focused"
+          style={{
+            ...BTN_STYLE,
+            flex: 1,
+            padding: "4px 12px",
+            color: selectedSgdbGame ? "#e0e0e0" : "#888",
+            textAlign: "left",
+            opacity: needsRestartAfterAdd || !steamInfo ? 0.4 : 1,
+          }}
+        >
+          {selectedSgdbGame
+            ? `🎮 ${selectedSgdbGame.name} (ID: ${selectedSgdbGame.id})`
+            : "— Search for matching games —"}
+        </Focusable>
+
+        <Focusable
+          onActivate={handleApplySgdbArt}
+          onClick={handleApplySgdbArt}
+          focusClassName="is-focused"
+          style={{
+            ...BTN_STYLE,
+            border: "1px solid #0078d4",
+            color: "#0078d4",
+            opacity: !selectedSgdbGame || !steamInfo || needsRestartAfterAdd || loading === "art" ? 0.4 : 1,
+          }}
+        >
+          {loading === "art" ? "Applying…" : "Apply Art"}
+        </Focusable>
+      </div>
+
+      {/* SGDB picker dropdown */}
+      {showSgdbPicker && (
+        <Focusable
+          style={{
+            marginBottom: "10px",
+            border: "1px solid #555",
+            borderRadius: "4px",
+            maxHeight: "180px",
+            overflowY: "auto",
+            padding: "2px 0",
+          }}
+        >
+          {sgdbGames.length === 0 && (
+            <p style={{ padding: "8px", margin: 0, fontSize: "0.85em", color: "#888" }}>
+              No matching games found on SteamGridDB for "{name}"
+            </p>
+          )}
+          {sgdbGames.map((g) => (
+            <Focusable
+              key={g.id}
+              onActivate={() => handleSelectSgdbGame(g)}
+              onClick={() => handleSelectSgdbGame(g)}
+              focusClassName="is-focused"
+              style={{
+                margin: "0 2px",
+                padding: "4px 10px",
+                cursor: "pointer",
+                fontSize: "0.85em",
+                borderBottom: "1px solid #333",
+                color: selectedSgdbGame?.id === g.id ? "#0078d4" : "#ccc",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+            >
+              🎮 {g.name} (ID: {g.id})
+            </Focusable>
+          ))}
+        </Focusable>
+      )}
+
       {/* ── SteamDB lookup ──────────────────────────────────────────────── */}
       <div style={{ fontSize: "0.82em", color: "#888", marginBottom: "8px" }}>
         Look up dependencies on{" "}
@@ -762,7 +880,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
             color: "#e67e22",
           }}
         >
-          ⚠ Restart Steam to unlock Init Prefix, Install Dependencies, and Add Art
+          ⚠ Restart Steam to unlock Init Prefix, Install Dependencies, and Apply Art
         </div>
       )}
 
@@ -841,17 +959,6 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           {loading === "deps" ? "Installing…" : "Install Dependencies"}
         </Focusable>
 
-        <Focusable
-          onActivate={handleAddArt}
-          onClick={handleAddArt}
-          focusClassName="is-focused"
-          style={{
-            ...BTN_STYLE,
-            opacity: !steamInfo || needsRestartAfterAdd || loading === "art" ? 0.5 : 1,
-          }}
-        >
-          {loading === "art" ? "Adding Art…" : "Add Art"}
-        </Focusable>
       </div>
 
       {/* ── Feedback ───────────────────────────────────────────────────── */}

@@ -124,29 +124,39 @@ def search_game(name: str) -> Optional[int]:
     Uses the /search/autocomplete endpoint which returns name + ID pairs.
     Falls back to a less strict search if the first result isn't close.
     """
+    results = search_steamgrid_games(name)
+    if results:
+        return results[0]["id"]
+    return None
+
+
+def search_steamgrid_games(name: str) -> list:
+    """Search SteamGridDB for games by name. Returns all matching games.
+
+    Returns list of dicts with keys: id (int), name (str).
+    """
     if not name or not name.strip():
-        return None
+        return []
 
     import urllib.parse
     term = urllib.parse.quote(name.strip())
     data = _api_get(f"/search/autocomplete/{term}")
     if not data or not data.get("success"):
         logger.info("No SteamGridDB results for '%s'", name)
-        return None
+        return []
 
     results = data.get("data", [])
     if not results:
-        return None
+        return []
 
-    # Return the first match's game ID
-    first = results[0]
-    game_id = first.get("id")
-    if game_id:
-        logger.info("SteamGridDB found '%s' (ID %s) for query '%s'",
-                     first.get("name", "?"), game_id, name)
-        return int(game_id)
-
-    return None
+    out = []
+    for item in results:
+        gid = item.get("id")
+        gname = item.get("name")
+        if gid and gname:
+            out.append({"id": int(gid), "name": gname})
+    logger.info("SteamGridDB found %d games for query '%s'", len(out), name)
+    return out
 
 
 # ── Fetch art URLs ───────────────────────────────────────────────────────────
@@ -160,47 +170,32 @@ def _pick_first_image(data: list) -> Optional[str]:
     return first.get("url") or None
 
 
-def fetch_steamgrid_art_urls(game_name: str) -> dict:
-    """One-step: search game by name → fetch art URLs.
+def _fetch_art_urls_for_game_id(game_id: int, game_name: str | None = None) -> dict:
+    """Fetch all art URLs for a specific SteamGridDB game ID.
 
-    Returns dict with keys:
-      success (bool), error (str|None),
-      game_id (int|None), game_name (str|None),
-      grid_p (str|None), hero (str|None), logo (str|None), wide (str|None)
-
-    Art type mapping to Steam eAssetType:
-      grid_p = 0 (portrait capsule)
-      wide   = 3 (landscape wide capsule)
-      hero   = 1 (hero banner)
-      logo   = 2 (logo)
+    Internal helper — used by both search-by-name and search-by-ID entry points.
     """
     result = {
         "success": False,
         "error": None,
-        "game_id": None,
-        "game_name": None,
+        "game_id": game_id,
+        "game_name": game_name,
         "grid_p": None,
         "hero": None,
         "logo": None,
         "wide": None,
     }
 
-    game_id = search_game(game_name)
-    if not game_id:
-        result["error"] = f"No SteamGridDB result for '{game_name}'"
-        return result
-
     # Get SGDB game data for the name info
-    game_data = _api_get(f"/games/id/{game_id}")
-    if game_data and game_data.get("success") and game_data.get("data"):
-        first = game_data["data"]
-        if isinstance(first, list):
-            first = first[0]
-        result["game_name"] = first.get("name") or game_name
+    if not game_name:
+        game_data = _api_get(f"/games/id/{game_id}")
+        if game_data and game_data.get("success") and game_data.get("data"):
+            first = game_data["data"]
+            if isinstance(first, list):
+                first = first[0]
+            result["game_name"] = first.get("name") or None
     else:
         result["game_name"] = game_name
-
-    result["game_id"] = game_id
 
     # Grid (portrait — eAssetType 0 / grid_p)
     for dims in ["600x900", "342x482", "660x930", ""]:
@@ -236,9 +231,47 @@ def fetch_steamgrid_art_urls(game_name: str) -> dict:
 
     result["success"] = bool(result["grid_p"] or result["hero"] or result["logo"] or result["wide"])
     if not result["success"]:
-        result["error"] = f"No art found for '{game_name}' on SteamGridDB"
+        result["error"] = f"No art found for game ID {game_id} on SteamGridDB"
 
     return result
+
+
+def fetch_steamgrid_art_urls_by_id(game_id: int, game_name: str | None = None) -> dict:
+    """Fetch SteamGridDB art URLs for a specific game by its SGDB ID.
+
+    Returns the same dict structure as fetch_steamgrid_art_urls().
+    """
+    return _fetch_art_urls_for_game_id(game_id, game_name)
+
+
+def fetch_steamgrid_art_urls(game_name: str) -> dict:
+    """One-step: search game by name → fetch art URLs.
+
+    Returns dict with keys:
+      success (bool), error (str|None),
+      game_id (int|None), game_name (str|None),
+      grid_p (str|None), hero (str|None), logo (str|None), wide (str|None)
+
+    Art type mapping to Steam eAssetType:
+      grid_p = 0 (portrait capsule)
+      wide   = 3 (landscape wide capsule)
+      hero   = 1 (hero banner)
+      logo   = 2 (logo)
+    """
+    game_id = search_game(game_name)
+    if not game_id:
+        return {
+            "success": False,
+            "error": f"No SteamGridDB result for '{game_name}'",
+            "game_id": None,
+            "game_name": None,
+            "grid_p": None,
+            "hero": None,
+            "logo": None,
+            "wide": None,
+        }
+
+    return _fetch_art_urls_for_game_id(game_id, game_name)
 
 
 # ── Apply art ────────────────────────────────────────────────────────────────

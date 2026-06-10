@@ -33,14 +33,23 @@ const fetchArtUrls = callable<
   }
 >("fetch_steamgrid_art_urls");
 
+const fetchArtUrlsById = callable<
+  [game_id: number, game_name?: string],
+  {
+    success: boolean;
+    error?: string;
+    game_id?: number;
+    game_name?: string;
+    grid_p?: string;
+    hero?: string;
+    logo?: string;
+    wide?: string;
+  }
+>("fetch_steamgrid_art_urls_by_id");
+
 const downloadAsBase64 = callable<[url: string], string>(
   "download_as_base64"
 );
-
-const cacheCardArt = callable<
-  [game_name: string, data_uri: string],
-  { success: boolean }
->("cache_card_art");
 
 // ── Get logo position JSON path for shortcuts ────────────────────────────────
 
@@ -112,7 +121,6 @@ export function useArtwork() {
       appId: number,
       url: string,
       assetType: SteamAssetType,
-      gameName?: string,
       appOverview?: any
     ): Promise<boolean> => {
       // Icons on shortcuts need the legacy shortcuts.vdf approach
@@ -137,11 +145,6 @@ export function useArtwork() {
           await initDefaultLogoPosition(appOverview);
         }
 
-        // Cache capsule art for Deckyfin's own card display
-        if (assetType === AssetType.GRID_P && gameName) {
-          cacheCardArt(gameName, b64data).catch(() => {});
-        }
-
         return true;
       } catch (err) {
         console.error(
@@ -152,6 +155,66 @@ export function useArtwork() {
       }
     },
     [downloadImage, clearArt]
+  );
+
+  /**
+   * Fetch SteamGridDB art URLs by specific game ID, download each asset,
+   * and apply via Steam's native SetCustomArtworkForApp API.
+   *
+   * This is used when the user picks a specific SGDB game from the picker,
+   * rather than relying on auto-detection by name.
+   *
+   * @returns Summary of what was applied and what failed.
+   */
+  const applyArtById = useCallback(
+    async (
+      gameId: number,
+      appId: number,
+      gameName?: string,
+      appOverview?: any
+    ): Promise<{ applied: string[]; errors: string[] }> => {
+      const applied: string[] = [];
+      const errors: string[] = [];
+
+      // 1. Fetch art URLs from SteamGridDB by game ID
+      let urls: any;
+      try {
+        urls = await fetchArtUrlsById(gameId, gameName);
+      } catch (err: any) {
+        errors.push(`API error: ${err?.message || "Failed to fetch art URLs"}`);
+        return { applied, errors };
+      }
+
+      if (!urls?.success) {
+        errors.push(urls?.error || `No art found for game ID ${gameId}`);
+        return { applied, errors };
+      }
+
+      // 2. Apply each available art type via Steam API
+      const typeMap: Array<{ key: string; type: SteamAssetType; url?: string }> = [
+        { key: "grid_p", type: AssetType.GRID_P, url: urls.grid_p },
+        { key: "hero", type: AssetType.HERO, url: urls.hero },
+        { key: "logo", type: AssetType.LOGO, url: urls.logo },
+        { key: "wide", type: AssetType.GRID_L, url: urls.wide },
+      ];
+
+      for (const { key, type, url } of typeMap) {
+        if (!url) {
+          errors.push(`No ${key} URL found on SteamGridDB`);
+          continue;
+        }
+
+        const ok = await applyArtByType(appId, url, type, appOverview);
+        if (ok) {
+          applied.push(key);
+        } else {
+          errors.push(`Failed to apply ${key}`);
+        }
+      }
+
+      return { applied, errors };
+    },
+    [applyArtByType]
   );
 
   /**
@@ -199,7 +262,7 @@ export function useArtwork() {
           continue;
         }
 
-        const ok = await applyArtByType(appId, url, type, gameName, appOverview);
+        const ok = await applyArtByType(appId, url, type, appOverview);
         if (ok) {
           applied.push(key);
         } else {
@@ -214,6 +277,7 @@ export function useArtwork() {
 
   return {
     applyAllArt,
+    applyArtById,
     applyArtByType,
     downloadImage,
     clearArt,
