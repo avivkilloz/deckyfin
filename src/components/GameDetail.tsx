@@ -729,96 +729,6 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         />
       </div>
 
-      {/* ── SGDB game picker ─────────────────────────────────────────────── */}
-      <label style={LABEL_STYLE}>
-        SteamGridDB Art
-        <span style={{ color: "#666", fontWeight: "normal" }}>
-          {" "}
-          (pick the matching game, then Apply)
-        </span>
-      </label>
-
-      <div
-        style={{
-          display: "flex",
-          gap: "6px",
-          alignItems: "center",
-          marginBottom: showSgdbPicker ? "4px" : "10px",
-        }}
-      >
-        <Focusable
-          onActivate={handleOpenSgdbPicker}
-          onClick={handleOpenSgdbPicker}
-          focusClassName="is-focused"
-          style={{
-            ...BTN_STYLE,
-            flex: 1,
-            padding: "4px 12px",
-            color: selectedSgdbGame ? "#e0e0e0" : "#888",
-            textAlign: "left",
-            opacity: needsRestartAfterAdd || !steamInfo ? 0.4 : 1,
-          }}
-        >
-          {selectedSgdbGame
-            ? `🎮 ${selectedSgdbGame.name} (ID: ${selectedSgdbGame.id})`
-            : "— Search for matching games —"}
-        </Focusable>
-
-        <Focusable
-          onActivate={handleApplySgdbArt}
-          onClick={handleApplySgdbArt}
-          focusClassName="is-focused"
-          style={{
-            ...BTN_STYLE,
-            border: "1px solid #0078d4",
-            color: "#0078d4",
-            opacity: !selectedSgdbGame || !steamInfo || needsRestartAfterAdd || loading === "art" ? 0.4 : 1,
-          }}
-        >
-          {loading === "art" ? "Applying…" : "Apply Art"}
-        </Focusable>
-      </div>
-
-      {/* SGDB picker dropdown */}
-      {showSgdbPicker && (
-        <Focusable
-          style={{
-            marginBottom: "10px",
-            border: "1px solid #555",
-            borderRadius: "4px",
-            maxHeight: "180px",
-            overflowY: "auto",
-            padding: "2px 0",
-          }}
-        >
-          {sgdbGames.length === 0 && (
-            <p style={{ padding: "8px", margin: 0, fontSize: "0.85em", color: "#888" }}>
-              No matching games found on SteamGridDB for "{name}"
-            </p>
-          )}
-          {sgdbGames.map((g) => (
-            <Focusable
-              key={g.id}
-              onActivate={() => handleSelectSgdbGame(g)}
-              onClick={() => handleSelectSgdbGame(g)}
-              focusClassName="is-focused"
-              style={{
-                margin: "0 2px",
-                padding: "4px 10px",
-                cursor: "pointer",
-                fontSize: "0.85em",
-                borderBottom: "1px solid #333",
-                color: selectedSgdbGame?.id === g.id ? "#0078d4" : "#ccc",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-            >
-              🎮 {g.name} (ID: {g.id})
-            </Focusable>
-          ))}
-        </Focusable>
-      )}
-
       {/* ── SteamDB lookup ──────────────────────────────────────────────── */}
       <div style={{ fontSize: "0.82em", color: "#888", marginBottom: "8px" }}>
         Look up dependencies on{" "}
@@ -972,6 +882,97 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         >
           {feedback.msg}
         </p>
+      )}
+
+      {/* ── SteamGridDB Art ─────────────────────────────────────────────────── */}
+      <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.08)", margin: "24px 0 8px" }} />
+
+      <label style={LABEL_STYLE}>
+        SteamGridDB Art
+        <span style={{ color: "#666", fontWeight: "normal" }}>
+          {" "}
+          (pick the matching game, then Apply)
+        </span>
+      </label>
+
+      <div
+        style={{
+          display: "flex",
+          gap: "6px",
+          alignItems: "center",
+          marginBottom: showSgdbPicker ? "4px" : "10px",
+        }}
+      >
+        <Focusable
+          onActivate={handleOpenSgdbPicker}
+          onClick={handleOpenSgdbPicker}
+          focusClassName="is-focused"
+          style={{
+            ...BTN_STYLE,
+            flex: 1,
+            padding: "4px 12px",
+            color: selectedSgdbGame ? "#e0e0e0" : "#888",
+            textAlign: "left",
+            opacity: needsRestartAfterAdd || !steamInfo ? 0.4 : 1,
+          }}
+        >
+          {selectedSgdbGame
+            ? `🎮 ${selectedSgdbGame.name} (ID: ${selectedSgdbGame.id})`
+            : "— Search for matching games —"}
+        </Focusable>
+
+        <Focusable
+          onActivate={handleApplySgdbArt}
+          onClick={handleApplySgdbArt}
+          focusClassName="is-focused"
+          style={{
+            ...BTN_STYLE,
+            padding: "4px 12px",
+            opacity: !selectedSgdbGame || !steamInfo || needsRestartAfterAdd || loading === "art" ? 0.4 : 1,
+          }}
+        >
+          {loading === "art" ? "Applying…" : "Apply"}
+        </Focusable>
+      </div>
+
+      {/* SGDB picker dropdown */}
+      {showSgdbPicker && (
+        <Focusable
+          style={{
+            marginBottom: "10px",
+            border: "1px solid #555",
+            borderRadius: "4px",
+            maxHeight: "180px",
+            overflowY: "auto",
+            padding: "2px 0",
+          }}
+        >
+          {sgdbGames.length === 0 && (
+            <p style={{ padding: "8px", margin: 0, fontSize: "0.85em", color: "#888" }}>
+              No matching games found on SteamGridDB for "{name}"
+            </p>
+          )}
+          {sgdbGames.map((g) => (
+            <Focusable
+              key={g.id}
+              onActivate={() => handleSelectSgdbGame(g)}
+              onClick={() => handleSelectSgdbGame(g)}
+              focusClassName="is-focused"
+              style={{
+                margin: "0 2px",
+                padding: "4px 10px",
+                cursor: "pointer",
+                fontSize: "0.85em",
+                borderBottom: "1px solid #333",
+                color: selectedSgdbGame?.id === g.id ? "#0078d4" : "#ccc",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+            >
+              🎮 {g.name} (ID: {g.id})
+            </Focusable>
+          ))}
+        </Focusable>
       )}
 
       {/* ── Danger Zone ──────────────────────────────────────────────────── */}
