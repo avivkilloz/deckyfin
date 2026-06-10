@@ -178,6 +178,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   // ── Loading states ──────────────────────────────────────────────────────
   const [loading, setLoading] = useState<string | null>(null); // which action is running
   const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [configFeedback, setConfigFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
   const [sgdbFeedback, setSgdbFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
   const [forceReinit, setForceReinit] = useState(false);
 
@@ -294,13 +295,13 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         launch_options: launchOptions || null,
       });
       if (!res.success) {
-        setFeedback({ ok: false, msg: "Failed to save config" });
+        setConfigFeedback({ ok: false, msg: "Failed to save config" });
       } else {
         setStoredName(name);
-        setFeedback({ ok: true, msg: "Config saved" });
+        setConfigFeedback({ ok: true, msg: "Config saved" });
       }
     } catch (err: any) {
-      setFeedback({ ok: false, msg: err?.message || "Failed to save config" });
+      setConfigFeedback({ ok: false, msg: err?.message || "Failed to save config" });
     }
   };
 
@@ -760,6 +761,29 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         )}
       </div>
 
+      {/* Apply Config */}
+      <div style={{ marginBottom: "8px" }}>
+        <Focusable
+          onActivate={handleApplyConfig}
+          onClick={handleApplyConfig}
+          focusClassName="is-focused"
+          style={BTN_STYLE}
+        >
+          Apply Config
+        </Focusable>
+        {configFeedback && (
+          <span
+            style={{
+              marginLeft: "10px",
+              fontSize: "0.85em",
+              color: configFeedback.ok ? "#2ecc71" : "tomato",
+            }}
+          >
+            {configFeedback.msg}
+          </span>
+        )}
+      </div>
+
       {/* ── Separator ──────────────────────────────────────────────────── */}
       <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.12)", margin: "14px 0" }} />
 
@@ -805,15 +829,6 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           marginBottom: "14px",
         }}
       >
-        <Focusable
-          onActivate={handleApplyConfig}
-          onClick={handleApplyConfig}
-          focusClassName="is-focused"
-          style={BTN_STYLE}
-        >
-          Apply Config
-        </Focusable>
-
         <Focusable
           onActivate={steamInfo ? handleUpdateSteam : handleAddToSteam}
           onClick={steamInfo ? handleUpdateSteam : handleAddToSteam}
