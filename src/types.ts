@@ -11,6 +11,7 @@ export interface GameConfig {
   proton_sync_paths?: string[];
   categories?: string[];
   launch_options?: string;
+  needs_restart_after_add?: boolean;
 }
 
 export interface GameFolder {

@@ -58,6 +58,94 @@ def _debug(msg: str):
 _debug("MODULE LOAD START")
 
 
+# ── Card Art Cache Helpers ─────────────────────────────────────────────
+
+def _get_card_art_cache_path(game_name: str) -> Optional[Path]:
+    """Get the cache file path for a game's card art.
+
+    Returns None if games folder is not configured.
+    """
+    try:
+        folder = get_games_folder()
+        if not folder:
+            return None
+        # Sanitize game name for filename
+        safe = "".join(c if c.isalnum() or c in " _-" else "_" for c in game_name)
+        cache_dir = folder / ".deckyfin" / "card_art"
+        return cache_dir / f"{safe}.txt"
+    except Exception:
+        return None
+
+
+def _get_card_art_cache(game_name: str) -> Optional[str]:
+    """Read cached card art data URI for a game. Returns None if not cached."""
+    try:
+        cache_path = _get_card_art_cache_path(game_name)
+        if cache_path and cache_path.exists():
+            return cache_path.read_text().strip()
+        return None
+    except Exception:
+        return None
+
+
+def _set_card_art_cache(game_name: str, data_uri: str) -> bool:
+    """Write a card art data URI to the cache. Returns True on success."""
+    try:
+        cache_path = _get_card_art_cache_path(game_name)
+        if not cache_path:
+            return False
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        cache_path.write_text(data_uri)
+        return True
+    except Exception:
+        return False
+
+
+def _fetch_card_art_from_sgdb(game_name: str) -> Optional[str]:
+    """Fetch grid_p (capsule) art from SteamGridDB for a game name.
+
+    Returns a base64 data URI string, or None if no art found.
+    """
+    import base64
+    import urllib.request
+
+    try:
+        from deckyfin_steamgrid import search_game, _api_get, _pick_first_image, _ssl_context, _UA
+    except ImportError:
+        return None
+
+    # Search SGDB
+    game_id = search_game(game_name)
+    if not game_id:
+        return None
+
+    # Get grid_p (capsule 600x900 — best for card thumbnails)
+    for dims in ["600x900", "342x482", "660x930"]:
+        data = _api_get(f"/grids/game/{game_id}?dimensions={dims}")
+        if data and data.get("success") and data.get("data"):
+            url = _pick_first_image(data["data"])
+            if url:
+                break
+    else:
+        return None
+
+    # Download and convert to base64 data URI
+    try:
+        ctx = _ssl_context()
+        req = urllib.request.Request(url, headers={"User-Agent": _UA})
+        with urllib.request.urlopen(req, context=ctx, timeout=20) as resp:
+            raw = resp.read()
+        b64 = base64.b64encode(raw).decode("ascii")
+        ext = "png"
+        if url.lower().endswith((".jpg", ".jpeg")):
+            ext = "jpg"
+        elif url.lower().endswith(".webp"):
+            ext = "webp"
+        return f"data:image/{ext};base64,{b64}"
+    except Exception:
+        return None
+
+
 class Plugin:
     """Deckyfin plugin backend — methods callable from the React frontend."""
 
@@ -140,7 +228,16 @@ class Plugin:
         return {"success": True, "path": str(result)}
 
     async def initialize(self, games_folder: Optional[str] = None) -> dict:
-        return initialize_app_structure(games_folder)
+        result = initialize_app_structure(games_folder)
+        # Clear needs_restart_after_add for all games — Steam has (re)started
+        try:
+            games = list_game_configs()
+            for game in games:
+                if game.get("needs_restart_after_add"):
+                    update_game_config(game["name"], {"needs_restart_after_add": None})
+        except Exception:
+            pass
+        return result
 
     # ── Games ─────────────────────────────────────────────────────────────
 
@@ -279,6 +376,11 @@ class Plugin:
             except Exception as e:
                 _debug(f"add_steam_shortcut: set_proton_version FAILED: {e}")
                 self.logger.warning("Failed to set Proton version: %s", e)
+        # Mark game as needing restart before Steam-dependent actions work
+        try:
+            update_game_config(app_name, {"needs_restart_after_add": True})
+        except Exception:
+            pass
         return {
             "success": True,
             "app_id": app_id,
@@ -454,49 +556,105 @@ class Plugin:
         return {"success": True}
 
     async def get_game_card_art(self, game_name: str) -> dict:
-        """Get downloaded art for a game as a base64 data URI (for the library card).
+        """Get art for a game as a base64 data URI (for the library card).
 
-        Prefers capsule ({appid}.png) then grid (_p.png) then hero (_hero.png)
-        then logo — capsule has the right aspect ratio for the card thumbnail.
+        Checks in order:
+        1. Steam grid folder (if game is in Steam, prefer this)
+        2. Local card_art cache (pre-fetched from SGDB during scan)
+        3. Falls back to None
         """
         import base64
         try:
             from steam_games import get_steam_shortcut_info
             from steam_utils import get_user_id, find_steam_root
             from deckyfin_consts import STEAM_USERDATA_FOLDER
-            uid = get_user_id()
-            info = get_steam_shortcut_info(game_name, uid)
-            if not info:
-                return {"data_uri": None}
-            unsigned_appid = info.get("unsigned_appid")
-            if not unsigned_appid:
-                return {"data_uri": None}
 
-            steam_root = find_steam_root()
-            grid_folder = steam_root / STEAM_USERDATA_FOLDER / uid / "config" / "grid"
+            # 1. Try Steam grid folder (for games already in Steam)
+            try:
+                uid = get_user_id()
+                info = get_steam_shortcut_info(game_name, uid)
+                if info:
+                    unsigned_appid = info.get("unsigned_appid")
+                    if unsigned_appid:
+                        steam_root = find_steam_root()
+                        grid_folder = steam_root / STEAM_USERDATA_FOLDER / uid / "config" / "grid"
+                        appid_str = str(unsigned_appid)
+                        candidates = [
+                            grid_folder / f"{appid_str}.png",
+                            grid_folder / f"{appid_str}.jpg",
+                            grid_folder / f"{appid_str}_p.png",
+                            grid_folder / f"{appid_str}_p.jpg",
+                            grid_folder / f"{appid_str}_hero.png",
+                            grid_folder / f"{appid_str}_hero.jpg",
+                            grid_folder / f"{appid_str}_logo.png",
+                        ]
+                        for path in candidates:
+                            if path.exists():
+                                with open(path, "rb") as f:
+                                    raw = f.read()
+                                ext = path.suffix.lstrip(".")
+                                b64 = base64.b64encode(raw).decode("ascii")
+                                return {"data_uri": f"data:image/{ext};base64,{b64}"}
+            except Exception:
+                pass  # Steam not available or game not in Steam — try cache
 
-            appid_str = str(unsigned_appid)
-            # Prefer capsule ({appid}.png) then grid then hero then logo
-            candidates = [
-                grid_folder / f"{appid_str}.png",
-                grid_folder / f"{appid_str}.jpg",
-                grid_folder / f"{appid_str}_p.png",
-                grid_folder / f"{appid_str}_p.jpg",
-                grid_folder / f"{appid_str}_hero.png",
-                grid_folder / f"{appid_str}_hero.jpg",
-                grid_folder / f"{appid_str}_logo.png",
-            ]
-            for path in candidates:
-                if path.exists():
-                    with open(path, "rb") as f:
-                        raw = f.read()
-                    ext = path.suffix.lstrip(".")
-                    b64 = base64.b64encode(raw).decode("ascii")
-                    return {"data_uri": f"data:image/{ext};base64,{b64}"}
+            # 2. Try local card_art cache
+            cache = _get_card_art_cache(game_name)
+            if cache:
+                return {"data_uri": cache}
+
+            # 3. Nothing found
             return {"data_uri": None}
         except Exception as e:
             logging.getLogger(APP_NAME).warning("Failed to get card art for '%s': %s", game_name, e)
             return {"data_uri": None}
+
+    # ── Card Art Cache ────────────────────────────────────────────────────
+
+    async def fetch_missing_card_art(self) -> dict:
+        """Fetch SGDB card art for all games that don't have cached art yet.
+
+        Called after library load or scan. Runs sequentially — each game
+        takes ~1–2 seconds. Returns count of newly fetched arts.
+        """
+        fetched = 0
+        errors = 0
+        try:
+            games = list_game_configs()
+        except Exception as e:
+            return {"fetched": 0, "errors": 1, "total": 0, "message": str(e)}
+
+        for game in games:
+            name = game.get("name", "")
+            if not name:
+                continue
+
+            # Skip if already cached
+            if _get_card_art_cache(name):
+                continue
+
+            try:
+                data_uri = _fetch_card_art_from_sgdb(name)
+                if data_uri:
+                    _set_card_art_cache(name, data_uri)
+                    fetched += 1
+                else:
+                    errors += 1
+            except Exception:
+                errors += 1
+
+        return {"fetched": fetched, "errors": errors, "total": len(games)}
+
+    async def fetch_card_art_uri(self, game_name: str) -> dict:
+        """Fetch card art for a single game from SGDB and cache it."""
+        try:
+            data_uri = _fetch_card_art_from_sgdb(game_name)
+            if data_uri:
+                _set_card_art_cache(game_name, data_uri)
+                return {"success": True, "data_uri": data_uri}
+            return {"success": False, "error": f"No art found for '{game_name}'"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
 
 
 # ── Global error wrapper ─────────────────────────────────────────────

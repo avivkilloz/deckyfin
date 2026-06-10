@@ -13,6 +13,7 @@ const listNonSteamGames = callable<[], { name: string }[]>("list_nonsteam_games"
 const restartSteam = callable<[], { success: boolean; message?: string }>("restart_steam");
 const getNeedsRestart = callable<[], boolean>("get_needs_restart");
 const setNeedsRestart = callable<[value: boolean], { success: boolean }>("set_needs_restart");
+const fetchMissingCardArt = callable<[], { fetched: number; errors: number; total: number }>("fetch_missing_card_art");
 
 const BTN_RESTART: React.CSSProperties = {
   padding: "6px 10px",
@@ -46,6 +47,7 @@ export const GameLibrary: VFC = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [restarting, setRestarting] = useState(false);
   const [needsRestart, setNeedsRestartState] = useState(false);
+  const [cardArtVersion, setCardArtVersion] = useState(0);
 
   const handleRestartSteam = useCallback(async () => {
     setRestarting(true);
@@ -85,6 +87,12 @@ export const GameLibrary: VFC = () => {
       setSteamNames(new Set());
     }
     setLoading(false);
+
+    // Pre-fetch card art for any games missing it
+    fetchMissingCardArt().then(() => {
+      setCardArtVersion(v => v + 1);
+    }).catch(() => {});
+
   }, []);
 
   useEffect(() => {
@@ -175,6 +183,7 @@ export const GameLibrary: VFC = () => {
         <p>No games found. Add game folders to your games directory, then go to Settings {'>'} Rescan.</p>
       )}
       <div
+        key={cardArtVersion}
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",

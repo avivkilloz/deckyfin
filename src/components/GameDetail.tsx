@@ -178,6 +178,9 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
 
   // ── Confirmation state (inline, CEF confirm() is blocked) ──────────────
   const [confirming, setConfirming] = useState<"steam" | "deckyfin" | "purge" | null>(null);
+  const [needsRestartAfterAdd, setNeedsRestartAfterAdd] = useState(
+    game.needs_restart_after_add ?? false
+  );
 
   // ── Executable picker ───────────────────────────────────────────────────
   const [showExePicker, setShowExePicker] = useState(false);
@@ -283,9 +286,10 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
       );
       if (res.success && res.app_id && res.unsigned_appid) {
         setSteamInfo({ app_id: res.app_id, unsigned_appid: res.unsigned_appid });
+        setNeedsRestartAfterAdd(true);
         setFeedback({
           ok: true,
-          msg: `Added to Steam (App ID: ${res.unsigned_appid}) — restart Steam to see it`,
+          msg: `Added to Steam (App ID: ${res.unsigned_appid}) — restart Steam to unlock actions`,
         });
         onNeedsRestart?.();
       } else {
@@ -362,7 +366,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   };
 
   const handleInitPrefix = async () => {
-    if (!steamInfo) return;
+    if (needsRestartAfterAdd || !steamInfo) return;
     setLoading("init");
     setFeedback(null);
     try {
@@ -383,7 +387,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   };
 
   const handleInstallDeps = async () => {
-    if (!steamInfo || mergedDeps.length === 0 || loading === "deps") return;
+    if (needsRestartAfterAdd || !steamInfo || mergedDeps.length === 0 || loading === "deps") return;
     setLoading("deps");
     setFeedback(null);
     // Persist processing state so it survives navigation away
@@ -417,7 +421,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   };
 
   const handleAddArt = async () => {
-    if (!steamInfo) return;
+    if (needsRestartAfterAdd || !steamInfo) return;
     setLoading("art");
     setFeedback(null);
     try {
@@ -570,6 +574,14 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         style={{ width: "100%", marginBottom: "10px" }}
       />
 
+      {/* Launch Options */}
+      <label style={LABEL_STYLE}>Launch Options</label>
+      <CompactTextField
+        value={launchOptions}
+        onChange={(e) => setLaunchOptions(e.target.value)}
+        style={{ width: "100%", marginBottom: "10px" }}
+      />
+
       {/* Proton Version: inline picker */}
       <label style={LABEL_STYLE}>Proton Version</label>
       <Focusable
@@ -624,13 +636,6 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         </div>
       )}
 
-      {/* Launch Options */}
-      <label style={LABEL_STYLE}>Launch Options</label>
-      <CompactTextField
-        value={launchOptions}
-        onChange={(e) => setLaunchOptions(e.target.value)}
-        style={{ width: "100%", marginBottom: "10px" }}
-      />
 
       {/* ── Dependencies: Toggle Chips + Custom ──────────────────────── */}
       <label style={LABEL_STYLE}>
@@ -742,6 +747,23 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         {currentProton && <> · Proton: {currentProton}</>}
       </div>
 
+      {/* ── Restart required warning ─────────────────────────────────────── */}
+      {needsRestartAfterAdd && (
+        <div
+          style={{
+            padding: "8px 12px",
+            marginBottom: "10px",
+            borderRadius: "4px",
+            background: "rgba(230, 126, 34, 0.15)",
+            border: "1px solid rgba(230, 126, 34, 0.3)",
+            fontSize: "0.82em",
+            color: "#e67e22",
+          }}
+        >
+          ⚠ Restart Steam to unlock Init Prefix, Install Dependencies, and Add Art
+        </div>
+      )}
+
       {/* ── Action Buttons ─────────────────────────────────────────────── */}
       <div
         style={{
@@ -784,7 +806,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           focusClassName="is-focused"
           style={{
             ...BTN_STYLE,
-            opacity: !steamInfo || loading === "init" ? 0.5 : 1,
+            opacity: !steamInfo || needsRestartAfterAdd || loading === "init" ? 0.5 : 1,
           }}
         >
           {loading === "init" ? "Initing…" : forceReinit ? "Re-init Prefix" : "Init Prefix"}
@@ -798,7 +820,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
             ...BTN_STYLE,
             background: forceReinit ? "#ff6666" : "transparent",
             borderColor: forceReinit ? "#ff6666" : "#555",
-            color: forceReinit ? "white" : "#aaa",
+            color: needsRestartAfterAdd ? "#555" : forceReinit ? "white" : "#aaa",
+            opacity: needsRestartAfterAdd ? 0.4 : 1,
           }}
         >
           {forceReinit ? "✓ Force re-init" : "☐ Force re-init"}
@@ -810,7 +833,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           focusClassName="is-focused"
           style={{
             ...BTN_STYLE,
-            opacity: !steamInfo || mergedDeps.length === 0 || loading === "deps" ? 0.5 : 1,
+            opacity: !steamInfo || needsRestartAfterAdd || mergedDeps.length === 0 || loading === "deps" ? 0.5 : 1,
           }}
         >
           {loading === "deps" ? "Installing…" : "Install Dependencies"}
@@ -822,7 +845,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           focusClassName="is-focused"
           style={{
             ...BTN_STYLE,
-            opacity: !steamInfo || loading === "art" ? 0.5 : 1,
+            opacity: !steamInfo || needsRestartAfterAdd || loading === "art" ? 0.5 : 1,
           }}
         >
           {loading === "art" ? "Adding Art…" : "Add Art"}
