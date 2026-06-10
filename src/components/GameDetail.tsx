@@ -178,6 +178,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   // ── Loading states ──────────────────────────────────────────────────────
   const [loading, setLoading] = useState<string | null>(null); // which action is running
   const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [sgdbFeedback, setSgdbFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
   const [forceReinit, setForceReinit] = useState(false);
 
   // ── Confirmation state (inline, CEF confirm() is blocked) ──────────────
@@ -242,6 +243,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
       setShowSgdbPicker(false);
       return;
     }
+    setSgdbFeedback(null);
     setLoading("sgdb_search");
     try {
       const res = await searchSteamgridGames(name);
@@ -262,7 +264,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   const handleApplySgdbArt = async () => {
     if (!selectedSgdbGame || !steamInfo || needsRestartAfterAdd) return;
     setLoading("art");
-    setFeedback(null);
+    setSgdbFeedback(null);
     try {
       const { applied, errors } = await applyArtById(
         selectedSgdbGame.id,
@@ -270,12 +272,12 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         selectedSgdbGame.name
       );
       if (applied.length > 0) {
-        setFeedback({ ok: true, msg: `Applied ${applied.join(", ")} art from "${selectedSgdbGame.name}"` });
+        setSgdbFeedback({ ok: true, msg: `Applied ${applied.join(", ")} art from "${selectedSgdbGame.name}"` });
       } else {
-        setFeedback({ ok: false, msg: errors.join("; ") || "No art found" });
+        setSgdbFeedback({ ok: false, msg: errors.join("; ") || "No art found" });
       }
     } catch (err: any) {
-      setFeedback({ ok: false, msg: err?.message || "Error" });
+      setSgdbFeedback({ ok: false, msg: err?.message || "Error" });
     }
     setLoading(null);
   };
@@ -887,7 +889,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
       {/* ── SteamGridDB Art ─────────────────────────────────────────────────── */}
       <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.08)", margin: "24px 0 8px" }} />
 
-      <label style={LABEL_STYLE}>
+      <label style={{ ...LABEL_STYLE, marginBottom: "8px" }}>
         SteamGridDB Art
         <span style={{ color: "#666", fontWeight: "normal" }}>
           {" "}
@@ -900,7 +902,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           display: "flex",
           gap: "6px",
           alignItems: "stretch",
-          marginBottom: showSgdbPicker ? "4px" : "10px",
+          marginBottom: "6px",
         }}
       >
         <Focusable
@@ -934,6 +936,20 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           {loading === "art" ? "Applying…" : "Apply"}
         </Focusable>
       </div>
+
+      {/* SGDB art feedback */}
+      {sgdbFeedback && (
+        <p
+          style={{
+            marginTop: "4px",
+            marginBottom: showSgdbPicker ? "4px" : "10px",
+            color: sgdbFeedback.ok ? "lightgreen" : "tomato",
+            fontSize: "0.85em",
+          }}
+        >
+          {sgdbFeedback.msg}
+        </p>
+      )}
 
       {/* SGDB picker dropdown */}
       {showSgdbPicker && (
