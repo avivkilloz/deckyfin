@@ -762,7 +762,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
       </div>
 
       {/* Apply Config */}
-      <div style={{ marginBottom: "8px" }}>
+      <div style={{ marginBottom: "4px" }}>
         <Focusable
           onActivate={handleApplyConfig}
           onClick={handleApplyConfig}
@@ -771,18 +771,19 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         >
           Apply Config
         </Focusable>
-        {configFeedback && (
-          <span
-            style={{
-              marginLeft: "10px",
-              fontSize: "0.85em",
-              color: configFeedback.ok ? "#2ecc71" : "tomato",
-            }}
-          >
-            {configFeedback.msg}
-          </span>
-        )}
       </div>
+      {configFeedback && (
+        <p
+          style={{
+            marginTop: "0",
+            marginBottom: "8px",
+            fontSize: "0.85em",
+            color: configFeedback.ok ? "#2ecc71" : "tomato",
+          }}
+        >
+          {configFeedback.msg}
+        </p>
+      )}
 
       {/* ── Separator ──────────────────────────────────────────────────── */}
       <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.12)", margin: "14px 0" }} />
@@ -835,8 +836,6 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           focusClassName="is-focused"
           style={{
             ...BTN_STYLE,
-            width: "100%",
-            textAlign: "center",
             opacity: loading === "add" || loading === "update" ? 0.5 : 1,
           }}
         >
@@ -878,7 +877,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
               opacity: needsRestartAfterAdd ? 0.4 : 1,
             }}
           >
-            {forceReinit ? "Force ✓" : "Force"}
+            {forceReinit ? "☑ Force" : "☐ Force"}
           </Focusable>
         </div>
 
@@ -888,8 +887,6 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           focusClassName="is-focused"
           style={{
             ...BTN_STYLE,
-            width: "100%",
-            textAlign: "center",
             opacity: !steamInfo || needsRestartAfterAdd || mergedDeps.length === 0 || loading === "deps" ? 0.5 : 1,
           }}
         >
