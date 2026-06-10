@@ -918,7 +918,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         >
           {selectedSgdbGame
             ? `🎮 ${selectedSgdbGame.name} (ID: ${selectedSgdbGame.id})`
-            : "— Search for matching games —"}
+            : "Search…"}
         </Focusable>
 
         <Focusable
