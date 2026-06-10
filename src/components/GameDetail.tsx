@@ -824,8 +824,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
       <div
         style={{
           display: "flex",
+          flexDirection: "column",
           gap: "6px",
-          flexWrap: "wrap",
           marginBottom: "14px",
         }}
       >
@@ -835,6 +835,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           focusClassName="is-focused"
           style={{
             ...BTN_STYLE,
+            width: "100%",
+            textAlign: "center",
             opacity: loading === "add" || loading === "update" ? 0.5 : 1,
           }}
         >
@@ -847,32 +849,38 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
             : "Add to Steam"}
         </Focusable>
 
-        <Focusable
-          onActivate={handleInitPrefix}
-          onClick={handleInitPrefix}
-          focusClassName="is-focused"
-          style={{
-            ...BTN_STYLE,
-            opacity: !steamInfo || needsRestartAfterAdd || loading === "init" ? 0.5 : 1,
-          }}
-        >
-          {loading === "init" ? "Initing…" : forceReinit ? "Re-init Prefix" : "Init Prefix"}
-        </Focusable>
+        <div style={{ display: "flex", gap: "6px" }}>
+          <Focusable
+            onActivate={handleInitPrefix}
+            onClick={handleInitPrefix}
+            focusClassName="is-focused"
+            style={{
+              ...BTN_STYLE,
+              flex: 1,
+              opacity: !steamInfo || needsRestartAfterAdd || loading === "init" ? 0.5 : 1,
+            }}
+          >
+            {loading === "init" ? "Initing…" : forceReinit ? "Re-init Prefix" : "Init Prefix"}
+          </Focusable>
 
-        <Focusable
-          onActivate={() => setForceReinit(!forceReinit)}
-          onClick={() => setForceReinit(!forceReinit)}
-          focusClassName="is-focused"
-          style={{
-            ...BTN_STYLE,
-            background: forceReinit ? "#ff6666" : "transparent",
-            borderColor: forceReinit ? "#ff6666" : "#555",
-            color: needsRestartAfterAdd ? "#555" : forceReinit ? "white" : "#aaa",
-            opacity: needsRestartAfterAdd ? 0.4 : 1,
-          }}
-        >
-          {forceReinit ? "✓ Force re-init" : "☐ Force re-init"}
-        </Focusable>
+          <Focusable
+            onActivate={() => setForceReinit(!forceReinit)}
+            onClick={() => setForceReinit(!forceReinit)}
+            focusClassName="is-focused"
+            style={{
+              ...BTN_STYLE,
+              padding: "8px 10px",
+              minWidth: "70px",
+              textAlign: "center",
+              background: forceReinit ? "#ff6666" : "transparent",
+              borderColor: forceReinit ? "#ff6666" : "#555",
+              color: needsRestartAfterAdd ? "#555" : forceReinit ? "white" : "#aaa",
+              opacity: needsRestartAfterAdd ? 0.4 : 1,
+            }}
+          >
+            {forceReinit ? "Force ✓" : "Force"}
+          </Focusable>
+        </div>
 
         <Focusable
           onActivate={handleInstallDeps}
@@ -880,6 +888,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           focusClassName="is-focused"
           style={{
             ...BTN_STYLE,
+            width: "100%",
+            textAlign: "center",
             opacity: !steamInfo || needsRestartAfterAdd || mergedDeps.length === 0 || loading === "deps" ? 0.5 : 1,
           }}
         >
