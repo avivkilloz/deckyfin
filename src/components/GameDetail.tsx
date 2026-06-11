@@ -195,6 +195,9 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   const [needsRestartAfterAdd, setNeedsRestartAfterAdd] = useState(
     game.needs_restart_after_add ?? false
   );
+  const [needsRestart, setNeedsRestart] = useState(
+    game.needs_restart_after_add ?? false
+  );
 
   // ── Executable picker ───────────────────────────────────────────────────
   const [showExePicker, setShowExePicker] = useState(false);
@@ -226,6 +229,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           setSteamInfo({ app_id: res.app_id, unsigned_appid: res.unsigned_appid });
           // Clear needs_restart_after_add — Steam has restarted and the shortcut exists
           setNeedsRestartAfterAdd(false);
+          setNeedsRestart(false);
           updateGameConfig(game.name, { needs_restart_after_add: null }).catch(() => {});
         }
       })
@@ -356,6 +360,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
       if (res.success && res.app_id && res.unsigned_appid) {
         setSteamInfo({ app_id: res.app_id, unsigned_appid: res.unsigned_appid });
         setNeedsRestartAfterAdd(true);
+        setNeedsRestart(true);
+        updateGameConfig(storedName, { needs_restart_after_add: true }).catch(() => {});
         setFeedback({
           ok: true,
           msg: `Added to Steam (App ID: ${res.unsigned_appid}) — restart Steam to unlock actions`,
@@ -384,7 +390,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
       );
       if (res.success && res.app_id && res.unsigned_appid) {
         setSteamInfo({ app_id: res.app_id, unsigned_appid: res.unsigned_appid });
-        setNeedsRestartAfterAdd(true);
+        setNeedsRestart(true);
+        updateGameConfig(storedName, { needs_restart_after_add: true }).catch(() => {});
         setFeedback({
           ok: true,
           msg: "Steam updated — restart Steam to apply",
@@ -507,6 +514,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
     try {
       await restartSteam();
       setNeedsRestartAfterAdd(false);
+      setNeedsRestart(false);
       updateGameConfig(storedName, { needs_restart_after_add: null }).catch(() => {});
     } catch (_) {
       // Steam will close this UI as part of the restart — errors here are expected
@@ -961,8 +969,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           focusClassName="is-focused"
           style={{
             ...BTN_STYLE,
-            border: needsRestartAfterAdd ? "1px solid #27ae60" : "1px solid #555",
-            color: needsRestartAfterAdd ? "#2ecc71" : "#e0e0e0",
+            border: needsRestart ? "1px solid #27ae60" : "1px solid #555",
+            color: needsRestart ? "#2ecc71" : "#e0e0e0",
           }}
         >
           {restarting ? "…" : "↺ Restart Steam"}
