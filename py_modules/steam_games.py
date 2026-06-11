@@ -64,16 +64,14 @@ def _remove_case_variants(shortcut: dict, canonical_name: str):
 
     Tools like Heroic create shortcuts with lowercase field names (e.g. 'exe',
     'appname'), while deckyfin uses uppercase ('Exe', 'AppName'). If both
-    variants exist, Steam may read the wrong one. This helper deletes the
-    opposite-case key (if any) before setting the intended field, so Steam
-    always sees the correct value.
+    variants exist, Steam may read the wrong one. This helper deletes ALL
+    case variants of a key (e.g. for 'AppName' it removes 'appname', 'appName',
+    'APPNAME', etc.) so the canonical version can be set cleanly.
     """
-    # Generate the opposite-case key: e.g. "Exe" → "exe", "appname" → "AppName"
-    if canonical_name[0].isupper():
-        variant = canonical_name[0].lower() + canonical_name[1:]
-    else:
-        variant = canonical_name[0].upper() + canonical_name[1:]
-    shortcut.pop(variant, None)
+    key_lower = canonical_name.lower()
+    for existing_key in list(shortcut.keys()):
+        if existing_key.lower() == key_lower and existing_key != canonical_name:
+            shortcut.pop(existing_key, None)
 
 
 def _collections_to_tags(collections: Optional[list[str]]) -> dict:
@@ -108,6 +106,123 @@ def _save_vdf_binary(data, path: Path):
     import vdf
     with open(path, "wb") as f:
         vdf.binary_dump(data, f)
+
+
+def _save_vdf_text(data, path: Path):
+    """Save data to a text-format VDF file."""
+    import vdf
+    with open(path, "w", encoding="utf-8") as f:
+        vdf.dump(data, f)
+
+
+def _get_localconfig_path(user_id: str) -> Path:
+    """Get the path to localconfig.vdf for the given user."""
+    steam_root = find_steam_root()
+    path = (
+        steam_root / STEAM_USERDATA_FOLDER / user_id
+        / STEAM_CONFIG_FOLDER / LOCALCONFIG_VDF
+    )
+    if not path.exists():
+        path = (
+            steam_root / STEAM_USERDATA_FOLDER / user_id
+            / STEAM_CONFIG_FOLDER / CONFIG_VDF
+        )
+    return path if path.exists() else None
+
+
+def _sync_user_collections(
+    user_id: str,
+    app_id: int,
+    new_collections: Optional[list[str]],
+    old_collections: Optional[list[str]] = None,
+):
+    """Update the user-collections JSON in localconfig.vdf to match collections
+    assigned to a game shortcut.
+
+    Steam stores user-defined collections in localconfig.vdf under
+    WebStorage.user-collections as a JSON blob. Each collection with an
+    ``srm-<base64(name)>`` key contains an ``added`` array of appids.
+
+    Shortcuts.vdf stores ``tags`` on each shortcut, but Steam also needs the
+    collection definition in localconfig.vdf — otherwise the collection won't
+    appear in the library sidebar.
+    """
+    import base64
+    import json
+
+    path = _get_localconfig_path(user_id)
+    if path is None:
+        return
+
+    try:
+        data = _load_vdf_text(path)
+    except Exception:
+        logger.warning("Failed to load localconfig.vdf for collection sync")
+        return
+
+    try:
+        ws = data.setdefault("UserLocalConfigStore", {}).setdefault("WebStorage", {})
+        raw = ws.get("user-collections", "{}")
+        if isinstance(raw, str):
+            collections = json.loads(raw)
+        else:
+            collections = raw  # already a dict
+    except (json.JSONDecodeError, TypeError):
+        collections = {}
+
+    changed = False
+
+    # Helper: get or create an srm- collection entry
+    def _ensure_srm_entry(name: str) -> dict:
+        key = "srm-" + base64.b64encode(name.encode("utf-8")).decode("utf-8")
+        if key not in collections or not isinstance(collections[key], dict):
+            collections[key] = {"id": key, "added": [], "removed": []}
+        return collections[key]
+
+    # Add app_id to new collections
+    if new_collections:
+        for name in new_collections:
+            if not name:
+                continue
+            entry = _ensure_srm_entry(name)
+            if app_id not in entry.get("added", []):
+                entry.setdefault("added", []).append(app_id)
+                changed = True
+
+    # Remove app_id from collections that were dropped
+    if old_collections:
+        for name in old_collections:
+            if not name or (new_collections and name in new_collections):
+                continue
+            key = "srm-" + base64.b64encode(name.encode("utf-8")).decode("utf-8")
+            entry = collections.get(key)
+            if entry and app_id in entry.get("added", []):
+                entry["added"].remove(app_id)
+                changed = True
+
+    if not changed:
+        return
+
+    ws["user-collections"] = json.dumps(collections, ensure_ascii=False)
+    _save_vdf_text(data, path)
+    logger.info(
+        "Synced user collections for app_id=%s (collections=%s)",
+        app_id, new_collections,
+    )
+
+
+def _parse_old_tags(shortcut: dict) -> Optional[list[str]]:
+    """Extract collection names from a shortcut's existing `tags` field."""
+    tags = shortcut.get("tags", {})
+    if not tags:
+        return None
+    names = [v for _, v in sorted(tags.items()) if v]
+    return names if names else None
+
+
+def _collections_equal(a: Optional[list[str]], b: Optional[list[str]]) -> bool:
+    """Check if two collection lists are equal (order-independent)."""
+    return sorted(a or []) == sorted(b or [])
 
 
 def get_steam_vdf_compat_tool_mapping(vdf_file: dict) -> dict:
@@ -260,6 +375,8 @@ def add_nonsteam_game(
             _remove_case_variants(shortcuts_dict[idx], "StartDir")
             _remove_case_variants(shortcuts_dict[idx], "LaunchOptions")
 
+            old_tags = _parse_old_tags(shortcuts_dict[idx])
+
             shortcuts_dict[idx]["AppName"] = app_name
             shortcuts_dict[idx]["Exe"] = exe_formatted
             shortcuts_dict[idx]["StartDir"] = start_dir
@@ -268,6 +385,12 @@ def add_nonsteam_game(
 
             shortcuts["shortcuts"] = shortcuts_dict
             _save_vdf_binary(shortcuts, shortcuts_path)
+
+            # Sync collections to localconfig.vdf if they changed
+            if not _collections_equal(old_tags, collections):
+                _sync_user_collections(
+                    user_id_actual, app_id, collections, old_tags,
+                )
 
             logger.info(
                 "Updated existing non-Steam game '%s' (app_id=%s) exe=%s",
@@ -307,6 +430,10 @@ def add_nonsteam_game(
 
     shortcuts["shortcuts"][next_index] = new_shortcut
     _save_vdf_binary(shortcuts, shortcuts_path)
+
+    # Sync collections to localconfig.vdf
+    if collections:
+        _sync_user_collections(user_id_actual, app_id, collections)
 
     logger.info(
         "Added non-Steam game '%s' (app_id=%s) exe=%s",
@@ -377,6 +504,8 @@ def update_nonsteam_game(
     _remove_case_variants(shortcuts_dict[target_idx], "StartDir")
     _remove_case_variants(shortcuts_dict[target_idx], "LaunchOptions")
 
+    old_tags = _parse_old_tags(shortcuts_dict[target_idx])
+
     shortcuts_dict[target_idx]["Exe"] = exe_formatted
     shortcuts_dict[target_idx]["StartDir"] = start_dir
     shortcuts_dict[target_idx]["LaunchOptions"] = launch_options
@@ -384,6 +513,12 @@ def update_nonsteam_game(
 
     shortcuts["shortcuts"] = shortcuts_dict
     _save_vdf_binary(shortcuts, shortcuts_path)
+
+    # Sync collections to localconfig.vdf if they changed
+    if not _collections_equal(old_tags, collections):
+        _sync_user_collections(
+            user_id_actual, app_id, collections, old_tags,
+        )
 
     logger.info(
         "Updated non-Steam game '%s' (app_id=%s) exe=%s",
