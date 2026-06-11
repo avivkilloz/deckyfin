@@ -420,15 +420,15 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
       {ptStatus ? (
         <div style={{ fontSize: "0.85em", marginBottom: "10px" }}>
           {ptStatus.flatpak_installed && (
-            <div style={{ marginBottom: "4px" }}>
-              <span>✅</span>{" "}
-              <span style={{ color: "#e0e0e0" }}>Flatpak protontricks</span>
-            </div>
-          )}
-          {ptStatus.native_available && (
             <div>
               <span>✅</span>{" "}
-              <span style={{ color: "#e0e0e0" }}>Native protontricks</span>
+              <span style={{ color: "#e0e0e0" }}>Protontricks (flatpak)</span>
+            </div>
+          )}
+          {!ptStatus.flatpak_installed && ptStatus.native_available && (
+            <div>
+              <span>✅</span>{" "}
+              <span style={{ color: "#e0e0e0" }}>Protontricks (native)</span>
             </div>
           )}
           {!ptStatus.flatpak_installed && !ptStatus.native_available && (
