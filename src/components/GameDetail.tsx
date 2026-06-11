@@ -616,7 +616,14 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   // ── Sync/install needed comparisons — drives green on action buttons ──
   const steamNeedsSync = (() => {
     const a = lastSyncedSnapshot;
-    const b = { name, executable, start_dir: startDir || null, launch_options: launchOptions || null, proton_version: protonVersion || null, collections: mergedCollections };
+    const b = {
+      name: configSnapshot.name,
+      executable: configSnapshot.executable,
+      start_dir: configSnapshot.start_dir,
+      launch_options: configSnapshot.launch_options,
+      proton_version: configSnapshot.proton_version,
+      collections: configSnapshot.collections,
+    };
     return JSON.stringify(a) !== JSON.stringify(b);
   })();
 
