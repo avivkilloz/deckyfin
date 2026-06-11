@@ -259,6 +259,7 @@ class Plugin:
         start_dir: Optional[str] = None,
         launch_options: str = "",
         proton_version: Optional[str] = None,
+        collections: Optional[list[str]] = None,
     ) -> dict:
         if not exe_path:
             return {"success": False, "error": "Executable path is required"}
@@ -273,7 +274,7 @@ class Plugin:
             games_folder = get_games_folder()
             if games_folder:
                 resolved_start = str(Path(games_folder) / resolved_start)
-        app_id = add_nonsteam_game(str(exe), app_name, resolved_start, launch_options)
+        app_id = add_nonsteam_game(str(exe), app_name, resolved_start, launch_options, collections=collections)
         _debug(
             f"add_steam_shortcut: app_id={app_id}, proton_version={proton_version!r}, "
             f"app_name={app_name}, exe={exe}"
@@ -309,6 +310,7 @@ class Plugin:
         start_dir: Optional[str] = None,
         launch_options: str = "",
         proton_version: Optional[str] = None,
+        collections: Optional[list[str]] = None,
     ) -> dict:
         """Update an existing Steam shortcut in-place. Returns error if not found."""
         # Resolve relative paths against the configured games folder
@@ -323,7 +325,7 @@ class Plugin:
             if games_folder:
                 resolved_start = str(Path(games_folder) / resolved_start)
         app_id = update_nonsteam_game(
-            app_name, str(exe), resolved_start or "", launch_options
+            app_name, str(exe), resolved_start or "", launch_options, collections=collections
         )
         if app_id is None:
             return {

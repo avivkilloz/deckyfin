@@ -9,7 +9,7 @@ const removeGame = callable<[name: string], { success: boolean }>(
   "remove_game"
 );
 const addSteamShortcut = callable<
-  [exe_path: string, app_name: string, start_dir?: string, launch_options?: string, proton_version?: string],
+  [exe_path: string, app_name: string, start_dir?: string, launch_options?: string, proton_version?: string, collections?: string[]],
   { success: boolean; app_id?: number; unsigned_appid?: number; error?: string }
 >("add_steam_shortcut");
 const getSteamShortcut = callable<
@@ -25,7 +25,7 @@ const purgeSteamGameData = callable<
   { success: boolean; removed_shortcut?: boolean; removed_prefix?: boolean; removed_grid?: boolean; unsigned_appid?: number; errors?: string[] }
 >("purge_steam_game_data");
 const updateSteamShortcut = callable<
-  [app_name: string, exe_path: string, start_dir?: string, launch_options?: string, proton_version?: string],
+  [app_name: string, exe_path: string, start_dir?: string, launch_options?: string, proton_version?: string, collections?: string[]],
   { success: boolean; app_id?: number; unsigned_appid?: number; error?: string }
 >("update_steam_shortcut");
 const listProtonVersions = callable<[], string[]>("list_proton_versions");
@@ -135,6 +135,12 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   const [launchOptions, setLaunchOptions] = useState(
     game.launch_options || ""
   );
+
+  // ── Collections ─────────────────────────────────────────────────────────
+  const [collections, setCollections] = useState(
+    game.collections?.join(", ") || ""
+  );
+  const collectionsList = collections.split(",").map((c) => c.trim()).filter(Boolean);
 
   // ── Dependencies: checkboxes + custom ────────────────────────────────────
   const existingDeps = game.proton_dependencies || [];
@@ -293,6 +299,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         proton_version: protonVersion || null,
         proton_dependencies: mergedDeps,
         launch_options: launchOptions || null,
+        collections: collectionsList,
       });
       if (!res.success) {
         setConfigFeedback({ ok: false, msg: "Failed to save config" });
@@ -341,7 +348,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         name,
         startDir || undefined,
         launchOptions || "",
-        protonVersion || undefined
+        protonVersion || undefined,
+        collectionsList.length > 0 ? collectionsList : undefined
       );
       if (res.success && res.app_id && res.unsigned_appid) {
         setSteamInfo({ app_id: res.app_id, unsigned_appid: res.unsigned_appid });
@@ -369,7 +377,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         executable,
         startDir || undefined,
         launchOptions || "",
-        protonVersion || undefined
+        protonVersion || undefined,
+        collectionsList.length > 0 ? collectionsList : undefined
       );
       if (res.success && res.app_id && res.unsigned_appid) {
         setSteamInfo({ app_id: res.app_id, unsigned_appid: res.unsigned_appid });
@@ -615,6 +624,46 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         onChange={(e) => setLaunchOptions(e.target.value)}
         style={{ width: "100%", marginBottom: "10px" }}
       />
+
+      {/* Collections */}
+      <label style={LABEL_STYLE}>
+        Collections
+        <span style={{ color: "#666", fontWeight: "normal" }}>
+          {" "}(comma-separated)
+        </span>
+      </label>
+      <CompactTextField
+        value={collections}
+        onChange={(e) => setCollections(e.target.value)}
+        placeholder="e.g. RPG, FPS, Favorites"
+        style={{ width: "100%", marginBottom: "10px" }}
+      />
+      {collectionsList.length > 0 && (
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "4px",
+            marginBottom: "10px",
+          }}
+        >
+          {collectionsList.map((c, i) => (
+            <span
+              key={i}
+              style={{
+                padding: "2px 8px",
+                fontSize: "0.78em",
+                border: "1px solid #555",
+                borderRadius: "10px",
+                background: "rgba(255,255,255,0.06)",
+                color: "#ccc",
+              }}
+            >
+              {c}
+            </span>
+          ))}
+        </div>
+      )}
 
       {/* Proton Version: inline picker */}
       <label style={LABEL_STYLE}>Proton Version</label>

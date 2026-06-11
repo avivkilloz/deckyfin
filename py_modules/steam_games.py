@@ -76,6 +76,17 @@ def _remove_case_variants(shortcut: dict, canonical_name: str):
     shortcut.pop(variant, None)
 
 
+def _collections_to_tags(collections: Optional[list[str]]) -> dict:
+    """Convert a list of collection names to the VDF tags field format.
+
+    Steam stores collections as integer-indexed entries in the 'tags' dict:
+        {"0": "RPG", "1": "FPS", ...}
+    """
+    if not collections:
+        return {}
+    return {str(i): name for i, name in enumerate(collections) if name}
+
+
 # ── VDF Parsing Helpers ────────────────────────────────────────────────────
 
 def _load_vdf_text(path: Path):
@@ -195,6 +206,7 @@ def add_nonsteam_game(
     start_dir: Optional[str] = None,
     launch_options: str = "",
     user_id: Optional[str] = None,
+    collections: Optional[list[str]] = None,
 ) -> int:
     """Add a non-Steam game to Steam shortcuts. Returns the calculated app_id.
 
@@ -252,6 +264,7 @@ def add_nonsteam_game(
             shortcuts_dict[idx]["Exe"] = exe_formatted
             shortcuts_dict[idx]["StartDir"] = start_dir
             shortcuts_dict[idx]["LaunchOptions"] = launch_options
+            shortcuts_dict[idx]["tags"] = _collections_to_tags(collections)
 
             shortcuts["shortcuts"] = shortcuts_dict
             _save_vdf_binary(shortcuts, shortcuts_path)
@@ -289,7 +302,7 @@ def add_nonsteam_game(
         "DevkitOverrideAppID": 0,
         "LastPlayTime": 0,
         "FlatpakAppID": "",
-        "tags": {},
+        "tags": _collections_to_tags(collections),
     }
 
     shortcuts["shortcuts"][next_index] = new_shortcut
@@ -310,6 +323,7 @@ def update_nonsteam_game(
     start_dir: str = "",
     launch_options: str = "",
     user_id: Optional[str] = None,
+    collections: Optional[list[str]] = None,
 ) -> Optional[int]:
     """Update an existing non-Steam game shortcut in-place by AppName.
     Returns the app_id of the updated shortcut, or None if not found.
@@ -366,6 +380,7 @@ def update_nonsteam_game(
     shortcuts_dict[target_idx]["Exe"] = exe_formatted
     shortcuts_dict[target_idx]["StartDir"] = start_dir
     shortcuts_dict[target_idx]["LaunchOptions"] = launch_options
+    shortcuts_dict[target_idx]["tags"] = _collections_to_tags(collections)
 
     shortcuts["shortcuts"] = shortcuts_dict
     _save_vdf_binary(shortcuts, shortcuts_path)
