@@ -148,8 +148,8 @@ class Plugin:
         try:
             games = list_game_configs()
             for game in games:
-                if game.get("needs_restart_after_add"):
-                    update_game_config(game["name"], {"needs_restart_after_add": None})
+                if game.get("needs_restart_after_add") or game.get("needs_restart"):
+                    update_game_config(game["name"], {"needs_restart_after_add": None, "needs_restart": None})
         except Exception:
             pass
         return result
@@ -294,7 +294,7 @@ class Plugin:
                 self.logger.warning("Failed to set Proton version: %s", e)
         # Mark game as needing restart before Steam-dependent actions work
         try:
-            update_game_config(app_name, {"needs_restart_after_add": True})
+            update_game_config(app_name, {"needs_restart_after_add": True, "needs_restart": True})
         except Exception:
             pass
         return {
@@ -340,10 +340,10 @@ class Plugin:
                 set_proton_version(app_id, proton_version, user_id, app_name)
             except Exception as e:
                 self.logger.warning("Failed to set Proton version: %s", e)
-        # Mark game as needing restart
+        # Mark game as needing restart (green border only, not warning/lock)
         try:
-            update_game_config(app_name, {"needs_restart_after_add": True})
-            self.logger.info("Marked '%s' as needs_restart_after_add", app_name)
+            update_game_config(app_name, {"needs_restart": True})
+            self.logger.info("Marked '%s' as needs_restart", app_name)
         except Exception as e:
             self.logger.warning("Failed to mark needs_restart for '%s': %s", app_name, e)
         return {

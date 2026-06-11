@@ -200,7 +200,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
     game.needs_restart_after_add ?? false
   );
   const [needsRestart, setNeedsRestart] = useState(
-    game.needs_restart_after_add ?? false
+    game.needs_restart ?? false
   );
 
   // ── Executable picker ───────────────────────────────────────────────────
@@ -227,7 +227,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
     // Fetch fresh game config — parent's games array may be stale
     getGame(game.name).then((res) => {
       if (res.success && res.game) {
-        setNeedsRestart(res.game.needs_restart_after_add ?? false);
+        setNeedsRestart(res.game.needs_restart ?? false);
+        setNeedsRestartAfterAdd(res.game.needs_restart_after_add ?? false);
       }
     }).catch(() => {});
   }, [game.name]);
@@ -367,7 +368,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         setSteamInfo({ app_id: res.app_id, unsigned_appid: res.unsigned_appid });
         setNeedsRestartAfterAdd(true);
         setNeedsRestart(true);
-        updateGameConfig(storedName, { needs_restart_after_add: true }).catch(() => {});
+        updateGameConfig(storedName, { needs_restart_after_add: true, needs_restart: true }).catch(() => {});
         setFeedback({
           ok: true,
           msg: `Added to Steam (App ID: ${res.unsigned_appid}) — restart Steam to unlock actions`,
@@ -397,7 +398,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
       if (res.success && res.app_id && res.unsigned_appid) {
         setSteamInfo({ app_id: res.app_id, unsigned_appid: res.unsigned_appid });
         setNeedsRestart(true);
-        updateGameConfig(storedName, { needs_restart_after_add: true }).catch(() => {});
+        updateGameConfig(storedName, { needs_restart: true }).catch(() => {});
         setFeedback({
           ok: true,
           msg: "Steam updated — restart Steam to apply",
@@ -517,11 +518,12 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
 
   const handleRestartSteam = async () => {
     setRestarting(true);
+    // Clear flags in config BEFORE restarting — the plugin connection may die
+    setNeedsRestartAfterAdd(false);
+    setNeedsRestart(false);
+    updateGameConfig(storedName, { needs_restart_after_add: null, needs_restart: null }).catch(() => {});
     try {
       await restartSteam();
-      setNeedsRestartAfterAdd(false);
-      setNeedsRestart(false);
-      updateGameConfig(storedName, { needs_restart_after_add: null }).catch(() => {});
     } catch (_) {
       // Steam will close this UI as part of the restart — errors here are expected
     }

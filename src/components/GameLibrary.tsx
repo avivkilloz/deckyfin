@@ -119,7 +119,7 @@ export const GameLibrary: VFC = () => {
           if (selectedGame) {
             setGames(prev => prev.map(g =>
               g.name === selectedGame.name
-                ? { ...g, needs_restart_after_add: true }
+                ? { ...g, needs_restart: true }
                 : g
             ));
           }

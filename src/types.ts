@@ -13,6 +13,7 @@ export interface GameConfig {
   launch_options?: string;
   collections?: string[];
   needs_restart_after_add?: boolean;
+  needs_restart?: boolean;
 }
 
 export interface GameFolder {
