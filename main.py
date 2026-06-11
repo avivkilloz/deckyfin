@@ -238,10 +238,35 @@ class Plugin:
     # ── Games ─────────────────────────────────────────────────────────────
 
     async def get_games(self) -> list:
-        return list_game_configs()
+        """Return all games from all sources, merged by name."""
+        sources = _list_sources()
+        merged: dict[str, dict] = {}
+        for source in sources:
+            try:
+                games = _load_source_games(source)
+            except Exception as e:
+                _debug(f"get_games: failed to load source {source['id']}: {e}")
+                continue
+            for game in games:
+                name = game.get("name", "")
+                if not name:
+                    continue
+                if name not in merged:
+                    merged[name] = {"name": name, "sources": []}
+                merged[name]["sources"].append({
+                    "source_id": source["id"],
+                    "source_name": source["name"],
+                    "source_type": source["type"],
+                    "config": game,
+                })
+        return list(merged.values())
 
-    async def get_game(self, name: str) -> dict:
-        game = get_game_config(name)
+    async def get_game(self, name: str, source_id: Optional[str] = None) -> dict:
+        source = _get_source_by_id(source_id) if source_id else (_list_sources() or [None])[0]
+        if not source:
+            return {"success": False, "error": "No source configured"}
+        path = source.get("path")
+        game = get_game_config(name, Path(path) if path else None)
         if game:
             return {"success": True, "game": game}
         return {"success": False, "error": f"Game '{name}' not found"}
@@ -253,38 +278,54 @@ class Plugin:
         except GameConfigError as e:
             return {"success": False, "error": str(e)}
 
-    async def update_game_config(self, name: str, updates: dict) -> dict:
+    async def update_game_config(self, name: str, updates: dict, source_id: Optional[str] = None) -> dict:
         """Update specific fields on an existing game config."""
+        source = _get_source_by_id(source_id) if source_id else (_list_sources() or [None])[0]
+        if not source:
+            return {"success": False, "error": "No source configured"}
+        path = source.get("path")
         try:
-            result = update_game_config(name, updates)
+            result = update_game_config(name, updates, Path(path) if path else None)
             return {"success": True, "game": result}
         except GameConfigError as e:
             return {"success": False, "error": str(e)}
 
-    async def set_game_processing_state(self, name: str, state: dict | None) -> dict:
+    async def set_game_processing_state(self, name: str, state: dict | None, source_id: Optional[str] = None) -> dict:
         """Persist the current processing state for a game (e.g. installing deps).
 
         Pass None to clear the state after processing completes.
         """
+        source = _get_source_by_id(source_id) if source_id else (_list_sources() or [None])[0]
+        if not source:
+            return {"success": False, "error": "No source configured"}
+        path = source.get("path")
         try:
-            update_game_config(name, {"processing_state": state})
+            update_game_config(name, {"processing_state": state}, Path(path) if path else None)
             return {"success": True}
         except GameConfigError as e:
             return {"success": False, "error": str(e)}
 
-    async def get_game_processing_state(self, name: str) -> dict | None:
+    async def get_game_processing_state(self, name: str, source_id: Optional[str] = None) -> dict | None:
         """Check if a game has a persisted processing state.
 
         Returns the state dict (e.g. {status: "installing", ...}) or None.
         """
+        source = _get_source_by_id(source_id) if source_id else (_list_sources() or [None])[0]
+        if not source:
+            return None
+        path = source.get("path")
         try:
-            game = get_game_config(name)
+            game = get_game_config(name, Path(path) if path else None)
             return game.get("processing_state") if game else None
         except Exception:
             return None
 
-    async def remove_game(self, name: str) -> dict:
-        removed = remove_game_config(name)
+    async def remove_game(self, name: str, source_id: Optional[str] = None) -> dict:
+        source = _get_source_by_id(source_id) if source_id else (_list_sources() or [None])[0]
+        if not source:
+            return {"success": False, "error": "No source configured"}
+        path = source.get("path")
+        removed = remove_game_config(name, Path(path) if path else None)
         return {"success": removed, "error": None if removed else f"Game '{name}' not found"}
 
     async def list_nonsteam_games(self) -> list:
