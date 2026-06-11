@@ -758,34 +758,6 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         />
       </div>
 
-      {/* Grey pills for current collections */}
-      {mergedCollections.length > 0 && (
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: "4px",
-            marginBottom: "10px",
-          }}
-        >
-          {mergedCollections.map((c, i) => (
-            <span
-              key={i}
-              style={{
-                padding: "2px 8px",
-                fontSize: "0.78em",
-                border: "1px solid #555",
-                borderRadius: "10px",
-                background: "rgba(255,255,255,0.06)",
-                color: "#ccc",
-              }}
-            >
-              {c}
-            </span>
-          ))}
-        </div>
-      )}
-
       {/* Proton Version: inline picker */}
       <label style={LABEL_STYLE}>Proton Version</label>
       <Focusable
