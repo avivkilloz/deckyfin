@@ -136,77 +136,184 @@ def _sync_user_collections(
     new_collections: Optional[list[str]],
     old_collections: Optional[list[str]] = None,
 ):
-    """Update the user-collections JSON in localconfig.vdf to match collections
-    assigned to a game shortcut.
+    """Sync collections to Steam's cloud storage JSON (modern authoritative source).
 
-    Steam stores user-defined collections in localconfig.vdf under
-    WebStorage.user-collections as a JSON blob. Each collection with an
-    ``srm-<base64(name)>`` key contains an ``added`` array of appids.
+    Modern Steam (2023+) stores user-defined collections in cloud storage JSON
+    files under ``userdata/{userId}/config/cloudstorage/``. Each collection is
+    a JSON entry with key ``user-collections.``-prefixed entries containing
+    ``added`` (app ID array) and ``name`` fields.
 
-    Shortcuts.vdf stores ``tags`` on each shortcut, but Steam also needs the
-    collection definition in localconfig.vdf — otherwise the collection won't
-    appear in the library sidebar.
+    The ``tags`` field in shortcuts.vdf is a legacy mechanism — Steam no longer
+    derives the library sidebar from it. Both are written for compatibility.
+
+    Follows the same format as Steam ROM Manager (srm-prefixed collections).
+    Deckyfin uses ``dfy-`` prefix.
     """
     import base64
     import json
 
-    path = _get_localconfig_path(user_id)
-    if path is None:
-        return
+    steam_root = find_steam_root()
+    cloud_dir = steam_root / STEAM_USERDATA_FOLDER / user_id / "config" / "cloudstorage"
 
-    try:
-        data = _load_vdf_text(path)
-    except Exception:
-        logger.warning("Failed to load localconfig.vdf for collection sync")
-        return
+    # ── Find active namespace ──────────────────────────────────────────
+    namespaces_path = cloud_dir / "cloud-storage-namespaces.json"
+    active_namespace = 1  # default
+    if namespaces_path.exists():
+        try:
+            with open(namespaces_path, "r", encoding="utf-8") as f:
+                namespaces = json.load(f)
+            # Format: [[1, "798"], [3, "0"]] — find the one with highest version
+            sorted_ns = sorted(namespaces, key=lambda x: int(x[1]), reverse=True)
+            if sorted_ns and sorted_ns[0][1] != "0":
+                active_namespace = sorted_ns[0][0]
+        except (json.JSONDecodeError, ValueError, IndexError, TypeError):
+            pass
 
-    try:
-        ws = data.setdefault("UserLocalConfigStore", {}).setdefault("WebStorage", {})
-        raw = ws.get("user-collections", "{}")
-        if isinstance(raw, str):
-            collections = json.loads(raw)
-        else:
-            collections = raw  # already a dict
-    except (json.JSONDecodeError, TypeError):
-        collections = {}
+    cloud_path = cloud_dir / f"cloud-storage-namespace-{active_namespace}.json"
+
+    # ── Load existing cloud storage data ──────────────────────────────
+    cloud_data = []
+    if cloud_path.exists():
+        try:
+            with open(cloud_path, "r", encoding="utf-8") as f:
+                cloud_data = json.load(f)
+        except (json.JSONDecodeError, ValueError):
+            cloud_data = []
+
+    # Parse existing collections: key → {name, added, removed}
+    collections: dict[str, dict] = {}
+    for item in cloud_data:
+        if not isinstance(item, list) or len(item) < 2:
+            continue
+        key = item[0]
+        if not isinstance(key, str) or not key.startswith("user-collections."):
+            continue
+        entry = item[1]
+        if not isinstance(entry, dict):
+            continue
+        if entry.get("is_deleted"):
+            continue
+        try:
+            value = json.loads(entry.get("value", "{}"))
+        except (json.JSONDecodeError, TypeError):
+            continue
+        collection_id = key.replace("user-collections.", "", 1)
+        collections[collection_id] = {
+            "id": collection_id,
+            "name": value.get("name", ""),
+            "added": value.get("added", []),
+            "removed": value.get("removed", []),
+        }
+
+    timestamp = int(__import__("time").time())
+
+    # ── Helper: encode a name to a base64 key (URL-safe, like SRM) ──
+    def _name_to_key(name: str) -> str:
+        b64 = base64.b64encode(name.encode("utf-8")).decode("utf-8")
+        b64 = b64.replace("+", "-").replace("/", "_").replace("=", "")
+        return f"dfy-{b64}"
 
     changed = False
 
-    # Helper: get or create an srm- collection entry
-    def _ensure_srm_entry(name: str) -> dict:
-        key = "srm-" + base64.b64encode(name.encode("utf-8")).decode("utf-8")
-        if key not in collections or not isinstance(collections[key], dict):
-            collections[key] = {"id": key, "added": [], "removed": []}
-        return collections[key]
-
-    # Add app_id to new collections
+    # ── Add app_id to new collections ──────────────────────────────────
     if new_collections:
         for name in new_collections:
             if not name:
                 continue
-            entry = _ensure_srm_entry(name)
-            if app_id not in entry.get("added", []):
-                entry.setdefault("added", []).append(app_id)
+            name_stripped = name.strip()
+
+            # Case-insensitive match against existing collections
+            existing_key = None
+            for cid, cdata in collections.items():
+                if cdata.get("name", "").lower() == name_stripped.lower():
+                    existing_key = cid
+                    break
+
+            if existing_key:
+                coll = collections[existing_key]
+            else:
+                existing_key = _name_to_key(name_stripped)
+                coll = collections.setdefault(existing_key, {
+                    "id": existing_key,
+                    "name": name_stripped,
+                    "added": [],
+                    "removed": [],
+                })
+
+            # Update name (in case it was renamed)
+            if coll["name"] != name_stripped:
+                coll["name"] = name_stripped
                 changed = True
 
-    # Remove app_id from collections that were dropped
+            # Ensure added/removed arrays exist
+            coll.setdefault("added", [])
+            coll.setdefault("removed", [])
+
+            if app_id not in coll["added"]:
+                coll["added"].append(app_id)
+                changed = True
+
+    # ── Remove app_id from dropped collections ─────────────────────────
     if old_collections:
         for name in old_collections:
-            if not name or (new_collections and name in new_collections):
+            if not name:
                 continue
-            key = "srm-" + base64.b64encode(name.encode("utf-8")).decode("utf-8")
-            entry = collections.get(key)
-            if entry and app_id in entry.get("added", []):
-                entry["added"].remove(app_id)
-                changed = True
+            if new_collections and name in new_collections:
+                continue
+
+            # Case-insensitive match
+            for cid, cdata in list(collections.items()):
+                if cdata.get("name", "").lower() == name.strip().lower():
+                    if app_id in cdata.get("added", []):
+                        cdata["added"].remove(app_id)
+                        changed = True
+                    break
 
     if not changed:
         return
 
-    ws["user-collections"] = json.dumps(collections, ensure_ascii=False)
-    _save_vdf_text(data, path)
+    # ── Build new cloud storage data ──────────────────────────────────
+    # Preserve all non-dfy collection entries, rebuild dfy entries
+    new_cloud = []
+    for item in cloud_data:
+        if not isinstance(item, list) or len(item) < 2:
+            new_cloud.append(item)
+            continue
+        key = item[0]
+        if isinstance(key, str) and key.startswith("user-collections.dfy-"):
+            continue  # will be rebuilt
+        new_cloud.append(item)
+
+    # Write dfy collections
+    for cid, cdata in collections.items():
+        if not cid.startswith("dfy-"):
+            continue
+        if not cdata.get("added"):
+            continue  # skip empty collections
+        cloud_key = f"user-collections.{cid}"
+        value_json = json.dumps(
+            {"id": cid, "name": cdata["name"], "added": cdata["added"], "removed": cdata.get("removed", [])},
+            ensure_ascii=False,
+        )
+        new_cloud.append([
+            cloud_key,
+            {
+                "key": cloud_key,
+                "timestamp": timestamp,
+                "value": value_json,
+                "version": str(timestamp),
+                "conflictResolutionMethod": "custom",
+                "strMethodId": "union-collections",
+            },
+        ])
+
+    # ── Write back ──────────────────────────────────────────────────────
+    cloud_dir.mkdir(parents=True, exist_ok=True)
+    with open(cloud_path, "w", encoding="utf-8") as f:
+        json.dump(new_cloud, f, ensure_ascii=False)
+
     logger.info(
-        "Synced user collections for app_id=%s (collections=%s)",
+        "Synced cloud storage collections for app_id=%s (collections=%s)",
         app_id, new_collections,
     )
 
