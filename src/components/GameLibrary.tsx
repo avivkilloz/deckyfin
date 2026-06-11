@@ -116,6 +116,13 @@ export const GameLibrary: VFC = () => {
         onNeedsRestart={() => {
           setNeedsRestartState(true);
           setNeedsRestart(true).catch(() => {});
+          if (selectedGame) {
+            setGames(prev => prev.map(g =>
+              g.name === selectedGame.name
+                ? { ...g, needs_restart_after_add: true }
+                : g
+            ));
+          }
         }}
       />
     );
