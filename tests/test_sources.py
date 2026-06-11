@@ -102,6 +102,59 @@ def test_migrate_games_folder(tmp_path, monkeypatch):
     assert sources[0]["path"] == "/home/deck/Games"
 
 
+def test_detect_capabilities_local_writable(tmp_path, monkeypatch):
+    """Local source at a writable path has all capabilities."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    import importlib, deckyfin_config, deckyfin_sources
+    importlib.reload(deckyfin_config)
+    importlib.reload(deckyfin_sources)
+    from deckyfin_sources import detect_capabilities
+    source = {"id": "x", "type": "local", "path": str(tmp_path), "url": None}
+    caps = detect_capabilities(source)
+    assert caps["can_play"] is True
+    assert caps["can_write_config"] is True
+    assert caps["can_download_to"] is True
+
+
+def test_detect_capabilities_mount_read_only(tmp_path, monkeypatch):
+    """Mount source returns can_play=False."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    import importlib, deckyfin_config, deckyfin_sources
+    importlib.reload(deckyfin_config)
+    importlib.reload(deckyfin_sources)
+    from deckyfin_sources import detect_capabilities
+    source = {"id": "x", "type": "mount", "path": str(tmp_path), "url": None}
+    caps = detect_capabilities(source)
+    assert caps["can_play"] is False
+
+
+def test_get_disk_usage_local(tmp_path, monkeypatch):
+    """get_disk_usage returns used/total/free for a local path."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    import importlib, deckyfin_config, deckyfin_sources
+    importlib.reload(deckyfin_config)
+    importlib.reload(deckyfin_sources)
+    from deckyfin_sources import get_disk_usage
+    source = {"id": "x", "type": "local", "path": str(tmp_path), "url": None}
+    usage = get_disk_usage(source)
+    assert "used" in usage
+    assert "total" in usage
+    assert "free" in usage
+    assert usage["total"] > 0
+
+
+def test_get_disk_usage_offline(tmp_path, monkeypatch):
+    """get_disk_usage returns None values when path doesn't exist."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    import importlib, deckyfin_config, deckyfin_sources
+    importlib.reload(deckyfin_config)
+    importlib.reload(deckyfin_sources)
+    from deckyfin_sources import get_disk_usage
+    source = {"id": "x", "type": "local", "path": "/nonexistent/path/xyz", "url": None}
+    usage = get_disk_usage(source)
+    assert usage["total"] is None
+
+
 def test_migrate_skips_if_sources_present(tmp_path, monkeypatch):
     """migrate_games_folder_to_source is a no-op when sources already exists."""
     _make_app_config(tmp_path, {
