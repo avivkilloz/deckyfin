@@ -217,16 +217,23 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
 
   // ── Green button state ────────────────────────────────────────────────────
   // Snapshots of what was last synced/installed — computed comparison drives green
-  const [lastSyncedSnapshot, setLastSyncedSnapshot] = useState(() => ({
-    name: game.name,
-    executable: game.executable,
-    start_dir: game.start_dir || null,
-    launch_options: game.launch_options || null,
-    proton_version: game.proton_version || null,
-    collections: game.collections || [],
-  }));
+  // Initialize from game prop's persisted snapshots directly (not async getGame)
+  // so the first render already has correct comparison values.
+  const [lastSyncedSnapshot, setLastSyncedSnapshot] = useState(() => {
+    if (game.steam_snapshot) {
+      try { return JSON.parse(game.steam_snapshot); } catch {}
+    }
+    return {
+      name: game.name,
+      executable: game.executable,
+      start_dir: game.start_dir || null,
+      launch_options: game.launch_options || null,
+      proton_version: game.proton_version || null,
+      collections: game.collections || [],
+    };
+  });
   const [lastInstalledDeps, setLastInstalledDeps] = useState<string[]>(
-    () => game.proton_dependencies || []
+    () => game.deps_snapshot || game.proton_dependencies || []
   );
 
   // Snapshot of last-saved config — used to detect unsaved changes (Apply Config green)
