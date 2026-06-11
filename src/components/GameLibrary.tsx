@@ -1,14 +1,13 @@
 import { VFC, useState, useEffect, useCallback } from "react";
 import { callable } from "@decky/api";
 import { Focusable } from "@decky/ui";
-import { GameConfig } from "../types";
+import { MergedGame } from "../types";
 import { GameCard } from "../components/GameCard";
 import { SettingsPage } from "../components/SettingsPage";
 import { GameDetail } from "../components/GameDetail";
 import { CompactTextField } from "../components/CompactTextField";
 
-const getGames = callable<[], GameConfig[]>("get_games");
-const getGamesFolder = callable<[], string | null>("get_games_folder");
+const getGames = callable<[], MergedGame[]>("get_games");
 const listNonSteamGames = callable<[], { name: string }[]>("list_nonsteam_games");
 const restartSteam = callable<[], { success: boolean; message?: string }>("restart_steam");
 const getNeedsRestart = callable<[], boolean>("get_needs_restart");
@@ -34,15 +33,14 @@ const BTN_SETTINGS: React.CSSProperties = {
 };
 
 export const GameLibrary: VFC = () => {
-  const [games, setGames] = useState<GameConfig[]>([]);
-  const [gamesFolder, setGamesFolder] = useState<string | null>(null);
+  const [games, setGames] = useState<MergedGame[]>([]);
   const [steamNames, setSteamNames] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<
     "library" | "settings" | "game-detail"
   >("library");
-  const [selectedGame, setSelectedGame] = useState<GameConfig | null>(null);
+  const [selectedGame, setSelectedGame] = useState<MergedGame | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [restarting, setRestarting] = useState(false);
   const [needsRestart, setNeedsRestartState] = useState(false);
@@ -68,12 +66,8 @@ export const GameLibrary: VFC = () => {
     setLoading(true);
     setError(null);
     try {
-      const [gamesRes, infoRes] = await Promise.all([
-        getGames(),
-        getGamesFolder(),
-      ]);
+      const gamesRes = await getGames();
       setGames(gamesRes || []);
-      setGamesFolder(infoRes ?? null);
     } catch (err: any) {
       setError(String(err));
     }
@@ -85,14 +79,13 @@ export const GameLibrary: VFC = () => {
       setSteamNames(new Set());
     }
     setLoading(false);
-
   }, []);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  const openGame = (game: GameConfig) => {
+  const openGame = (game: MergedGame) => {
     setSelectedGame(game);
     setView("game-detail");
   };
@@ -102,7 +95,7 @@ export const GameLibrary: VFC = () => {
   );
 
   if (view === "settings") {
-    return <SettingsPage gamesFolder={gamesFolder} onBack={() => { loadData(); setView("library"); }} />;
+    return <SettingsPage onBack={() => { loadData(); setView("library"); }} />;
   }
 
   if (view === "game-detail" && selectedGame) {
@@ -116,13 +109,7 @@ export const GameLibrary: VFC = () => {
         onNeedsRestart={() => {
           setNeedsRestartState(true);
           setNeedsRestart(true).catch(() => {});
-          if (selectedGame) {
-            setGames(prev => prev.map(g =>
-              g.name === selectedGame.name
-                ? { ...g, needs_restart: true }
-                : g
-            ));
-          }
+          loadData();
         }}
       />
     );
@@ -173,14 +160,8 @@ export const GameLibrary: VFC = () => {
 
       {/* Game list */}
       {error && <p style={{ color: "red" }}>{error}</p>}
-      {!loading && !error && !gamesFolder && (
-        <div>
-          <p>No games folder configured!</p>
-          <button onClick={() => setView("settings")}>Configure</button>
-        </div>
-      )}
-      {!loading && filteredGames.length === 0 && gamesFolder && (
-        <p>No games found. Add game folders to your games directory, then go to Settings {'>'} Rescan.</p>
+      {!loading && !error && games.length === 0 && (
+        <p>No games found. Add sources in Settings, then Rescan.</p>
       )}
       <div
         style={{
@@ -190,7 +171,13 @@ export const GameLibrary: VFC = () => {
         }}
       >
         {filteredGames.map((game) => (
-          <GameCard key={game.name} game={game} isInSteam={steamNames.has(game.name)} onClick={() => openGame(game)} />
+          <GameCard
+            key={game.name}
+            game={game.sources[0]?.config ?? { name: game.name, executable: "" }}
+            isInSteam={steamNames.has(game.name)}
+            sourceCount={game.sources.length}
+            onClick={() => openGame(game)}
+          />
         ))}
       </div>
     </div>
