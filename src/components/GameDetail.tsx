@@ -1,11 +1,11 @@
 import { VFC, useState, useEffect, useRef } from "react";
 import { callable } from "@decky/api";
 import { Navigation, Focusable } from "@decky/ui";
-import { GameConfig } from "../types";
+import { GameConfig, MergedGame, GameSource, SourceCapabilities } from "../types";
 import { useArtwork } from "../hooks/useArtwork";
 import { CompactTextField } from "../components/CompactTextField";
 
-const removeGame = callable<[name: string], { success: boolean }>(
+const removeGame = callable<[name: string, source_id: string], { success: boolean }>(
   "remove_game"
 );
 const addSteamShortcut = callable<
@@ -42,12 +42,12 @@ const installDeps = callable<
   { success: boolean; installed?: string[]; failed?: string[]; error?: string }
 >("install_dependencies");
 const updateGameConfig = callable<
-  [name: string, updates: Record<string, any>],
+  [name: string, updates: Record<string, any>, source_id: string],
   { success: boolean }
 >("update_game_config");
 const scanExes = callable<[subfolder: string], string[]>("scan_game_exes");
 const getGame = callable<
-  [name: string],
+  [name: string, source_id: string],
   { success: boolean; game?: GameConfig }
 >("get_game");
 const searchSteamgridGames = callable<
@@ -55,13 +55,16 @@ const searchSteamgridGames = callable<
   { success: boolean; games: Array<{ id: number; name: string }> }
 >("search_steamgrid_games");
 const setGameProcessingState = callable<
-  [name: string, state: Record<string, any> | null],
+  [name: string, state: Record<string, any> | null, source_id: string],
   { success: boolean }
 >("set_game_processing_state");
 const getGameProcessingState = callable<
-  [name: string],
+  [name: string, source_id: string],
   Record<string, any> | null
 >("get_game_processing_state");
+const getSourceCapabilities = callable<[source_id: string], SourceCapabilities>(
+  "get_source_capabilities"
+);
 const restartSteam = callable<[], { success: boolean; message?: string }>("restart_steam");
 const listSteamCollections = callable<[], string[]>("list_steam_collections");
 
@@ -88,7 +91,7 @@ const POPULAR_DEPS = [
 ];
 
 interface Props {
-  game: GameConfig;
+  game: MergedGame;
   onBack: () => void;
   onNeedsRestart?: () => void;
 }
@@ -121,25 +124,37 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
     return () => clearTimeout(timer);
   }, []);
 
+  // ── Source selector ────────────────────────────────────────────────────────
+  const [selectedSourceIdx, setSelectedSourceIdx] = useState(0);
+  const [showSourcePicker, setShowSourcePicker] = useState(false);
+  const [capabilities, setCapabilities] = useState<SourceCapabilities>({
+    can_play: true,
+    can_write_config: true,
+    can_download_to: true,
+  });
+
+  const selectedSource: GameSource = game.sources[selectedSourceIdx] ?? game.sources[0];
+  const currentConfig: GameConfig = selectedSource?.config ?? game.sources[0]?.config ?? { name: game.name, executable: "" };
+
   // ── Editable config fields ──────────────────────────────────────────────
-  const [name, setName] = useState(game.name);
-  const [storedName, setStoredName] = useState(game.name); // last saved name (lookup key)
-  const [executable, setExecutable] = useState(game.executable);
-  const [startDir, setStartDir] = useState(game.start_dir || "");
+  const [name, setName] = useState(currentConfig.name);
+  const [storedName, setStoredName] = useState(currentConfig.name); // last saved name (lookup key)
+  const [executable, setExecutable] = useState(currentConfig.executable);
+  const [startDir, setStartDir] = useState(currentConfig.start_dir || "");
   const [steamAppId, setSteamAppId] = useState<number | undefined>(
-    game.steam_app_id
+    currentConfig.steam_app_id
   );
   const [steamAppIdInput, setSteamAppIdInput] = useState(
-    game.steam_app_id !== undefined ? String(game.steam_app_id) : ""
+    currentConfig.steam_app_id !== undefined ? String(currentConfig.steam_app_id) : ""
   );
 
   const [protonVersion, setProtonVersion] = useState(
-    game.proton_version || ""
+    currentConfig.proton_version || ""
   );
   const [protonPickerOpen, setShowProtonPicker] = useState(false);
 
   const [launchOptions, setLaunchOptions] = useState(
-    game.launch_options || ""
+    currentConfig.launch_options || ""
   );
 
   // ── Collections: toggle chips + custom ─────────────────────────────────
@@ -169,7 +184,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   };
 
   // ── Dependencies: checkboxes + custom ────────────────────────────────────
-  const existingDeps = game.proton_dependencies || [];
+  const existingDeps = currentConfig.proton_dependencies || [];
   const [checkedDeps, setCheckedDeps] = useState<string[]>(
     existingDeps.filter((d) => POPULAR_DEPS.includes(d))
   );
@@ -221,34 +236,34 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   // so the first render already has correct comparison values.
   // null = no prior sync at all → steamNeedsSync will show green (unknown state)
   const [lastSyncedSnapshot, setLastSyncedSnapshot] = useState(() => {
-    if (game.steam_snapshot) {
-      try { return JSON.parse(game.steam_snapshot); } catch {}
+    if (currentConfig.steam_snapshot) {
+      try { return JSON.parse(currentConfig.steam_snapshot); } catch {}
     }
     return null;
   });
   const [lastInstalledDeps, setLastInstalledDeps] = useState<string[]>(
-    () => game.deps_snapshot ?? []
+    () => currentConfig.deps_snapshot ?? []
   );
 
   // Snapshot of last-saved config — used to detect unsaved changes (Apply Config green)
   const [configSnapshot, setConfigSnapshot] = useState(() => ({
-    name: game.name,
-    executable: game.executable,
-    start_dir: game.start_dir || null,
-    steam_app_id: game.steam_app_id ?? null,
-    proton_version: game.proton_version || null,
-    proton_dependencies: game.proton_dependencies || [],
-    launch_options: game.launch_options || null,
-    collections: game.collections || [],
+    name: currentConfig.name,
+    executable: currentConfig.executable,
+    start_dir: currentConfig.start_dir || null,
+    steam_app_id: currentConfig.steam_app_id ?? null,
+    proton_version: currentConfig.proton_version || null,
+    proton_dependencies: currentConfig.proton_dependencies || [],
+    launch_options: currentConfig.launch_options || null,
+    collections: currentConfig.collections || [],
   }));
 
   // ── Confirmation state (inline, CEF confirm() is blocked) ──────────────
   const [confirming, setConfirming] = useState<"steam" | "deckyfin" | "purge" | null>(null);
   const [needsRestartAfterAdd, setNeedsRestartAfterAdd] = useState(
-    game.needs_restart_after_add ?? false
+    currentConfig.needs_restart_after_add ?? false
   );
   const [needsRestart, setNeedsRestart] = useState(
-    game.needs_restart ?? false
+    currentConfig.needs_restart ?? false
   );
 
   // ── Executable picker ───────────────────────────────────────────────────
@@ -267,13 +282,53 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   // ── Artwork ───────────────────────────────────────────────────────────────
   const { applyArtById } = useArtwork();
 
+  // ── Load capabilities when source changes ─────────────────────────────────
+  useEffect(() => {
+    if (!selectedSource) return;
+    getSourceCapabilities(selectedSource.source_id)
+      .then(setCapabilities)
+      .catch(() => setCapabilities({ can_play: true, can_write_config: true, can_download_to: true }));
+  }, [selectedSource?.source_id]);
+
+  // ── Reload config state when selected source changes ──────────────────────
+  useEffect(() => {
+    if (!currentConfig) return;
+    setName(currentConfig.name);
+    setStoredName(currentConfig.name);
+    setExecutable(currentConfig.executable);
+    setStartDir(currentConfig.start_dir || "");
+    setSteamAppId(currentConfig.steam_app_id);
+    setSteamAppIdInput(currentConfig.steam_app_id !== undefined ? String(currentConfig.steam_app_id) : "");
+    setProtonVersion(currentConfig.proton_version || "");
+    setLaunchOptions(currentConfig.launch_options || "");
+    if (currentConfig.steam_snapshot) {
+      try { setLastSyncedSnapshot(JSON.parse(currentConfig.steam_snapshot)); } catch { setLastSyncedSnapshot(null); }
+    } else {
+      setLastSyncedSnapshot(null);
+    }
+    setLastInstalledDeps(currentConfig.deps_snapshot ?? []);
+    setConfigSnapshot({
+      name: currentConfig.name,
+      executable: currentConfig.executable,
+      start_dir: currentConfig.start_dir || null,
+      steam_app_id: currentConfig.steam_app_id ?? null,
+      proton_version: currentConfig.proton_version || null,
+      proton_dependencies: currentConfig.proton_dependencies || [],
+      launch_options: currentConfig.launch_options || null,
+      collections: currentConfig.collections || [],
+    });
+    setNeedsRestartAfterAdd(currentConfig.needs_restart_after_add ?? false);
+    setNeedsRestart(currentConfig.needs_restart ?? false);
+    setSteamInfo(null);
+  }, [selectedSourceIdx]);
+
   // ── Init on mount ───────────────────────────────────────────────────────
   useEffect(() => {
     listProtonVersions()
       .then(setProtonVersions)
       .catch(() => setProtonVersions([]));
     // Fetch fresh game config — parent's games array may be stale
-    getGame(game.name).then((res) => {
+    getGame(game.name, selectedSource.source_id).then((res) => {
       if (res.success && res.game) {
         setNeedsRestart(res.game.needs_restart ?? false);
         setNeedsRestartAfterAdd(res.game.needs_restart_after_add ?? false);
@@ -302,7 +357,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         }
       }
     }).catch(() => {});
-  }, [game.name]);
+  }, [game.name, selectedSource?.source_id]);
 
   useEffect(() => {
     getSteamShortcut(game.name)
@@ -319,7 +374,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
     listSteamCollections().then((collections) => {
       setSteamCollections(collections);
       // Partition game's existing collections into known vs custom
-      const existing = game.collections || [];
+      const existing = currentConfig.collections || [];
       const knownColls = existing.filter((c) => collections.includes(c));
       const customColls = existing.filter((c) => !collections.includes(c));
       setCheckedCollections(knownColls);
@@ -333,7 +388,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
 
   // ── Restore processing state on mount (e.g. Installing… survived navigation) ──
   useEffect(() => {
-    getGameProcessingState(game.name)
+    getGameProcessingState(game.name, selectedSource.source_id)
       .then((state: any) => {
         if (state?.status === "installing") {
           setLoading("deps");
@@ -402,7 +457,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         launch_options: launchOptions || null,
         collections: mergedCollections,
       };
-      const res = await updateGameConfig(storedName, payload);
+      const res = await updateGameConfig(storedName, payload, selectedSource.source_id);
       if (!res.success) {
         setConfigFeedback({ ok: false, msg: "Failed to save config" });
       } else {
@@ -459,7 +514,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         setNeedsRestartAfterAdd(true);
         setNeedsRestart(true);
         setLastSyncedSnapshot({ name, executable, start_dir: startDir || null, launch_options: launchOptions || null, proton_version: protonVersion || null, collections: mergedCollections });
-        updateGameConfig(storedName, { steam_snapshot: JSON.stringify({ name, executable, start_dir: startDir || null, launch_options: launchOptions || null, proton_version: protonVersion || null, collections: mergedCollections }), needs_restart_after_add: true, needs_restart: true }).catch(() => {});
+        updateGameConfig(storedName, { steam_snapshot: JSON.stringify({ name, executable, start_dir: startDir || null, launch_options: launchOptions || null, proton_version: protonVersion || null, collections: mergedCollections }), needs_restart_after_add: true, needs_restart: true }, selectedSource.source_id).catch(() => {});
         setFeedback({
           ok: true,
           msg: `Added to Steam (App ID: ${res.unsigned_appid}) — restart Steam to unlock actions`,
@@ -490,7 +545,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         setSteamInfo({ app_id: res.app_id, unsigned_appid: res.unsigned_appid });
         setNeedsRestart(true);
         setLastSyncedSnapshot({ name, executable, start_dir: startDir || null, launch_options: launchOptions || null, proton_version: protonVersion || null, collections: mergedCollections });
-        updateGameConfig(storedName, { steam_snapshot: JSON.stringify({ name, executable, start_dir: startDir || null, launch_options: launchOptions || null, proton_version: protonVersion || null, collections: mergedCollections }), needs_restart: true }).catch(() => {});
+        updateGameConfig(storedName, { steam_snapshot: JSON.stringify({ name, executable, start_dir: startDir || null, launch_options: launchOptions || null, proton_version: protonVersion || null, collections: mergedCollections }), needs_restart: true }, selectedSource.source_id).catch(() => {});
         setFeedback({
           ok: true,
           msg: "Steam updated — restart Steam to apply",
@@ -572,19 +627,19 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
       status: "installing",
       deps: mergedDeps,
       pfxid: String(steamInfo.unsigned_appid),
-    }).catch(() => {});
+    }, selectedSource.source_id).catch(() => {});
     try {
       const res = await installDeps(
         String(steamInfo.unsigned_appid),
         mergedDeps.join(", ")
       );
       // Clear processing state on completion
-      setGameProcessingState(game.name, null).catch(() => {});
+      setGameProcessingState(game.name, null, selectedSource.source_id).catch(() => {});
       if (res.success) {
         const installed = (res.installed || []).join(", ");
         setFeedback({ ok: true, msg: `Installed: ${installed}` });
         setLastInstalledDeps(mergedDeps);
-        updateGameConfig(storedName, { deps_snapshot: mergedDeps }).catch(() => {});
+        updateGameConfig(storedName, { deps_snapshot: mergedDeps }, selectedSource.source_id).catch(() => {});
       } else {
         const failed = (res.failed || []).join(", ");
         setFeedback({
@@ -593,7 +648,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         });
       }
     } catch (err: any) {
-      setGameProcessingState(game.name, null).catch(() => {});
+      setGameProcessingState(game.name, null, selectedSource.source_id).catch(() => {});
       setFeedback({ ok: false, msg: err?.message || "Error" });
     }
     setLoading(null);
@@ -603,7 +658,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   const handleRemove = async () => {
     setFeedback(null);
     try {
-      await removeGame(storedName);
+      await removeGame(storedName, selectedSource.source_id);
       onBack();
     } catch (err: any) {
       setFeedback({ ok: false, msg: err?.message || "Error removing game" });
@@ -670,16 +725,59 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
       focusClassName="is-focused"
       style={{ padding: "8px" }}
     >
-      {/* Back */}
-      <Focusable
-        ref={backRef}
-        onActivate={onBack}
-        onClick={onBack}
-        focusClassName="is-focused"
-        style={{ ...BTN_STYLE, marginBottom: "12px", display: "inline-block" }}
-      >
-        Back
-      </Focusable>
+      {/* Back + source selector row */}
+      <div style={{ display: "flex", gap: "6px", alignItems: "center", marginBottom: "12px", flexWrap: "wrap" }}>
+        <Focusable
+          ref={backRef}
+          onActivate={onBack}
+          onClick={onBack}
+          focusClassName="is-focused"
+          style={{ ...BTN_STYLE, padding: "4px 10px" }}
+        >
+          Back
+        </Focusable>
+
+        {game.sources.length > 0 && (() => {
+          const typeColor = selectedSource.source_type === "local" ? "#27ae60"
+            : selectedSource.source_type === "mount" ? "#e67e22" : "#0984e3";
+          const typeBg = selectedSource.source_type === "local" ? "#1a3a1a"
+            : selectedSource.source_type === "mount" ? "#2a2a1a" : "#1a1a3a";
+          return (
+            <Focusable
+              onActivate={() => setShowSourcePicker((p) => !p)}
+              onClick={() => setShowSourcePicker((p) => !p)}
+              focusClassName="is-focused"
+              style={{ ...BTN_STYLE, padding: "4px 12px", borderColor: typeColor, color: typeColor, display: "flex", alignItems: "center", gap: "6px" }}
+            >
+              <span style={{ padding: "1px 5px", fontSize: "0.75em", borderRadius: "8px", background: typeBg, border: `1px solid ${typeColor}` }}>
+                {selectedSource.source_type}
+              </span>
+              {selectedSource.source_name} {game.sources.length > 1 ? "▾" : ""}
+            </Focusable>
+          );
+        })()}
+      </div>
+
+      {/* Source picker dropdown */}
+      {showSourcePicker && game.sources.length > 1 && (
+        <Focusable style={{ marginBottom: "10px", border: "1px solid #555", borderRadius: "4px", padding: "2px 0" }}>
+          {game.sources.map((src, idx) => (
+            <Focusable
+              key={src.source_id}
+              onActivate={() => { setSelectedSourceIdx(idx); setShowSourcePicker(false); }}
+              onClick={() => { setSelectedSourceIdx(idx); setShowSourcePicker(false); }}
+              focusClassName="is-focused"
+              style={{ margin: "0 2px", padding: "4px 10px", cursor: "pointer", fontSize: "0.85em", borderBottom: "1px solid #333",
+                color: idx === selectedSourceIdx ? "#0078d4" : "#ccc" }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+            >
+              {src.source_name}
+              <span style={{ marginLeft: "6px", fontSize: "0.78em", color: "#666" }}>({src.source_type})</span>
+            </Focusable>
+          ))}
+        </Focusable>
+      )}
 
       {/* ── Config Fields ──────────────────────────────────────────────── */}
       <h4 style={{ margin: "0 0 10px 0" }}>Game Settings</h4>
@@ -998,18 +1096,19 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
 
       {/* Apply Config */}
       <Focusable
-        onActivate={handleApplyConfig}
-        onClick={handleApplyConfig}
+        onActivate={capabilities.can_write_config ? handleApplyConfig : undefined}
+        onClick={capabilities.can_write_config ? handleApplyConfig : undefined}
         focusClassName="is-focused"
         style={{
           ...BTN_STYLE,
           display: "inline-block",
           marginBottom: "8px",
-          border: configDirty ? "1px solid #27ae60" : "1px solid #555",
-          color: configDirty ? "#2ecc71" : "#e0e0e0",
+          border: configDirty && capabilities.can_write_config ? "1px solid #27ae60" : "1px solid #555",
+          color: configDirty && capabilities.can_write_config ? "#2ecc71" : "#e0e0e0",
+          opacity: capabilities.can_write_config ? 1 : 0.4,
         }}
       >
-        {configDirty ? "Apply Config *" : "Apply Config"}
+        {configDirty && capabilities.can_write_config ? "Apply Config *" : "Apply Config"}
       </Focusable>
       {configFeedback && (
         <p
@@ -1060,6 +1159,14 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         </div>
       )}
 
+      {/* Capability lock notice */}
+      {!capabilities.can_play && (
+        <div style={{ padding: "8px 10px", borderRadius: "4px", background: "rgba(52,73,94,0.3)",
+          border: "1px solid #2c3e50", fontSize: "0.78em", color: "#7f8c8d", marginBottom: "8px" }}>
+          🔒 Steam & prefix actions unavailable — games on {selectedSource.source_type} sources can't be launched by Steam
+        </div>
+      )}
+
       {/* ── Steam Actions ─────────────────────────────────────────────────── */}
       <label style={{ ...LABEL_STYLE, marginTop: "14px", marginBottom: "6px", fontSize: "0.9em", color: "#999" }}>
         Steam Actions
@@ -1074,14 +1181,14 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         }}
       >
         <Focusable
-          onActivate={steamInfo ? handleUpdateSteam : handleAddToSteam}
-          onClick={steamInfo ? handleUpdateSteam : handleAddToSteam}
+          onActivate={capabilities.can_play ? (steamInfo ? handleUpdateSteam : handleAddToSteam) : undefined}
+          onClick={capabilities.can_play ? (steamInfo ? handleUpdateSteam : handleAddToSteam) : undefined}
           focusClassName="is-focused"
           style={{
             ...BTN_STYLE,
-            opacity: loading === "add" || loading === "update" ? 0.5 : 1,
-            border: steamNeedsSync ? "1px solid #27ae60" : "1px solid #555",
-            color: steamNeedsSync ? "#2ecc71" : "#e0e0e0",
+            opacity: !capabilities.can_play || loading === "add" || loading === "update" ? 0.4 : 1,
+            border: capabilities.can_play && steamNeedsSync ? "1px solid #27ae60" : "1px solid #555",
+            color: capabilities.can_play && steamNeedsSync ? "#2ecc71" : "#e0e0e0",
           }}
         >
           {loading === "add"
@@ -1095,12 +1202,12 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
 
         <div style={{ display: "flex", gap: "6px" }}>
           <Focusable
-            onActivate={handleInitPrefix}
-            onClick={handleInitPrefix}
+            onActivate={capabilities.can_play ? handleInitPrefix : undefined}
+            onClick={capabilities.can_play ? handleInitPrefix : undefined}
             focusClassName="is-focused"
             style={{
               ...BTN_STYLE,
-              opacity: !steamInfo || needsRestartAfterAdd || loading === "init" ? 0.5 : 1,
+              opacity: !capabilities.can_play || !steamInfo || needsRestartAfterAdd || loading === "init" ? 0.4 : 1,
             }}
           >
             {loading === "init" ? "Initing…" : forceReinit ? "Re-init Prefix" : "Init Prefix"}
@@ -1125,14 +1232,14 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         </div>
 
         <Focusable
-          onActivate={handleInstallDeps}
-          onClick={handleInstallDeps}
+          onActivate={capabilities.can_play ? handleInstallDeps : undefined}
+          onClick={capabilities.can_play ? handleInstallDeps : undefined}
           focusClassName="is-focused"
           style={{
             ...BTN_STYLE,
-            opacity: !steamInfo || needsRestartAfterAdd || mergedDeps.length === 0 || loading === "deps" ? 0.5 : 1,
-            border: depsNeedsInstall ? "1px solid #27ae60" : "1px solid #555",
-            color: depsNeedsInstall ? "#2ecc71" : "#e0e0e0",
+            opacity: !capabilities.can_play || !steamInfo || needsRestartAfterAdd || mergedDeps.length === 0 || loading === "deps" ? 0.4 : 1,
+            border: capabilities.can_play && depsNeedsInstall ? "1px solid #27ae60" : "1px solid #555",
+            color: capabilities.can_play && depsNeedsInstall ? "#2ecc71" : "#e0e0e0",
           }}
         >
           {loading === "deps" ? "Installing…" : "Install Dependencies"}
