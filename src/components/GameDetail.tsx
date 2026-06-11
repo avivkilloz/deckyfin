@@ -59,7 +59,6 @@ const getGameProcessingState = callable<
   Record<string, any> | null
 >("get_game_processing_state");
 const restartSteam = callable<[], { success: boolean; message?: string }>("restart_steam");
-const getNeedsRestart = callable<[], boolean>("get_needs_restart");
 
 /** Popular Proton dependencies shown as toggle chips. */
 const POPULAR_DEPS = [
@@ -190,7 +189,6 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   const [sgdbFeedback, setSgdbFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
   const [forceReinit, setForceReinit] = useState(false);
   const [restarting, setRestarting] = useState(false);
-  const [needsRestart, setNeedsRestartState] = useState(false);
 
   // ── Confirmation state (inline, CEF confirm() is blocked) ──────────────
   const [confirming, setConfirming] = useState<"steam" | "deckyfin" | "purge" | null>(null);
@@ -233,11 +231,6 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
       })
       .catch(() => {});
   }, [game.name]);
-
-  // ── Restore persisted needs-restart state on mount ────────────────
-  useEffect(() => {
-    getNeedsRestart().then((val) => setNeedsRestartState(val)).catch(() => {});
-  }, []);
 
   // ── Restore processing state on mount (e.g. Installing… survived navigation) ──
   useEffect(() => {
@@ -391,6 +384,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
       );
       if (res.success && res.app_id && res.unsigned_appid) {
         setSteamInfo({ app_id: res.app_id, unsigned_appid: res.unsigned_appid });
+        setNeedsRestartAfterAdd(true);
         setFeedback({
           ok: true,
           msg: "Steam updated — restart Steam to apply",
@@ -512,7 +506,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
     setRestarting(true);
     try {
       await restartSteam();
-      setNeedsRestartState(false);
+      setNeedsRestartAfterAdd(false);
+      updateGameConfig(storedName, { needs_restart_after_add: null }).catch(() => {});
     } catch (_) {
       // Steam will close this UI as part of the restart — errors here are expected
     }
@@ -966,8 +961,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           focusClassName="is-focused"
           style={{
             ...BTN_STYLE,
-            border: needsRestart ? "1px solid #27ae60" : "1px solid #555",
-            color: needsRestart ? "#2ecc71" : "#e0e0e0",
+            border: needsRestartAfterAdd ? "1px solid #27ae60" : "1px solid #555",
+            color: needsRestartAfterAdd ? "#2ecc71" : "#e0e0e0",
           }}
         >
           {restarting ? "…" : "↺ Restart Steam"}
