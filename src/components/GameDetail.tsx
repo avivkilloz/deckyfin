@@ -276,6 +276,13 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
       if (res.success && res.game) {
         setNeedsRestart(res.game.needs_restart ?? false);
         setNeedsRestartAfterAdd(res.game.needs_restart_after_add ?? false);
+        // Restore persisted snapshots so green state survives navigation
+        if (res.game.steam_snapshot) {
+          try { setLastSyncedSnapshot(JSON.parse(res.game.steam_snapshot)); } catch {}
+        }
+        if (res.game.deps_snapshot) {
+          setLastInstalledDeps(res.game.deps_snapshot);
+        }
       }
     }).catch(() => {});
   }, [game.name]);
@@ -435,7 +442,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         setNeedsRestartAfterAdd(true);
         setNeedsRestart(true);
         setLastSyncedSnapshot({ name, executable, start_dir: startDir || null, launch_options: launchOptions || null, proton_version: protonVersion || null, collections: mergedCollections });
-        updateGameConfig(storedName, { needs_restart_after_add: true, needs_restart: true }).catch(() => {});
+        updateGameConfig(storedName, { steam_snapshot: JSON.stringify({ name, executable, start_dir: startDir || null, launch_options: launchOptions || null, proton_version: protonVersion || null, collections: mergedCollections }), needs_restart_after_add: true, needs_restart: true }).catch(() => {});
         setFeedback({
           ok: true,
           msg: `Added to Steam (App ID: ${res.unsigned_appid}) — restart Steam to unlock actions`,
@@ -466,7 +473,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         setSteamInfo({ app_id: res.app_id, unsigned_appid: res.unsigned_appid });
         setNeedsRestart(true);
         setLastSyncedSnapshot({ name, executable, start_dir: startDir || null, launch_options: launchOptions || null, proton_version: protonVersion || null, collections: mergedCollections });
-        updateGameConfig(storedName, { needs_restart: true }).catch(() => {});
+        updateGameConfig(storedName, { steam_snapshot: JSON.stringify({ name, executable, start_dir: startDir || null, launch_options: launchOptions || null, proton_version: protonVersion || null, collections: mergedCollections }), needs_restart: true }).catch(() => {});
         setFeedback({
           ok: true,
           msg: "Steam updated — restart Steam to apply",
@@ -560,6 +567,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         const installed = (res.installed || []).join(", ");
         setFeedback({ ok: true, msg: `Installed: ${installed}` });
         setLastInstalledDeps(mergedDeps);
+        updateGameConfig(storedName, { deps_snapshot: mergedDeps }).catch(() => {});
       } else {
         const failed = (res.failed || []).join(", ");
         setFeedback({
