@@ -169,3 +169,49 @@ def test_migrate_skips_if_sources_present(tmp_path, monkeypatch):
     ran = migrate_games_folder_to_source()
     assert ran is False
     assert len(list_sources()) == 1  # unchanged
+
+
+def test_load_source_games_local(tmp_path, monkeypatch):
+    """load_source_games reads games from a local source's .deckyfin/config.json."""
+    import json as _j
+    monkeypatch.setenv("HOME", str(tmp_path))
+    # Create a fake .deckyfin/config.json inside the source path
+    source_path = tmp_path / "games"
+    source_path.mkdir()
+    deckyfin_dir = source_path / ".deckyfin"
+    deckyfin_dir.mkdir()
+    config_data = {"games": [{"name": "Dark Souls", "executable": "DarkSouls.exe"}]}
+    (deckyfin_dir / "config.json").write_text(_j.dumps(config_data))
+
+    import importlib, deckyfin_config, deckyfin_sources
+    importlib.reload(deckyfin_config)
+    importlib.reload(deckyfin_sources)
+    from deckyfin_sources import load_source_games
+    source = {"id": "x", "type": "local", "path": str(source_path), "url": None}
+    games = load_source_games(source)
+    assert len(games) == 1
+    assert games[0]["name"] == "Dark Souls"
+
+
+def test_load_source_games_empty(tmp_path, monkeypatch):
+    """load_source_games returns [] when no config exists."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    source_path = tmp_path / "games"
+    source_path.mkdir()
+    import importlib, deckyfin_config, deckyfin_sources
+    importlib.reload(deckyfin_config)
+    importlib.reload(deckyfin_sources)
+    from deckyfin_sources import load_source_games
+    source = {"id": "x", "type": "local", "path": str(source_path), "url": None}
+    assert load_source_games(source) == []
+
+
+def test_load_source_games_offline(tmp_path, monkeypatch):
+    """load_source_games returns [] for a path that doesn't exist."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    import importlib, deckyfin_config, deckyfin_sources
+    importlib.reload(deckyfin_config)
+    importlib.reload(deckyfin_sources)
+    from deckyfin_sources import load_source_games
+    source = {"id": "x", "type": "local", "path": "/nonexistent/xyz", "url": None}
+    assert load_source_games(source) == []
