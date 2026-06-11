@@ -219,18 +219,12 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   // Snapshots of what was last synced/installed — computed comparison drives green
   // Initialize from game prop's persisted snapshots directly (not async getGame)
   // so the first render already has correct comparison values.
+  // null = no prior sync at all → steamNeedsSync will show green (unknown state)
   const [lastSyncedSnapshot, setLastSyncedSnapshot] = useState(() => {
     if (game.steam_snapshot) {
       try { return JSON.parse(game.steam_snapshot); } catch {}
     }
-    return {
-      name: game.name,
-      executable: game.executable,
-      start_dir: game.start_dir || null,
-      launch_options: game.launch_options || null,
-      proton_version: game.proton_version || null,
-      collections: game.collections || [],
-    };
+    return null;
   });
   const [lastInstalledDeps, setLastInstalledDeps] = useState<string[]>(
     () => game.deps_snapshot ?? []
@@ -298,15 +292,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         if (res.game.steam_snapshot) {
           try { setLastSyncedSnapshot(JSON.parse(res.game.steam_snapshot)); } catch {}
         } else {
-          // No prior sync — assume saved config matches last synced state
-          setLastSyncedSnapshot({
-            name: res.game.name,
-            executable: res.game.executable,
-            start_dir: res.game.start_dir || null,
-            launch_options: res.game.launch_options || null,
-            proton_version: res.game.proton_version || null,
-            collections: res.game.collections || [],
-          });
+          // No prior sync — null means unknown, so steamNeedsSync stays true
+          setLastSyncedSnapshot(null);
         }
         if (res.game.deps_snapshot) {
           setLastInstalledDeps(res.game.deps_snapshot);
@@ -653,6 +640,9 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
 
   // ── Sync/install needed comparisons — drives green on action buttons ──
   const steamNeedsSync = (() => {
+    // null = no prior sync at all (e.g. game was never Added/Updated to Steam
+    // or was imported from an older config). Show green to encourage first sync.
+    if (!lastSyncedSnapshot) return true;
     const a = lastSyncedSnapshot;
     const b = {
       name: configSnapshot.name,
