@@ -215,6 +215,9 @@ def _sync_user_collections(
 
     changed = False
 
+    # Use unsigned app_id for cloud storage (Steam collections use the positive format)
+    unsigned_app_id = convert_appid_to_unsigned_32bit(app_id)
+
     # ── Add app_id to new collections ──────────────────────────────────
     if new_collections:
         for name in new_collections:
@@ -249,8 +252,8 @@ def _sync_user_collections(
             coll.setdefault("added", [])
             coll.setdefault("removed", [])
 
-            if app_id not in coll["added"]:
-                coll["added"].append(app_id)
+            if unsigned_app_id not in coll["added"]:
+                coll["added"].append(unsigned_app_id)
                 changed = True
 
     # ── Remove app_id from dropped collections ─────────────────────────
@@ -264,8 +267,8 @@ def _sync_user_collections(
             # Case-insensitive match
             for cid, cdata in list(collections.items()):
                 if cdata.get("name", "").lower() == name.strip().lower():
-                    if app_id in cdata.get("added", []):
-                        cdata["added"].remove(app_id)
+                    if unsigned_app_id in cdata.get("added", []):
+                        cdata["added"].remove(unsigned_app_id)
                         changed = True
                     break
 
