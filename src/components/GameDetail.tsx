@@ -358,7 +358,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
 
   const handleApplyConfig = async () => {
     try {
-      const res = await updateGameConfig(storedName, {
+      const payload = {
         name,
         executable,
         start_dir: startDir || null,
@@ -367,27 +367,21 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         proton_dependencies: mergedDeps,
         launch_options: launchOptions || null,
         collections: mergedCollections,
-      });
+      };
+      const hasChanges = JSON.stringify(payload) !== JSON.stringify(configSnapshot);
+      const res = await updateGameConfig(storedName, payload);
       if (!res.success) {
         setConfigFeedback({ ok: false, msg: "Failed to save config" });
       } else {
         setStoredName(name);
         setConfigFeedback({ ok: true, msg: "Config saved" });
-        // Update snapshot so Apply Config green goes away
-        setConfigSnapshot({
-          name,
-          executable,
-          start_dir: startDir || null,
-          steam_app_id: steamAppId ?? null,
-          proton_version: protonVersion || null,
-          proton_dependencies: mergedDeps,
-          launch_options: launchOptions || null,
-          collections: mergedCollections,
-        });
-        // Signal that saved config may need to be synced to Steam
-        setSteamNeedsSync(true);
-        if (mergedDeps.length > 0) {
-          setDepsNeedsInstall(true);
+        setConfigSnapshot(payload);
+        // Only set downstream flags when something actually changed
+        if (hasChanges) {
+          setSteamNeedsSync(true);
+          if (mergedDeps.length > 0) {
+            setDepsNeedsInstall(true);
+          }
         }
       }
     } catch (err: any) {
