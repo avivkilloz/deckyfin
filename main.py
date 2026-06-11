@@ -340,6 +340,12 @@ class Plugin:
                 set_proton_version(app_id, proton_version, user_id, app_name)
             except Exception as e:
                 self.logger.warning("Failed to set Proton version: %s", e)
+        # Mark game as needing restart
+        try:
+            update_game_config(app_name, {"needs_restart_after_add": True})
+            self.logger.info("Marked '%s' as needs_restart_after_add", app_name)
+        except Exception as e:
+            self.logger.warning("Failed to mark needs_restart for '%s': %s", app_name, e)
         return {
             "success": True,
             "app_id": app_id,
