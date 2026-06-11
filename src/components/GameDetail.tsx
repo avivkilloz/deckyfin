@@ -215,6 +215,22 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   const [forceReinit, setForceReinit] = useState(false);
   const [restarting, setRestarting] = useState(false);
 
+  // ── Green button state ────────────────────────────────────────────────────
+  const [steamNeedsSync, setSteamNeedsSync] = useState(false);
+  const [depsNeedsInstall, setDepsNeedsInstall] = useState(false);
+
+  // Snapshot of last-saved config — used to detect unsaved changes (Apply Config green)
+  const [configSnapshot, setConfigSnapshot] = useState(() => ({
+    name: game.name,
+    executable: game.executable,
+    start_dir: game.start_dir || null,
+    steam_app_id: game.steam_app_id ?? null,
+    proton_version: game.proton_version || null,
+    proton_dependencies: game.proton_dependencies || [],
+    launch_options: game.launch_options || null,
+    collections: game.collections || [],
+  }));
+
   // ── Confirmation state (inline, CEF confirm() is blocked) ──────────────
   const [confirming, setConfirming] = useState<"steam" | "deckyfin" | "purge" | null>(null);
   const [needsRestartAfterAdd, setNeedsRestartAfterAdd] = useState(
@@ -357,6 +373,22 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
       } else {
         setStoredName(name);
         setConfigFeedback({ ok: true, msg: "Config saved" });
+        // Update snapshot so Apply Config green goes away
+        setConfigSnapshot({
+          name,
+          executable,
+          start_dir: startDir || null,
+          steam_app_id: steamAppId ?? null,
+          proton_version: protonVersion || null,
+          proton_dependencies: mergedDeps,
+          launch_options: launchOptions || null,
+          collections: mergedCollections,
+        });
+        // Signal that saved config may need to be synced to Steam
+        setSteamNeedsSync(true);
+        if (mergedDeps.length > 0) {
+          setDepsNeedsInstall(true);
+        }
       }
     } catch (err: any) {
       setConfigFeedback({ ok: false, msg: err?.message || "Failed to save config" });
@@ -406,6 +438,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         setSteamInfo({ app_id: res.app_id, unsigned_appid: res.unsigned_appid });
         setNeedsRestartAfterAdd(true);
         setNeedsRestart(true);
+        setSteamNeedsSync(false);
         updateGameConfig(storedName, { needs_restart_after_add: true, needs_restart: true }).catch(() => {});
         setFeedback({
           ok: true,
@@ -436,6 +469,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
       if (res.success && res.app_id && res.unsigned_appid) {
         setSteamInfo({ app_id: res.app_id, unsigned_appid: res.unsigned_appid });
         setNeedsRestart(true);
+        setSteamNeedsSync(false);
         updateGameConfig(storedName, { needs_restart: true }).catch(() => {});
         setFeedback({
           ok: true,
@@ -529,6 +563,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
       if (res.success) {
         const installed = (res.installed || []).join(", ");
         setFeedback({ ok: true, msg: `Installed: ${installed}` });
+        setDepsNeedsInstall(false);
       } else {
         const failed = (res.failed || []).join(", ");
         setFeedback({
@@ -566,6 +601,21 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
     }
     setRestarting(false);
   };
+
+  // ── Detect unsaved config changes — drives Apply Config green state ──
+  const configDirty = (() => {
+    const current = {
+      name,
+      executable,
+      start_dir: startDir || null,
+      steam_app_id: steamAppId ?? null,
+      proton_version: protonVersion || null,
+      proton_dependencies: mergedDeps,
+      launch_options: launchOptions || null,
+      collections: mergedCollections,
+    };
+    return JSON.stringify(current) !== JSON.stringify(configSnapshot);
+  })();
 
   // ── Render ──────────────────────────────────────────────────────────────
 
@@ -908,9 +958,15 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         onActivate={handleApplyConfig}
         onClick={handleApplyConfig}
         focusClassName="is-focused"
-        style={{ ...BTN_STYLE, display: "inline-block", marginBottom: "8px" }}
+        style={{
+          ...BTN_STYLE,
+          display: "inline-block",
+          marginBottom: "8px",
+          border: configDirty ? "1px solid #27ae60" : "1px solid #555",
+          color: configDirty ? "#2ecc71" : "#e0e0e0",
+        }}
       >
-        Apply Config
+        {configDirty ? "Apply Config *" : "Apply Config"}
       </Focusable>
       {configFeedback && (
         <p
@@ -981,6 +1037,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           style={{
             ...BTN_STYLE,
             opacity: loading === "add" || loading === "update" ? 0.5 : 1,
+            border: steamNeedsSync ? "1px solid #27ae60" : "1px solid #555",
+            color: steamNeedsSync ? "#2ecc71" : "#e0e0e0",
           }}
         >
           {loading === "add"
@@ -1030,6 +1088,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           style={{
             ...BTN_STYLE,
             opacity: !steamInfo || needsRestartAfterAdd || mergedDeps.length === 0 || loading === "deps" ? 0.5 : 1,
+            border: depsNeedsInstall ? "1px solid #27ae60" : "1px solid #555",
+            color: depsNeedsInstall ? "#2ecc71" : "#e0e0e0",
           }}
         >
           {loading === "deps" ? "Installing…" : "Install Dependencies"}
