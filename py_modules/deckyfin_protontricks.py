@@ -415,10 +415,10 @@ def install_protontricks_dependencies(
 
     Strategy (each method has a 120s timeout):
       1. Kill stale wineserver
-      2. Flatpak protontricks (auto-installs if missing) — preferred because it
-         correctly uses Proton's bundled wine, not system wine
-      3. Native protontricks CLI (Arch/AUR) — kill wineserver first
+      2. Native protontricks CLI (Arch/AUR) — preferred when available
+      3. Flatpak protontricks (auto-installs if missing) — fallback
       4. Proton-bundled wine + winetricks — set WINELOADER/WINESERVER directly
+      5. System winetricks (last resort)
 
     Args:
         pfxid: Unsigned 32-bit app ID (used as prefix ID)
@@ -449,10 +449,10 @@ def install_protontricks_dependencies(
             else:
                 logger.warning("Prefix directory not found at %s", compatdata)
                 # ── Try to create prefix so protontricks can find it ──
-                # But only when flatpak isn't available — flatpak protontricks
-                # auto-creates the prefix using its own cached wine, avoiding
-                # version mismatch with _find_proton_wine() (see #prefix-init)
-                if not shutil.which("flatpak"):
+                # When native protontricks is used, it needs the prefix to exist.
+                # Only create here if neither native nor flatpak is available
+                # (both can auto-create the prefix on their own).
+                if not shutil.which("protontricks") and not shutil.which("flatpak"):
                     try:
                         _init_prefix_for_deps(compatdata, steam_root)
                         prefix_dir = str(compatdata)
@@ -543,12 +543,40 @@ def install_protontricks_dependencies(
 
 
 def _build_methods(pfxid, dep, pfx_path, proton_wine, steam_root):
-    """Build ordered list of (method_name, attempt_fn) tuples."""
+    """Build ordered list of (method_name, attempt_fn) tuples.
+
+    Priority:
+      1. Native protontricks CLI (if available — preferred on Arch/CachyOS)
+      2. Flatpak protontricks (auto-installs if missing)
+      3. Proton wine + winetricks
+      4. System winetricks (last resort)
+    """
     methods = []
 
-    # ── Method 1: Flatpak protontricks ──────────────────────────────────
-    # Preferred: handles Proton wine detection correctly.
-    # Auto-installs the flatpak if missing.
+    # ── Method 1: Native protontricks CLI (preferred on Arch/CachyOS) ────
+    native = shutil.which("protontricks")
+    if native:
+        def _native(t):
+            extra_env = {}
+            if steam_root:
+                extra_env["STEAM_DIR"] = str(steam_root)
+
+            cmd: list[str] = [native, "--no-bwrap", pfxid, "--unattended", dep]
+
+            real_user = _get_real_user()
+            if real_user:
+                cmd = _runuser_cmd(cmd, real_user, extra_env)
+                return _run_with_clean_env(
+                    cmd, capture_output=True, text=True, timeout=t,
+                )
+            return _run_with_clean_env(
+                cmd,
+                extra_env=extra_env or None,
+                capture_output=True, text=True, timeout=t,
+            )
+        methods.append(("native protontricks", _native))
+
+    # ── Method 2: Flatpak protontricks ──────────────────────────────────
     if shutil.which("flatpak"):
         fp = _ensure_flatpak_protontricks()
         if fp:
@@ -581,29 +609,6 @@ def _build_methods(pfxid, dep, pfx_path, proton_wine, steam_root):
                     result.returncode = 0
                 return result
             methods.append(("flatpak protontricks", _flatpak))
-
-    # ── Method 2: Native protontricks CLI ───────────────────────────────
-    native = shutil.which("protontricks")
-    if native:
-        def _native(t):
-            extra_env = {}
-            if steam_root:
-                extra_env["STEAM_DIR"] = str(steam_root)
-
-            cmd: list[str] = [native, "--no-bwrap", pfxid, "--unattended", dep]
-
-            real_user = _get_real_user()
-            if real_user:
-                cmd = _runuser_cmd(cmd, real_user, extra_env)
-                return _run_with_clean_env(
-                    cmd, capture_output=True, text=True, timeout=t,
-                )
-            return _run_with_clean_env(
-                cmd,
-                extra_env=extra_env or None,
-                capture_output=True, text=True, timeout=t,
-            )
-        methods.append(("native protontricks", _native))
 
     # ── Method 3: Proton wine + winetricks ──────────────────────────────
     # Use Proton's own wine with WINELOADER/WINESERVER set, then run winetricks.
