@@ -109,8 +109,8 @@ export const GameLibrary: VFC = () => {
     return (
       <GameDetail
         game={selectedGame}
-        onBack={() => {
-          loadData();
+        onBack={async () => {
+          await loadData();
           setView("library");
         }}
         onNeedsRestart={() => {

@@ -233,7 +233,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
     };
   });
   const [lastInstalledDeps, setLastInstalledDeps] = useState<string[]>(
-    () => game.deps_snapshot || game.proton_dependencies || []
+    () => game.deps_snapshot ?? []
   );
 
   // Snapshot of last-saved config — used to detect unsaved changes (Apply Config green)
@@ -311,7 +311,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         if (res.game.deps_snapshot) {
           setLastInstalledDeps(res.game.deps_snapshot);
         } else {
-          setLastInstalledDeps(res.game.proton_dependencies || []);
+          setLastInstalledDeps([]);
         }
       }
     }).catch(() => {});
