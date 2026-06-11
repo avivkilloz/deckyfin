@@ -368,7 +368,15 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         launch_options: launchOptions || null,
         collections: mergedCollections,
       };
-      const hasChanges = JSON.stringify(payload) !== JSON.stringify(configSnapshot);
+      // Steam shortcut fields: name, executable, start_dir, launch_options, proton, collections
+      const oldSteam = (({ name, executable, start_dir, launch_options, proton_version, collections }) =>
+        ({ name, executable, start_dir, launch_options, proton_version, collections }))(configSnapshot);
+      const newSteam = { name, executable, start_dir: startDir || null, launch_options: launchOptions || null, proton_version: protonVersion || null, collections: mergedCollections };
+      const steamChanged = JSON.stringify(oldSteam) !== JSON.stringify(newSteam);
+      // Deps changed?
+      const oldDeps = configSnapshot.proton_dependencies || [];
+      const depsChanged = JSON.stringify(mergedDeps) !== JSON.stringify(oldDeps);
+
       const res = await updateGameConfig(storedName, payload);
       if (!res.success) {
         setConfigFeedback({ ok: false, msg: "Failed to save config" });
@@ -376,12 +384,11 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         setStoredName(name);
         setConfigFeedback({ ok: true, msg: "Config saved" });
         setConfigSnapshot(payload);
-        // Only set downstream flags when something actually changed
-        if (hasChanges) {
+        if (steamChanged) {
           setSteamNeedsSync(true);
-          if (mergedDeps.length > 0) {
-            setDepsNeedsInstall(true);
-          }
+        }
+        if (depsChanged && mergedDeps.length > 0) {
+          setDepsNeedsInstall(true);
         }
       }
     } catch (err: any) {
