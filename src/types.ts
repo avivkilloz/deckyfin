@@ -14,6 +14,10 @@ export interface GameConfig {
   collections?: string[];
   needs_restart_after_add?: boolean;
   needs_restart?: boolean;
+  /** Persisted snapshot of Steam-affecting fields at last sync time. JSON string. */
+  steam_snapshot?: string;
+  /** Persisted snapshot of deps at last install time. */
+  deps_snapshot?: string[];
 }
 
 export interface GameFolder {
