@@ -276,12 +276,35 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
       if (res.success && res.game) {
         setNeedsRestart(res.game.needs_restart ?? false);
         setNeedsRestartAfterAdd(res.game.needs_restart_after_add ?? false);
+        // Sync configSnapshot with what's actually on disk
+        setConfigSnapshot({
+          name: res.game.name,
+          executable: res.game.executable,
+          start_dir: res.game.start_dir || null,
+          steam_app_id: res.game.steam_app_id ?? null,
+          proton_version: res.game.proton_version || null,
+          proton_dependencies: res.game.proton_dependencies || [],
+          launch_options: res.game.launch_options || null,
+          collections: res.game.collections || [],
+        });
         // Restore persisted snapshots so green state survives navigation
         if (res.game.steam_snapshot) {
           try { setLastSyncedSnapshot(JSON.parse(res.game.steam_snapshot)); } catch {}
+        } else {
+          // No prior sync — assume saved config matches last synced state
+          setLastSyncedSnapshot({
+            name: res.game.name,
+            executable: res.game.executable,
+            start_dir: res.game.start_dir || null,
+            launch_options: res.game.launch_options || null,
+            proton_version: res.game.proton_version || null,
+            collections: res.game.collections || [],
+          });
         }
         if (res.game.deps_snapshot) {
           setLastInstalledDeps(res.game.deps_snapshot);
+        } else {
+          setLastInstalledDeps(res.game.proton_dependencies || []);
         }
       }
     }).catch(() => {});
