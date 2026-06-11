@@ -961,7 +961,10 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         </div>
       )}
 
-      {/* ── Action Buttons ─────────────────────────────────────────────── */}
+      {/* ── Steam Actions ─────────────────────────────────────────────────── */}
+      <label style={{ ...LABEL_STYLE, marginTop: "14px", marginBottom: "6px", fontSize: "0.9em", color: "#999" }}>
+        Steam Actions
+      </label>
       <div
         style={{
           display: "flex",
@@ -971,6 +974,26 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           alignItems: "flex-start",
         }}
       >
+        {/* Open in Steam */}
+        {steamInfo && (
+          <Focusable
+            onActivate={() =>
+              Navigation.NavigateToExternalWeb(
+                `steam://nav/games/details/${steamInfo.unsigned_appid}`
+              )
+            }
+            onClick={() =>
+              Navigation.NavigateToExternalWeb(
+                `steam://nav/games/details/${steamInfo.unsigned_appid}`
+              )
+            }
+            focusClassName="is-focused"
+            style={{ ...BTN_STYLE }}
+          >
+            ▶ Open in Steam
+          </Focusable>
+        )}
+
         <Focusable
           onActivate={steamInfo ? handleUpdateSteam : handleAddToSteam}
           onClick={steamInfo ? handleUpdateSteam : handleAddToSteam}
