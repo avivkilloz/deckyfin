@@ -40,6 +40,16 @@ from deckyfin_protontricks import (
 )
 from deckyfin_steamgrid import apply_steam_grid as _apply_steam_grid, set_api_key as _set_steamgrid_key, get_configured_api_key as _get_steamgrid_key, fetch_steamgrid_art_urls as _fetch_steamgrid_art_urls, search_steamgrid_games as _search_steamgrid_games, fetch_steamgrid_art_urls_by_id as _fetch_steamgrid_art_urls_by_id
 from deckyfin_steam_ctl import is_steam_running, restart_steam
+from deckyfin_sources import (
+    list_sources as _list_sources,
+    add_source as _add_source,
+    remove_source as _remove_source,
+    get_source_by_id as _get_source_by_id,
+    detect_capabilities as _detect_capabilities,
+    get_disk_usage as _get_disk_usage,
+    migrate_games_folder_to_source as _migrate_games_folder_to_source,
+    load_source_games as _load_source_games,
+)
 from steam_utils import get_user_id, list_steam_users
 from steam_games import convert_appid_to_unsigned_32bit
 from deckyfin_consts import APP_NAME, APP_VERSION
@@ -85,6 +95,13 @@ class Plugin:
                     update_game_config(game["name"], {"needs_restart_after_add": None, "needs_restart": None})
         except Exception:
             pass
+        # Migrate legacy games_folder to sources list (runs once)
+        try:
+            migrated = _migrate_games_folder_to_source()
+            if migrated:
+                _debug("_main: migrated games_folder to sources list")
+        except Exception as e:
+            _debug(f"_main: migration error: {e}")
 
     async def _unload(self):
         _debug("_unload called")
@@ -98,6 +115,53 @@ class Plugin:
             "version": APP_VERSION,
             "games_folder": str(folder) if folder else None,
         }
+
+    # ── Sources ───────────────────────────────────────────────────────────
+
+    async def list_sources(self) -> list:
+        return _list_sources()
+
+    async def add_source(
+        self,
+        name: str,
+        type: str,
+        path: Optional[str] = None,
+        url: Optional[str] = None,
+    ) -> dict:
+        try:
+            source = _add_source(name, type, path, url)
+            return {"success": True, "source": source}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    async def remove_source(self, source_id: str) -> dict:
+        removed = _remove_source(source_id)
+        return {"success": removed, "error": None if removed else f"Source '{source_id}' not found"}
+
+    async def get_source_capabilities(self, source_id: str) -> dict:
+        source = _get_source_by_id(source_id)
+        if not source:
+            return {"can_play": False, "can_write_config": False, "can_download_to": False}
+        return _detect_capabilities(source)
+
+    async def get_source_disk_usage(self, source_id: str) -> dict:
+        source = _get_source_by_id(source_id)
+        if not source:
+            return {"used": None, "total": None, "free": None}
+        return _get_disk_usage(source)
+
+    async def initialize_source(self, source_id: str) -> dict:
+        """Re-scan a source for new game folders and create config entries."""
+        source = _get_source_by_id(source_id)
+        if not source:
+            return {"success": False, "error": f"Source '{source_id}' not found"}
+        if source.get("type") == "agent":
+            return {"success": False, "error": "Agent sources are managed remotely"}
+        path = source.get("path")
+        if not path:
+            return {"success": False, "error": "Source has no path"}
+        result = initialize_app_structure(path)
+        return result
 
     # ── Steam ─────────────────────────────────────────────────────────────
 
