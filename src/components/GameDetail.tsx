@@ -815,7 +815,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         onActivate={handleApplyConfig}
         onClick={handleApplyConfig}
         focusClassName="is-focused"
-        style={{ ...BTN_STYLE, marginBottom: "8px" }}
+        style={{ ...BTN_STYLE, display: "inline-block", marginBottom: "8px" }}
       >
         Apply Config
       </Focusable>
@@ -875,6 +875,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           flexDirection: "column",
           gap: "6px",
           marginBottom: "14px",
+          alignItems: "flex-start",
         }}
       >
         <Focusable
@@ -902,7 +903,6 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
             focusClassName="is-focused"
             style={{
               ...BTN_STYLE,
-              flex: 1,
               opacity: !steamInfo || needsRestartAfterAdd || loading === "init" ? 0.5 : 1,
             }}
           >
