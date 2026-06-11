@@ -216,8 +216,18 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   const [restarting, setRestarting] = useState(false);
 
   // ── Green button state ────────────────────────────────────────────────────
-  const [steamNeedsSync, setSteamNeedsSync] = useState(false);
-  const [depsNeedsInstall, setDepsNeedsInstall] = useState(false);
+  // Snapshots of what was last synced/installed — computed comparison drives green
+  const [lastSyncedSnapshot, setLastSyncedSnapshot] = useState(() => ({
+    name: game.name,
+    executable: game.executable,
+    start_dir: game.start_dir || null,
+    launch_options: game.launch_options || null,
+    proton_version: game.proton_version || null,
+    collections: game.collections || [],
+  }));
+  const [lastInstalledDeps, setLastInstalledDeps] = useState<string[]>(
+    () => game.proton_dependencies || []
+  );
 
   // Snapshot of last-saved config — used to detect unsaved changes (Apply Config green)
   const [configSnapshot, setConfigSnapshot] = useState(() => ({
@@ -368,15 +378,6 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         launch_options: launchOptions || null,
         collections: mergedCollections,
       };
-      // Steam shortcut fields: name, executable, start_dir, launch_options, proton, collections
-      const oldSteam = (({ name, executable, start_dir, launch_options, proton_version, collections }) =>
-        ({ name, executable, start_dir, launch_options, proton_version, collections }))(configSnapshot);
-      const newSteam = { name, executable, start_dir: startDir || null, launch_options: launchOptions || null, proton_version: protonVersion || null, collections: mergedCollections };
-      const steamChanged = JSON.stringify(oldSteam) !== JSON.stringify(newSteam);
-      // Deps changed?
-      const oldDeps = configSnapshot.proton_dependencies || [];
-      const depsChanged = JSON.stringify(mergedDeps) !== JSON.stringify(oldDeps);
-
       const res = await updateGameConfig(storedName, payload);
       if (!res.success) {
         setConfigFeedback({ ok: false, msg: "Failed to save config" });
@@ -384,12 +385,6 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         setStoredName(name);
         setConfigFeedback({ ok: true, msg: "Config saved" });
         setConfigSnapshot(payload);
-        if (steamChanged) {
-          setSteamNeedsSync(true);
-        }
-        if (depsChanged && mergedDeps.length > 0) {
-          setDepsNeedsInstall(true);
-        }
       }
     } catch (err: any) {
       setConfigFeedback({ ok: false, msg: err?.message || "Failed to save config" });
@@ -439,7 +434,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         setSteamInfo({ app_id: res.app_id, unsigned_appid: res.unsigned_appid });
         setNeedsRestartAfterAdd(true);
         setNeedsRestart(true);
-        setSteamNeedsSync(false);
+        setLastSyncedSnapshot({ name, executable, start_dir: startDir || null, launch_options: launchOptions || null, proton_version: protonVersion || null, collections: mergedCollections });
         updateGameConfig(storedName, { needs_restart_after_add: true, needs_restart: true }).catch(() => {});
         setFeedback({
           ok: true,
@@ -470,7 +465,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
       if (res.success && res.app_id && res.unsigned_appid) {
         setSteamInfo({ app_id: res.app_id, unsigned_appid: res.unsigned_appid });
         setNeedsRestart(true);
-        setSteamNeedsSync(false);
+        setLastSyncedSnapshot({ name, executable, start_dir: startDir || null, launch_options: launchOptions || null, proton_version: protonVersion || null, collections: mergedCollections });
         updateGameConfig(storedName, { needs_restart: true }).catch(() => {});
         setFeedback({
           ok: true,
@@ -564,7 +559,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
       if (res.success) {
         const installed = (res.installed || []).join(", ");
         setFeedback({ ok: true, msg: `Installed: ${installed}` });
-        setDepsNeedsInstall(false);
+        setLastInstalledDeps(mergedDeps);
       } else {
         const failed = (res.failed || []).join(", ");
         setFeedback({
@@ -616,6 +611,18 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
       collections: mergedCollections,
     };
     return JSON.stringify(current) !== JSON.stringify(configSnapshot);
+  })();
+
+  // ── Sync/install needed comparisons — drives green on action buttons ──
+  const steamNeedsSync = (() => {
+    const a = lastSyncedSnapshot;
+    const b = { name, executable, start_dir: startDir || null, launch_options: launchOptions || null, proton_version: protonVersion || null, collections: mergedCollections };
+    return JSON.stringify(a) !== JSON.stringify(b);
+  })();
+
+  const depsNeedsInstall = (() => {
+    const saved = configSnapshot.proton_dependencies || [];
+    return saved.length > 0 && JSON.stringify(saved) !== JSON.stringify(lastInstalledDeps);
   })();
 
   // ── Render ──────────────────────────────────────────────────────────────
