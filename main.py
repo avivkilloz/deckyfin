@@ -76,6 +76,15 @@ class Plugin:
             _debug("_main OK")
         except Exception as e:
             _debug(f"_main logger error: {e}")
+        # Clear stale per-game restart flags — Steam (re)started, so all
+        # pending needs_restart / needs_restart_after_add are outdated.
+        try:
+            games = list_game_configs()
+            for game in games:
+                if game.get("needs_restart_after_add") or game.get("needs_restart"):
+                    update_game_config(game["name"], {"needs_restart_after_add": None, "needs_restart": None})
+        except Exception:
+            pass
 
     async def _unload(self):
         _debug("_unload called")
