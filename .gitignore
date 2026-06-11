@@ -20,3 +20,6 @@ dist/
 
 # Test fixtures (auto-generated)
 tests/fixtures/generated/
+
+# Brainstorming companion
+.superpowers/
