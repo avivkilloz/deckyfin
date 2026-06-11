@@ -1049,26 +1049,6 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           {restarting ? "…" : "↺ Restart Steam"}
         </Focusable>
 
-        {/* Play */}
-        {steamInfo && (
-          <Focusable
-            onActivate={() =>
-              Navigation.NavigateToExternalWeb(
-                `steam://rungameid/${steamInfo.unsigned_appid}`
-              )
-            }
-            onClick={() =>
-              Navigation.NavigateToExternalWeb(
-                `steam://rungameid/${steamInfo.unsigned_appid}`
-              )
-            }
-            focusClassName="is-focused"
-            style={{ ...BTN_STYLE }}
-          >
-            ▶ Play
-          </Focusable>
-        )}
-
       </div>
 
       {/* ── Feedback ───────────────────────────────────────────────────── */}
