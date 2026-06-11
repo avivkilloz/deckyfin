@@ -391,7 +391,7 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
         onActivate={handleSaveKey}
         onClick={handleSaveKey}
         focusClassName="is-focused"
-        style={{ ...BTN_STYLE, width: "100%", marginBottom: "8px" }}
+        style={{ ...BTN_STYLE, marginBottom: "8px" }}
       >
         Save Key
       </Focusable>
