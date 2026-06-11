@@ -419,17 +419,21 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
 
       {ptStatus ? (
         <div style={{ fontSize: "0.85em", marginBottom: "10px" }}>
-          <div style={{ marginBottom: "4px" }}>
-            <span>{ptStatus.flatpak_installed ? "✅" : "❌"}</span>{" "}
-            <span style={{ color: "#e0e0e0" }}>Flatpak protontricks</span>
-            {ptStatus.flatpak_available && !ptStatus.flatpak_installed && (
-              <span style={{ color: "#888", marginLeft: "8px" }}>(flatpak CLI available)</span>
-            )}
-          </div>
-          <div>
-            <span>{ptStatus.native_available ? "✅" : "❌"}</span>{" "}
-            <span style={{ color: "#e0e0e0" }}>Native protontricks</span>
-          </div>
+          {ptStatus.flatpak_installed && (
+            <div style={{ marginBottom: "4px" }}>
+              <span>✅</span>{" "}
+              <span style={{ color: "#e0e0e0" }}>Flatpak protontricks</span>
+            </div>
+          )}
+          {ptStatus.native_available && (
+            <div>
+              <span>✅</span>{" "}
+              <span style={{ color: "#e0e0e0" }}>Native protontricks</span>
+            </div>
+          )}
+          {!ptStatus.flatpak_installed && !ptStatus.native_available && (
+            <p style={{ color: "#888", margin: 0 }}>Not installed</p>
+          )}
         </div>
       ) : (
         <p style={{ fontSize: "0.85em", color: "#888", marginBottom: "10px" }}>Checking…</p>
@@ -451,12 +455,6 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
             {ptInstalling ? "Installing…" : "Install Protontricks (flatpak)"}
           </Focusable>
         </div>
-      )}
-
-      {ptStatus && ptStatus.flatpak_available && ptStatus.flatpak_installed && !ptStatus.native_available && (
-        <p style={{ fontSize: "0.85em", color: "#2ecc71", marginBottom: "8px" }}>
-          ✅ Ready — protontricks is installed via flatpak
-        </p>
       )}
 
       {ptMessage && (
