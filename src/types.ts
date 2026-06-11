@@ -83,6 +83,42 @@ declare global {
   var SteamClient: SteamClient;
 }
 
+// ── Multi-source types ────────────────────────────────────────────────────────
+
+export type SourceType = "local" | "mount" | "agent";
+
+export interface Source {
+  id: string;
+  name: string;
+  type: SourceType;
+  path: string | null;
+  url: string | null;
+}
+
+export interface SourceCapabilities {
+  can_play: boolean;
+  can_write_config: boolean;
+  can_download_to: boolean;
+}
+
+export interface SourceDiskUsage {
+  used: number;   // bytes
+  total: number;
+  free: number;
+}
+
+export interface GameSource {
+  source_id: string;
+  source_name: string;
+  source_type: SourceType;
+  config: GameConfig;
+}
+
+export interface MergedGame {
+  name: string;
+  sources: GameSource[];
+}
+
 /** SteamGridDB art URLs response from backend. */
 export interface SteamGridArtUrls {
   success: boolean;
