@@ -111,6 +111,14 @@ class Plugin:
             self._set_needs_restart_flag(False)
         except Exception:
             pass
+        # Clear per-game restart flags for ALL games — Steam restart processes all shortcuts
+        try:
+            games = list_game_configs()
+            for game in games:
+                if game.get("needs_restart_after_add") or game.get("needs_restart"):
+                    update_game_config(game["name"], {"needs_restart_after_add": None, "needs_restart": None})
+        except Exception:
+            pass
         return result
 
     async def get_needs_restart(self) -> bool:

@@ -518,10 +518,9 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
 
   const handleRestartSteam = async () => {
     setRestarting(true);
-    // Clear flags in config BEFORE restarting — the plugin connection may die
+    // Clear local state — the backend clears ALL per-game flags server-side
     setNeedsRestartAfterAdd(false);
     setNeedsRestart(false);
-    updateGameConfig(storedName, { needs_restart_after_add: null, needs_restart: null }).catch(() => {});
     try {
       await restartSteam();
     } catch (_) {
