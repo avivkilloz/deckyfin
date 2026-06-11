@@ -1,16 +1,18 @@
 import { VFC, useState, useEffect, useRef, useCallback } from "react";
 import { callable } from "@decky/api";
 import { Navigation, Focusable } from "@decky/ui";
+import { Source } from "../types";
 import { CompactTextField } from "../components/CompactTextField";
 
-const setGamesFolder = callable<
-  [path: string],
-  { success: boolean; path?: string; error?: string }
->("set_games_folder");
-const initialize = callable<
-  [games_folder?: string],
-  { success: boolean; error?: string; message?: string }
->("initialize");
+const listSources = callable<[], Source[]>("list_sources");
+const addSource = callable<
+  [name: string, type: string, path: string | null, url: string | null],
+  { success: boolean; source?: Source; error?: string }
+>("add_source");
+const removeSource = callable<[source_id: string], { success: boolean }>("remove_source");
+const getSourceDiskUsage = callable<[source_id: string], { used: number | null; total: number | null; free: number | null }>("get_source_disk_usage");
+const initializeSource = callable<[source_id: string], { success: boolean; message?: string }>("initialize_source");
+
 const getSteamGridKey = callable<[], { key: string; has_override: boolean }>(
   "get_steamgrid_key"
 );
@@ -18,8 +20,6 @@ const setSteamGridKey = callable<
   [key: string],
   { success: boolean }
 >("set_steamgrid_key");
-const listSubfolders = callable<[path: string], string[]>("list_subfolders");
-
 const getProtontricksStatus = callable<
   [],
   { flatpak_available: boolean; flatpak_installed: boolean; native_available: boolean; status: string }
@@ -30,7 +30,6 @@ const installProtontricks = callable<
 >("install_protontricks");
 
 interface Props {
-  gamesFolder: string | null;
   onBack: () => void;
 }
 
@@ -44,7 +43,7 @@ const BTN_STYLE: React.CSSProperties = {
   color: "#e0e0e0",
 };
 
-export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
+export const SettingsPage: VFC<Props> = ({ onBack }) => {
   const backRef = useRef<HTMLDivElement>(null);
 
   // ── Auto-focus Back button on mount so B-button works immediately ──
@@ -53,52 +52,71 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
     return () => clearTimeout(timer);
   }, []);
 
-  const [folderPath, setFolderPath] = useState(gamesFolder || "");
-  const [message, setMessage] = useState<string | null>(null);
-  const [rescanned, setRescanned] = useState(false);
+  // ── Sources state ─────────────────────────────────────────────────────────
+  const [sources, setSources] = useState<Source[]>([]);
+  const [diskUsages, setDiskUsages] = useState<Record<string, { used: number | null; total: number | null; free: number | null }>>({});
+  const [sourceMessage, setSourceMessage] = useState<{ id: string; msg: string } | null>(null);
 
-  // ── Folder browser ───────────────────────────────────────────────────────
-  const [showFolderPicker, setShowFolderPicker] = useState(false);
-  const [browsePath, setBrowsePath] = useState("/");
-  const [subfolders, setSubfolders] = useState<string[]>([]);
-  const [browseLoading, setBrowseLoading] = useState(false);
+  // Add source form
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newSourceName, setNewSourceName] = useState("");
+  const [newSourceType, setNewSourceType] = useState<"local" | "mount" | "agent">("local");
+  const [newSourcePath, setNewSourcePath] = useState("");
+  const [newSourceUrl, setNewSourceUrl] = useState("");
+  const [addSourceMsg, setAddSourceMsg] = useState<string | null>(null);
 
-  const loadSubfolders = useCallback(async (path: string) => {
-    setBrowseLoading(true);
+  const loadSources = useCallback(async () => {
     try {
-      const dirs = await listSubfolders(path);
-      setSubfolders(dirs);
-      setBrowsePath(path);
+      const s = await listSources();
+      setSources(s || []);
+      for (const src of s || []) {
+        getSourceDiskUsage(src.id)
+          .then((usage) => setDiskUsages((prev) => ({ ...prev, [src.id]: usage })))
+          .catch(() => {});
+      }
     } catch {
-      setSubfolders([]);
+      setSources([]);
     }
-    setBrowseLoading(false);
   }, []);
 
-  const handleOpenFolderPicker = async () => {
-    if (showFolderPicker) {
-      setShowFolderPicker(false);
-      return;
+  useEffect(() => {
+    loadSources();
+  }, [loadSources]);
+
+  const handleAddSource = async () => {
+    setAddSourceMsg(null);
+    const path = newSourceType !== "agent" ? newSourcePath || null : null;
+    const url = newSourceType === "agent" ? newSourceUrl || null : null;
+    if (!newSourceName.trim()) { setAddSourceMsg("❌ Name is required"); return; }
+    if (newSourceType !== "agent" && !path) { setAddSourceMsg("❌ Path is required"); return; }
+    if (newSourceType === "agent" && !url) { setAddSourceMsg("❌ URL is required"); return; }
+    try {
+      const res = await addSource(newSourceName, newSourceType, path, url);
+      if (res.success) {
+        setShowAddForm(false);
+        setNewSourceName(""); setNewSourcePath(""); setNewSourceUrl("");
+        await loadSources();
+      } else {
+        setAddSourceMsg(`❌ ${res.error || "Failed"}`);
+      }
+    } catch (err: any) {
+      setAddSourceMsg(`❌ ${err?.message || "Failed"}`);
     }
-    await loadSubfolders("/");
-    setShowFolderPicker(true);
   };
 
-  const handleFolderClick = async (name: string) => {
-    const newPath = browsePath === "/" ? `/${name}` : `${browsePath}/${name}`;
-    await loadSubfolders(newPath);
+  const handleRemoveSource = async (source_id: string) => {
+    try {
+      await removeSource(source_id);
+      await loadSources();
+    } catch {}
   };
 
-  const handleGoUp = async () => {
-    if (browsePath === "/") return;
-    const parent = browsePath.substring(0, browsePath.lastIndexOf("/"));
-    const newPath = parent || "/";
-    await loadSubfolders(newPath);
-  };
-
-  const handleSelectFolder = () => {
-    setFolderPath(browsePath);
-    setShowFolderPicker(false);
+  const handleRescanSource = async (source_id: string) => {
+    try {
+      const res = await initializeSource(source_id);
+      setSourceMessage({ id: source_id, msg: res.success ? "✅ Rescanned" : "❌ Failed" });
+      setTimeout(() => setSourceMessage(null), 3000);
+    } catch {}
   };
 
   // ── SteamGridDB key ──────────────────────────────────────────────────
@@ -169,39 +187,6 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
   };
   // ── End Protontricks ────────────────────────────────────────────────
 
-  const handleSave = async () => {
-    setMessage(null);
-    setRescanned(false);
-    try {
-      const result = await setGamesFolder(folderPath);
-      if (result.success) {
-        setMessage("✅ Settings saved!");
-        await initialize(folderPath);
-        setTimeout(() => setMessage(null), 3000);
-      } else {
-        setMessage(`❌ ${result.error || "Save failed"}`);
-      }
-    } catch (err: any) {
-      setMessage(`❌ ${err?.message || "Save failed"}`);
-    }
-  };
-
-  const handleRescan = async () => {
-    setMessage(null);
-    setRescanned(false);
-    try {
-      const result = await initialize();
-      if (result.success) {
-        setMessage(`✅ ${result.message || "Scan complete"}`);
-        setRescanned(true);
-      } else {
-        setMessage(`❌ ${result.error || "Scan failed"}`);
-      }
-    } catch (err: any) {
-      setMessage(`❌ ${err?.message || "Scan failed"}`);
-    }
-  };
-
   return (
     <Focusable
       onCancel={onBack}
@@ -226,138 +211,100 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
       </Focusable>
       <h3 style={{ margin: "0 0 10px 0" }}>Settings</h3>
 
-      {/* ── Games Folder ────────────────────────────────────────────────── */}
-      <h4 style={{ margin: "0 0 10px 0" }}>Games Folder</h4>
-      <p style={{ fontSize: "0.85em", color: "#aaa", marginBottom: "8px" }}>
-        Path to the root directory containing your game folders. Each
-        subdirectory is treated as a separate game with its own config.
-      </p>
-      <div
-        style={{
-          display: "flex",
-          gap: "6px",
-          alignItems: "center",
-          marginBottom: "12px",
-        }}
-      >
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <CompactTextField
-            value={folderPath}
-            onChange={(e) => setFolderPath(e.target.value)}
-            style={{ width: "100%" }}
-          />
-        </div>
+      {/* ── Sources ──────────────────────────────────────────────────────── */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+        <h4 style={{ margin: 0 }}>Sources</h4>
         <Focusable
-          onActivate={handleOpenFolderPicker}
-          onClick={handleOpenFolderPicker}
+          onActivate={() => setShowAddForm((v) => !v)}
+          onClick={() => setShowAddForm((v) => !v)}
           focusClassName="is-focused"
-          style={{ ...BTN_STYLE, alignSelf: "center", padding: "4px 12px" }}
+          style={{ ...BTN_STYLE, fontSize: "0.82em", padding: "4px 10px", borderColor: "#0078d4", color: "#0078d4" }}
         >
-          {showFolderPicker ? "✕" : "Browse"}
+          {showAddForm ? "✕ Cancel" : "+ Add Source"}
         </Focusable>
       </div>
 
-      {/* Folder browser dropdown */}
-      {showFolderPicker && (
-        <Focusable
-          style={{
-            marginBottom: "10px",
-            border: "1px solid #555",
-            borderRadius: "4px",
-            padding: "2px 0",
-          }}
-        >
-          <div style={{ fontSize: "0.85em", color: "#aaa", padding: "4px 10px 2px", wordBreak: "break-all" }}>
-            {browsePath}
-          </div>
-          {browseLoading && (
-            <p style={{ padding: "8px", margin: 0, fontSize: "0.85em", color: "#888" }}>
-              Loading…
-            </p>
-          )}
-          {!browseLoading && (
-            <div style={{ maxHeight: "180px", overflowY: "auto" }}>
-              {browsePath !== "/" && (
-                <Focusable
-                  onActivate={handleGoUp}
-                  onClick={handleGoUp}
-                  focusClassName="is-focused"
-                  style={{
-                    margin: "0 2px",
-                    padding: "4px 10px",
-                    cursor: "pointer",
-                    fontSize: "0.85em",
-                    borderBottom: "1px solid #333",
-                    color: "#f0ad4e",
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                >
-                  .. (up)
-                </Focusable>
-              )}
-              {subfolders.length === 0 && browsePath === "/" && (
-                <p style={{ padding: "8px", margin: 0, fontSize: "0.85em", color: "#888" }}>
-                  No subdirectories found
-                </p>
-              )}
-              {subfolders.map((name) => (
-                <Focusable
-                  key={name}
-                  onActivate={() => handleFolderClick(name)}
-                  onClick={() => handleFolderClick(name)}
-                  focusClassName="is-focused"
-                  style={{
-                    margin: "0 2px",
-                    padding: "4px 10px",
-                    cursor: "pointer",
-                    fontSize: "0.85em",
-                    borderBottom: "1px solid #333",
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                >
-                  📁 {name}
-                </Focusable>
-              ))}
-              <Focusable
-                onActivate={handleSelectFolder}
-                onClick={handleSelectFolder}
-                focusClassName="is-focused"
-                style={{
-                  margin: "0 2px",
-                  padding: "8px 10px",
-                  cursor: "pointer",
-                  fontSize: "0.85em",
-                  color: "#27ae60",
-                  textAlign: "center",
-                  fontWeight: "bold",
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.12)")}
-                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-              >
-                ✓ Select This Folder
+      {/* Add source form */}
+      {showAddForm && (
+        <div style={{ border: "1px solid #444", borderRadius: "6px", padding: "10px", marginBottom: "10px" }}>
+          <div style={{ fontSize: "0.78em", color: "#888", marginBottom: "4px" }}>Name</div>
+          <CompactTextField value={newSourceName} onChange={(e) => setNewSourceName(e.target.value)} style={{ width: "100%", marginBottom: "8px" }} />
+          <div style={{ fontSize: "0.78em", color: "#888", marginBottom: "4px" }}>Type</div>
+          <div style={{ display: "flex", gap: "6px", marginBottom: "8px" }}>
+            {(["local", "mount", "agent"] as const).map((t) => (
+              <Focusable key={t} onActivate={() => setNewSourceType(t)} onClick={() => setNewSourceType(t)} focusClassName="is-focused"
+                style={{ padding: "3px 10px", fontSize: "0.82em", borderRadius: "12px", cursor: "pointer",
+                  border: newSourceType === t ? "1px solid #0078d4" : "1px solid #555",
+                  background: newSourceType === t ? "#0078d4" : "transparent",
+                  color: newSourceType === t ? "white" : "#ccc" }}>
+                {t}
               </Focusable>
-            </div>
+            ))}
+          </div>
+          {newSourceType !== "agent" ? (
+            <>
+              <div style={{ fontSize: "0.78em", color: "#888", marginBottom: "4px" }}>Path</div>
+              <CompactTextField value={newSourcePath} onChange={(e) => setNewSourcePath(e.target.value)} placeholder="/home/deck/Games" style={{ width: "100%", marginBottom: "8px" }} />
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: "0.78em", color: "#888", marginBottom: "4px" }}>URL</div>
+              <CompactTextField value={newSourceUrl} onChange={(e) => setNewSourceUrl(e.target.value)} placeholder="http://10.0.0.1:8080" style={{ width: "100%", marginBottom: "8px" }} />
+            </>
           )}
-        </Focusable>
+          <Focusable onActivate={handleAddSource} onClick={handleAddSource} focusClassName="is-focused"
+            style={{ ...BTN_STYLE, borderColor: "#27ae60", color: "#2ecc71", display: "inline-block" }}>
+            Add
+          </Focusable>
+          {addSourceMsg && <span style={{ marginLeft: "8px", fontSize: "0.82em", color: "tomato" }}>{addSourceMsg}</span>}
+        </div>
       )}
 
-      <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-        <Focusable
-          onActivate={handleSave}
-          onClick={handleSave}
-          focusClassName="is-focused"
-          style={BTN_STYLE}
-        >
-          Save
-        </Focusable>
-        {message && (
-          <span style={{ fontSize: "0.85em", color: message.startsWith("✅") ? "#2ecc71" : "tomato" }}>
-            {message}
-          </span>
-        )}
-      </div>
+      {/* Source list */}
+      {sources.length === 0 && !showAddForm && (
+        <p style={{ fontSize: "0.85em", color: "#888" }}>No sources configured. Add one above.</p>
+      )}
+      {sources.map((src) => {
+        const usage = diskUsages[src.id];
+        const usedPct = usage?.total ? Math.round((usage.used! / usage.total) * 100) : null;
+        const typeColor = src.type === "local" ? "#27ae60" : src.type === "mount" ? "#e67e22" : "#0984e3";
+        const typeBg = src.type === "local" ? "#1a3a1a" : src.type === "mount" ? "#2a2a1a" : "#1a1a3a";
+        const offline = !usage?.total && usage?.total !== undefined;
+        return (
+          <div key={src.id} style={{ border: "1px solid #444", borderRadius: "6px", padding: "10px", marginBottom: "8px", opacity: offline ? 0.7 : 1 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "6px" }}>
+              <div>
+                <span style={{ fontWeight: 600, color: "#e0e0e0" }}>{src.name}</span>
+                <span style={{ marginLeft: "8px", padding: "2px 7px", fontSize: "0.75em", borderRadius: "10px", background: typeBg, color: typeColor, border: `1px solid ${typeColor}` }}>{src.type}</span>
+                {offline && <span style={{ marginLeft: "6px", fontSize: "0.75em", color: "#e74c3c" }}>⚠ offline</span>}
+              </div>
+              <div style={{ display: "flex", gap: "4px" }}>
+                <Focusable onActivate={() => handleRescanSource(src.id)} onClick={() => handleRescanSource(src.id)} focusClassName="is-focused"
+                  style={{ ...BTN_STYLE, fontSize: "0.75em", padding: "2px 8px" }}>
+                  {sourceMessage?.id === src.id ? sourceMessage.msg : "Rescan"}
+                </Focusable>
+                <Focusable onActivate={() => handleRemoveSource(src.id)} onClick={() => handleRemoveSource(src.id)} focusClassName="is-focused"
+                  style={{ ...BTN_STYLE, fontSize: "0.75em", padding: "2px 8px", borderColor: "#c0392b", color: "#e74c3c" }}>
+                  Remove
+                </Focusable>
+              </div>
+            </div>
+            <div style={{ fontSize: "0.78em", color: "#666", marginBottom: "6px" }}>{src.path || src.url}</div>
+            {usedPct !== null && (
+              <>
+                <div style={{ fontSize: "0.75em", color: "#888", marginBottom: "3px", display: "flex", justifyContent: "space-between" }}>
+                  <span>Disk</span>
+                  <span>{Math.round(usage!.used! / 1e9)} GB / {Math.round(usage!.total! / 1e9)} GB</span>
+                </div>
+                <div style={{ height: "5px", background: "#333", borderRadius: "3px", overflow: "hidden" }}>
+                  <div style={{ width: `${usedPct}%`, height: "100%", background: typeColor, borderRadius: "3px" }} />
+                </div>
+              </>
+            )}
+            {offline && <div style={{ fontSize: "0.75em", color: "#555" }}>Disk info unavailable</div>}
+          </div>
+        );
+      })}
 
       <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.12)", margin: "20px 0" }} />
 
@@ -462,34 +409,6 @@ export const SettingsPage: VFC<Props> = ({ gamesFolder, onBack }) => {
           {ptMessage}
         </p>
       )}
-
-      <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.12)", margin: "20px 0" }} />
-
-      {/* ── Maintenance ──────────────────────────────────────────────────── */}
-      <h4 style={{ margin: "0 0 10px 0" }}>Maintenance</h4>
-
-      <p style={{ fontSize: "0.85em", color: "#aaa", marginBottom: "10px" }}>
-        Re-discover games from the configured folder and create config entries for any new subdirectories.
-      </p>
-      <Focusable
-        onActivate={handleRescan}
-        onClick={handleRescan}
-        focusClassName="is-focused"
-        style={{
-          padding: "8px 16px",
-          fontSize: "0.85em",
-          cursor: "pointer",
-          borderRadius: "4px",
-          border: "1px solid #f0ad4e",
-          background: "transparent",
-          color: "#f0ad4e",
-          display: "inline-block",
-        }}
-      >
-        Rescan Games Folder
-      </Focusable>
-
-      {message && <p style={{ marginTop: "12px", color: rescanned ? "#f0ad4e" : undefined }}>{message}</p>}
 
       <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.12)", margin: "20px 0" }} />
 
