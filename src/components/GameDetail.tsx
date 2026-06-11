@@ -46,6 +46,10 @@ const updateGameConfig = callable<
   { success: boolean }
 >("update_game_config");
 const scanExes = callable<[subfolder: string], string[]>("scan_game_exes");
+const getGame = callable<
+  [name: string],
+  { success: boolean; game?: GameConfig }
+>("get_game");
 const searchSteamgridGames = callable<
   [game_name: string],
   { success: boolean; games: Array<{ id: number; name: string }> }
@@ -220,7 +224,13 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
     listProtonVersions()
       .then(setProtonVersions)
       .catch(() => setProtonVersions([]));
-  }, []);
+    // Fetch fresh game config — parent's games array may be stale
+    getGame(game.name).then((res) => {
+      if (res.success && res.game) {
+        setNeedsRestart(res.game.needs_restart_after_add ?? false);
+      }
+    }).catch(() => {});
+  }, [game.name]);
 
   useEffect(() => {
     getSteamShortcut(game.name)
