@@ -321,6 +321,67 @@ def _sync_user_collections(
     )
 
 
+def list_steam_collections() -> list[str]:
+    """List all existing Steam collection names from cloud storage JSON.
+
+    Returns sorted, deduplicated list of collection names (case-preserved).
+    Returns empty list if no collections found or on error.
+    """
+    try:
+        import json
+        user_id = get_user_id()
+        steam_root = find_steam_root()
+        if not steam_root:
+            return []
+        cloud_dir = steam_root / STEAM_USERDATA_FOLDER / user_id / "config" / "cloudstorage"
+
+        # Find active namespace
+        namespaces_path = cloud_dir / "cloud-storage-namespaces.json"
+        active_namespace = 1
+        if namespaces_path.exists():
+            try:
+                with open(namespaces_path, "r", encoding="utf-8") as f:
+                    namespaces = json.load(f)
+                sorted_ns = sorted(namespaces, key=lambda x: int(x[1]), reverse=True)
+                if sorted_ns and sorted_ns[0][1] != "0":
+                    active_namespace = sorted_ns[0][0]
+            except (json.JSONDecodeError, ValueError, IndexError, TypeError):
+                pass
+
+        cloud_path = cloud_dir / f"cloud-storage-namespace-{active_namespace}.json"
+        if not cloud_path.exists():
+            return []
+
+        with open(cloud_path, "r", encoding="utf-8") as f:
+            cloud_data = json.load(f)
+
+        # Extract collection names
+        names: set[str] = set()
+        for item in cloud_data:
+            if not isinstance(item, list) or len(item) < 2:
+                continue
+            key = item[0]
+            if not isinstance(key, str) or not key.startswith("user-collections."):
+                continue
+            entry = item[1]
+            if not isinstance(entry, dict):
+                continue
+            if entry.get("is_deleted"):
+                continue
+            try:
+                value = json.loads(entry.get("value", "{}"))
+            except (json.JSONDecodeError, TypeError):
+                continue
+            name = value.get("name", "")
+            if name:
+                names.add(name)
+
+        return sorted(names)
+    except Exception:
+        logger.exception("Failed to list Steam collections")
+        return []
+
+
 def _parse_old_tags(shortcut: dict) -> Optional[list[str]]:
     """Extract collection names from a shortcut's existing `tags` field."""
     tags = shortcut.get("tags", {})

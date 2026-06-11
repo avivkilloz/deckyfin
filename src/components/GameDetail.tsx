@@ -63,6 +63,7 @@ const getGameProcessingState = callable<
   Record<string, any> | null
 >("get_game_processing_state");
 const restartSteam = callable<[], { success: boolean; message?: string }>("restart_steam");
+const listSteamCollections = callable<[], string[]>("list_steam_collections");
 
 /** Popular Proton dependencies shown as toggle chips. */
 const POPULAR_DEPS = [
@@ -141,11 +142,31 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
     game.launch_options || ""
   );
 
-  // ── Collections ─────────────────────────────────────────────────────────
-  const [collections, setCollections] = useState(
-    game.collections?.join(", ") || ""
-  );
-  const collectionsList = collections.split(",").map((c) => c.trim()).filter(Boolean);
+  // ── Collections: toggle chips + custom ─────────────────────────────────
+  const [steamCollections, setSteamCollections] = useState<string[]>([]);
+  const [checkedCollections, setCheckedCollections] = useState<string[]>([]);
+  const [customCollections, setCustomCollections] = useState<string>("");
+  const [collectionsLoaded, setCollectionsLoaded] = useState(false);
+
+  const mergedCollections = ((): string[] => {
+    const custom = customCollections
+      .split(",")
+      .map((c) => c.trim())
+      .filter(Boolean);
+    const all = [...checkedCollections, ...custom];
+    const seen = new Set<string>();
+    return all.filter((c) => {
+      if (seen.has(c)) return false;
+      seen.add(c);
+      return true;
+    });
+  })();
+
+  const toggleCheckedCollection = (name: string) => {
+    setCheckedCollections((prev) =>
+      prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]
+    );
+  };
 
   // ── Dependencies: checkboxes + custom ────────────────────────────────────
   const existingDeps = game.proton_dependencies || [];
@@ -243,6 +264,23 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
       .catch(() => {});
   }, [game.name]);
 
+  // ── Fetch existing Steam collections on mount ───────────────────────────
+  useEffect(() => {
+    listSteamCollections().then((collections) => {
+      setSteamCollections(collections);
+      // Partition game's existing collections into known vs custom
+      const existing = game.collections || [];
+      const knownColls = existing.filter((c) => collections.includes(c));
+      const customColls = existing.filter((c) => !collections.includes(c));
+      setCheckedCollections(knownColls);
+      setCustomCollections(customColls.join(", "));
+      setCollectionsLoaded(true);
+    }).catch(() => {
+      setSteamCollections([]);
+      setCollectionsLoaded(true);
+    });
+  }, [game.name]);
+
   // ── Restore processing state on mount (e.g. Installing… survived navigation) ──
   useEffect(() => {
     getGameProcessingState(game.name)
@@ -312,7 +350,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         proton_version: protonVersion || null,
         proton_dependencies: mergedDeps,
         launch_options: launchOptions || null,
-        collections: collectionsList,
+        collections: mergedCollections,
       });
       if (!res.success) {
         setConfigFeedback({ ok: false, msg: "Failed to save config" });
@@ -362,7 +400,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         startDir || undefined,
         launchOptions || "",
         protonVersion || undefined,
-        collectionsList.length > 0 ? collectionsList : undefined
+        mergedCollections.length > 0 ? mergedCollections : undefined
       );
       if (res.success && res.app_id && res.unsigned_appid) {
         setSteamInfo({ app_id: res.app_id, unsigned_appid: res.unsigned_appid });
@@ -393,7 +431,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         startDir || undefined,
         launchOptions || "",
         protonVersion || undefined,
-        collectionsList.length > 0 ? collectionsList : undefined
+        mergedCollections.length > 0 ? mergedCollections : undefined
       );
       if (res.success && res.app_id && res.unsigned_appid) {
         setSteamInfo({ app_id: res.app_id, unsigned_appid: res.unsigned_appid });
@@ -655,20 +693,73 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         style={{ width: "100%", marginBottom: "10px" }}
       />
 
-      {/* Collections */}
+      {/* ── Collections: Toggle Chips + Custom ──────────────────────────── */}
       <label style={LABEL_STYLE}>
         Collections
         <span style={{ color: "#666", fontWeight: "normal" }}>
-          {" "}(comma-separated)
+          {" "}
+          (click to select)
         </span>
       </label>
-      <CompactTextField
-        value={collections}
-        onChange={(e) => setCollections(e.target.value)}
-        placeholder="e.g. RPG, FPS, Favorites"
-        style={{ width: "100%", marginBottom: "10px" }}
-      />
-      {collectionsList.length > 0 && (
+
+      <div
+        style={{
+          marginBottom: "8px",
+          border: "1px solid #444",
+          borderRadius: "4px",
+          padding: "8px",
+        }}
+      >
+        {steamCollections.length > 0 && (
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "6px",
+              marginBottom: "10px",
+            }}
+          >
+            {steamCollections.map((name) => {
+              const selected = checkedCollections.includes(name);
+              return (
+                <Focusable
+                  key={name}
+                  onActivate={() => toggleCheckedCollection(name)}
+                  onClick={() => toggleCheckedCollection(name)}
+                  focusClassName="is-focused"
+                  style={{
+                    padding: "4px 12px",
+                    fontSize: "0.82em",
+                    border: selected
+                      ? "1px solid #0078d4"
+                      : "1px solid #555",
+                    borderRadius: "14px",
+                    background: selected ? "#0078d4" : "transparent",
+                    color: selected ? "white" : "#ccc",
+                    cursor: "pointer",
+                  }}
+                >
+                  {name}
+                </Focusable>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Custom collections */}
+        <label style={{ fontSize: "0.82em", color: "#888", display: "block", marginBottom: "2px" }}>
+          Custom (comma-separated)
+        </label>
+        <CompactTextField
+          value={customCollections}
+          onChange={(e) => setCustomCollections(e.target.value)}
+          placeholder={steamCollections.length > 0 ? "e.g. RPG, FPS" : "e.g. RPG, FPS, Favorites"}
+          style={{ width: "100%" }}
+        />
+      </div>
+
+      {/* Grey pills for current collections */}
+      {mergedCollections.length > 0 && (
         <div
           style={{
             display: "flex",
@@ -677,7 +768,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
             marginBottom: "10px",
           }}
         >
-          {collectionsList.map((c, i) => (
+          {mergedCollections.map((c, i) => (
             <span
               key={i}
               style={{
