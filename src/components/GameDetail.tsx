@@ -167,6 +167,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   const [showCopyGamePicker, setShowCopyGamePicker] = useState(false);
   const [copyGameDest, setCopyGameDest] = useState<import("../types").Source | null>(null);
   const [copyGameConfirming, setCopyGameConfirming] = useState(false);
+  const [copyGameFeedback, setCopyGameFeedback] = useState<string | null>(null);
   const [transferId, setTransferId] = useState<string | null>(null);
   const [transferStatus, setTransferStatus] = useState<import("../types").TransferStatus | null>(null);
 
@@ -821,6 +822,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   const handleStartTransfer = async () => {
     if (!copyGameDest) return;
     setCopyGameConfirming(false);
+    setCopyGameFeedback(null);
     try {
       const res = await startGameTransfer(
         game.name,
@@ -839,8 +841,12 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           total_bytes: 0,
           error: null,
         });
+      } else {
+        setCopyGameFeedback(`✗ ${res.error ?? "Failed to start transfer"}`);
       }
-    } catch (_) {}
+    } catch (e) {
+      setCopyGameFeedback(`✗ ${String(e)}`);
+    }
     setCopyGameDest(null);
   };
 
@@ -1097,6 +1103,18 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
               }}
             >
               {copyConfigFeedback}
+            </p>
+          )}
+
+          {copyGameFeedback && (
+            <p
+              style={{
+                margin: "0 0 4px 0",
+                fontSize: "0.82em",
+                color: "tomato",
+              }}
+            >
+              {copyGameFeedback}
             </p>
           )}
 
