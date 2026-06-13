@@ -345,11 +345,29 @@ class Plugin:
         src_game_dir = Path(src_path) / game_name
         dst_game_dir = Path(dst_path) / game_name
 
+        if not src_game_dir.exists():
+            return {"success": False, "error": f"Game folder not found: {src_game_dir}"}
+
+        # Reject if a transfer to the same destination is already running
+        already = next(
+            (e for e in _transfer_registry.values()
+             if e["game_name"] == game_name
+             and e["to_source_id"] == to_source_id
+             and e["status"] == "running"),
+            None,
+        )
+        if already:
+            return {
+                "success": False,
+                "error": "Transfer already in progress",
+                "transfer_id": already["transfer_id"],
+            }
+
         src_uid, src_gid = _owner_creds_for(src_path)
         dst_uid, dst_gid = _owner_creds_for(dst_path)
         # Pick non-root creds if available (for FUSE mounts)
         owner_uid = src_uid if src_uid != 0 else dst_uid
-        owner_gid = src_gid if src_gid != 0 else dst_gid
+        owner_gid = src_gid if src_uid != 0 else dst_gid  # track same branch as uid
 
         # Calculate total size (via subprocess if FUSE)
         try:
@@ -408,6 +426,11 @@ class Plugin:
                     )
                 except Exception as cfg_err:
                     _debug(f"start_game_transfer: config copy warning: {cfg_err!r}")
+                # Initialise destination source so it picks up the new game
+                try:
+                    _run_source_script("init", dst_path, dst_uid, dst_gid)
+                except Exception as init_err:
+                    _debug(f"start_game_transfer: init warning: {init_err!r}")
                 entry["status"] = "done"
                 _debug(f"start_game_transfer: {transfer_id} done")
             except RuntimeError as exc:
@@ -420,6 +443,10 @@ class Plugin:
                 entry["status"] = "failed"
                 entry["error"] = str(exc)
                 _debug(f"start_game_transfer: {transfer_id} error: {exc!r}")
+            finally:
+                if entry["status"] == "running":
+                    entry["status"] = "failed"
+                    entry["error"] = entry.get("error") or "Transfer interrupted"
 
         _threading.Thread(target=_run, daemon=True).start()
         return {"success": True, "transfer_id": transfer_id}
