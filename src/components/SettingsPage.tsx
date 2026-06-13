@@ -20,6 +20,10 @@ const addSource = callable<
 const removeSource = callable<[source_id: string], { success: boolean }>("remove_source");
 const getSourceDiskUsage = callable<[source_id: string], { used: number | null; total: number | null; free: number | null }>("get_source_disk_usage");
 const initializeSource = callable<[source_id: string], { success: boolean; message?: string }>("initialize_source");
+const listActiveTransfers = callable<
+  [],
+  import("../types").TransferStatus[]
+>("list_active_transfers");
 
 const getSteamGridKey = callable<[], { key: string; has_override: boolean }>(
   "get_steamgrid_key"
@@ -63,6 +67,7 @@ export const SettingsPage: VFC<Props> = ({ onBack }) => {
   // ── Sources state ─────────────────────────────────────────────────────────
   const [sources, setSources] = useState<Source[]>([]);
   const [diskUsages, setDiskUsages] = useState<Record<string, { used: number | null; total: number | null; free: number | null }>>({});
+  const [activeTransfers, setActiveTransfers] = useState<import("../types").TransferStatus[]>([]);
   const [sourceMessage, setSourceMessage] = useState<{ id: string; msg: string } | null>(null);
 
   // Add source form
@@ -132,6 +137,7 @@ export const SettingsPage: VFC<Props> = ({ onBack }) => {
 
   useEffect(() => {
     loadSources();
+    listActiveTransfers().then(setActiveTransfers).catch(() => {});
   }, [loadSources]);
 
   const handleAddSource = async () => {
@@ -407,6 +413,21 @@ export const SettingsPage: VFC<Props> = ({ onBack }) => {
               </>
             )}
             {offline && <div style={{ fontSize: "0.75em", color: "#555" }}>Disk info unavailable</div>}
+            {(() => {
+              const xfer = activeTransfers.find(
+                (t) => t.to_source_id === src.id && t.status === "running",
+              );
+              if (!xfer) return null;
+              const pct =
+                xfer.total_bytes > 0
+                  ? Math.round((xfer.bytes_copied / xfer.total_bytes) * 100)
+                  : 0;
+              return (
+                <div style={{ fontSize: "0.75em", color: "#e67e22", marginTop: "4px" }}>
+                  ⟳ Receiving {xfer.game_name}… {pct}%
+                </div>
+              );
+            })()}
           </div>
         );
       })}
