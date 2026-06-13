@@ -4,6 +4,13 @@ import { Navigation, Focusable } from "@decky/ui";
 import { Source } from "../types";
 import { CompactTextField } from "../components/CompactTextField";
 
+const GUIDES_BASE = "https://github.com/avivkilloz/deckyfin/blob/feature/multi-source/guides";
+const SOURCE_GUIDE_URLS: Record<string, string> = {
+  local: `${GUIDES_BASE}/source-local.md`,
+  mount: `${GUIDES_BASE}/source-mount.md`,
+  agent: `${GUIDES_BASE}/source-agent.md`,
+};
+
 const listSources = callable<[], Source[]>("list_sources");
 const listSubfolders = callable<[path: string], string[]>("list_subfolders");
 const addSource = callable<
@@ -274,7 +281,7 @@ export const SettingsPage: VFC<Props> = ({ onBack }) => {
           <div style={{ fontSize: "0.78em", color: "#888", marginBottom: "4px" }}>Name</div>
           <CompactTextField value={newSourceName} onChange={(e) => setNewSourceName(e.target.value)} style={{ width: "100%", marginBottom: "8px" }} />
           <div style={{ fontSize: "0.78em", color: "#888", marginBottom: "4px" }}>Type</div>
-          <div style={{ display: "flex", gap: "6px", marginBottom: "8px" }}>
+          <div style={{ display: "flex", gap: "6px", marginBottom: "8px", alignItems: "center" }}>
             {(["local", "mount", "agent"] as const).map((t) => (
               <Focusable key={t} onActivate={() => setNewSourceType(t)} onClick={() => setNewSourceType(t)} focusClassName="is-focused"
                 style={{ padding: "3px 10px", fontSize: "0.82em", borderRadius: "12px", cursor: "pointer",
@@ -284,6 +291,14 @@ export const SettingsPage: VFC<Props> = ({ onBack }) => {
                 {t}
               </Focusable>
             ))}
+            <Focusable
+              focusClassName="is-focused"
+              onActivate={() => Navigation.NavigateToExternalWeb(SOURCE_GUIDE_URLS[newSourceType])}
+              onClick={() => Navigation.NavigateToExternalWeb(SOURCE_GUIDE_URLS[newSourceType])}
+              style={{ padding: "3px 7px", fontSize: "0.85em", borderRadius: "12px", cursor: "pointer", border: "1px solid #555", color: "#888", lineHeight: 1 }}
+            >
+              ℹ
+            </Focusable>
           </div>
           {newSourceType !== "agent" ? (
             <>
