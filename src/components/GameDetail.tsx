@@ -9,7 +9,7 @@ const removeGame = callable<[name: string, source_id: string], { success: boolea
   "remove_game"
 );
 const addSteamShortcut = callable<
-  [exe_path: string, app_name: string, start_dir?: string, launch_options?: string, proton_version?: string, collections?: string[]],
+  [exe_path: string, app_name: string, start_dir?: string, launch_options?: string, proton_version?: string, collections?: string[], source_id?: string],
   { success: boolean; app_id?: number; unsigned_appid?: number; error?: string }
 >("add_steam_shortcut");
 const getSteamShortcut = callable<
@@ -25,7 +25,7 @@ const purgeSteamGameData = callable<
   { success: boolean; removed_shortcut?: boolean; removed_prefix?: boolean; removed_grid?: boolean; unsigned_appid?: number; errors?: string[] }
 >("purge_steam_game_data");
 const updateSteamShortcut = callable<
-  [app_name: string, exe_path: string, start_dir?: string, launch_options?: string, proton_version?: string, collections?: string[]],
+  [app_name: string, exe_path: string, start_dir?: string, launch_options?: string, proton_version?: string, collections?: string[], source_id?: string],
   { success: boolean; app_id?: number; unsigned_appid?: number; error?: string }
 >("update_steam_shortcut");
 const listProtonVersions = callable<[], string[]>("list_proton_versions");
@@ -45,7 +45,7 @@ const updateGameConfig = callable<
   [name: string, updates: Record<string, any>, source_id: string],
   { success: boolean }
 >("update_game_config");
-const scanExes = callable<[subfolder: string], string[]>("scan_game_exes");
+const scanExes = callable<[subfolder: string, source_id?: string], string[]>("scan_game_exes");
 const getGame = callable<
   [name: string, source_id: string],
   { success: boolean; game?: GameConfig }
@@ -301,6 +301,12 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
     setSteamAppIdInput(currentConfig.steam_app_id !== undefined ? String(currentConfig.steam_app_id) : "");
     setProtonVersion(currentConfig.proton_version || "");
     setLaunchOptions(currentConfig.launch_options || "");
+    const srcDeps = currentConfig.proton_dependencies || [];
+    setCheckedDeps(srcDeps.filter((d) => POPULAR_DEPS.includes(d)));
+    setCustomDeps(srcDeps.filter((d) => !POPULAR_DEPS.includes(d)).join(", "));
+    const srcColls = currentConfig.collections || [];
+    setCheckedCollections(srcColls.filter((c) => steamCollections.includes(c)));
+    setCustomCollections(srcColls.filter((c) => !steamCollections.includes(c)).join(", "));
     if (currentConfig.steam_snapshot) {
       try { setLastSyncedSnapshot(JSON.parse(currentConfig.steam_snapshot)); } catch { setLastSyncedSnapshot(null); }
     } else {
@@ -319,7 +325,6 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
     });
     setNeedsRestartAfterAdd(currentConfig.needs_restart_after_add ?? false);
     setNeedsRestart(currentConfig.needs_restart ?? false);
-    setSteamInfo(null);
   }, [selectedSourceIdx]);
 
   // ── Init on mount ───────────────────────────────────────────────────────
@@ -327,34 +332,45 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
     listProtonVersions()
       .then(setProtonVersions)
       .catch(() => setProtonVersions([]));
-    // Fetch fresh game config — parent's games array may be stale
+    // Fetch fresh game config — parent's games array may be stale after Apply Config
     getGame(game.name, selectedSource.source_id).then((res) => {
       if (res.success && res.game) {
-        setNeedsRestart(res.game.needs_restart ?? false);
-        setNeedsRestartAfterAdd(res.game.needs_restart_after_add ?? false);
+        const g = res.game;
+        // Refresh all form fields so they reflect the latest saved config
+        setName(g.name);
+        setStoredName(g.name);
+        setExecutable(g.executable);
+        setStartDir(g.start_dir || "");
+        setSteamAppId(g.steam_app_id);
+        setSteamAppIdInput(g.steam_app_id !== undefined ? String(g.steam_app_id) : "");
+        setProtonVersion(g.proton_version || "");
+        setLaunchOptions(g.launch_options || "");
+        const freshDeps = g.proton_dependencies || [];
+        setCheckedDeps(freshDeps.filter((d) => POPULAR_DEPS.includes(d)));
+        setCustomDeps(freshDeps.filter((d) => !POPULAR_DEPS.includes(d)).join(", "));
+        const freshColls = g.collections || [];
+        setCheckedCollections(freshColls.filter((c) => steamCollections.includes(c)));
+        setCustomCollections(freshColls.filter((c) => !steamCollections.includes(c)).join(", "));
+        setNeedsRestart(g.needs_restart ?? false);
+        setNeedsRestartAfterAdd(g.needs_restart_after_add ?? false);
         // Sync configSnapshot with what's actually on disk
         setConfigSnapshot({
-          name: res.game.name,
-          executable: res.game.executable,
-          start_dir: res.game.start_dir || null,
-          steam_app_id: res.game.steam_app_id ?? null,
-          proton_version: res.game.proton_version || null,
-          proton_dependencies: res.game.proton_dependencies || [],
-          launch_options: res.game.launch_options || null,
-          collections: res.game.collections || [],
+          name: g.name,
+          executable: g.executable,
+          start_dir: g.start_dir || null,
+          steam_app_id: g.steam_app_id ?? null,
+          proton_version: g.proton_version || null,
+          proton_dependencies: g.proton_dependencies || [],
+          launch_options: g.launch_options || null,
+          collections: g.collections || [],
         });
         // Restore persisted snapshots so green state survives navigation
-        if (res.game.steam_snapshot) {
-          try { setLastSyncedSnapshot(JSON.parse(res.game.steam_snapshot)); } catch {}
+        if (g.steam_snapshot) {
+          try { setLastSyncedSnapshot(JSON.parse(g.steam_snapshot)); } catch {}
         } else {
-          // No prior sync — null means unknown, so steamNeedsSync stays true
           setLastSyncedSnapshot(null);
         }
-        if (res.game.deps_snapshot) {
-          setLastInstalledDeps(res.game.deps_snapshot);
-        } else {
-          setLastInstalledDeps([]);
-        }
+        setLastInstalledDeps(g.deps_snapshot ?? []);
       }
     }).catch(() => {});
   }, [game.name, selectedSource?.source_id]);
@@ -476,9 +492,9 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
       setShowExePicker(false);
       return;
     }
-    const root = game.path || game.name;
+    const root = currentConfig.path || game.name;
     try {
-      const exes = await scanExes(root);
+      const exes = await scanExes(root, selectedSource.source_id);
       setExeOptions(exes);
       setScanRoot(root);
       setShowExePicker(true);
@@ -507,7 +523,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         startDir || undefined,
         launchOptions || "",
         protonVersion || undefined,
-        mergedCollections.length > 0 ? mergedCollections : undefined
+        mergedCollections.length > 0 ? mergedCollections : undefined,
+        selectedSource.source_id
       );
       if (res.success && res.app_id && res.unsigned_appid) {
         setSteamInfo({ app_id: res.app_id, unsigned_appid: res.unsigned_appid });
@@ -539,7 +556,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         startDir || undefined,
         launchOptions || "",
         protonVersion || undefined,
-        mergedCollections.length > 0 ? mergedCollections : undefined
+        mergedCollections.length > 0 ? mergedCollections : undefined,
+        selectedSource.source_id
       );
       if (res.success && res.app_id && res.unsigned_appid) {
         setSteamInfo({ app_id: res.app_id, unsigned_appid: res.unsigned_appid });
@@ -726,7 +744,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
       style={{ padding: "8px" }}
     >
       {/* Back + source selector row */}
-      <div style={{ display: "flex", gap: "6px", alignItems: "center", marginBottom: "12px", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: "6px", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", justifyContent: "space-between" }}>
         <Focusable
           ref={backRef}
           onActivate={onBack}

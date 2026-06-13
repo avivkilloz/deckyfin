@@ -272,10 +272,9 @@ export const SettingsPage: VFC<Props> = ({ onBack }) => {
         const offline = !usage?.total && usage?.total !== undefined;
         return (
           <div key={src.id} style={{ border: "1px solid #444", borderRadius: "6px", padding: "10px", marginBottom: "8px", opacity: offline ? 0.7 : 1 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "6px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
               <div>
                 <span style={{ fontWeight: 600, color: "#e0e0e0" }}>{src.name}</span>
-                <span style={{ marginLeft: "8px", padding: "2px 7px", fontSize: "0.75em", borderRadius: "10px", background: typeBg, color: typeColor, border: `1px solid ${typeColor}` }}>{src.type}</span>
                 {offline && <span style={{ marginLeft: "6px", fontSize: "0.75em", color: "#e74c3c" }}>⚠ offline</span>}
               </div>
               <div style={{ display: "flex", gap: "4px" }}>
@@ -288,6 +287,9 @@ export const SettingsPage: VFC<Props> = ({ onBack }) => {
                   Remove
                 </Focusable>
               </div>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "4px" }}>
+              <span style={{ padding: "2px 7px", fontSize: "0.75em", borderRadius: "10px", background: typeBg, color: typeColor, border: `1px solid ${typeColor}` }}>{src.type}</span>
             </div>
             <div style={{ fontSize: "0.78em", color: "#666", marginBottom: "6px" }}>{src.path || src.url}</div>
             {usedPct !== null && (

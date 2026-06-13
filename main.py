@@ -40,6 +40,12 @@ from deckyfin_protontricks import (
 )
 from deckyfin_steamgrid import apply_steam_grid as _apply_steam_grid, set_api_key as _set_steamgrid_key, get_configured_api_key as _get_steamgrid_key, fetch_steamgrid_art_urls as _fetch_steamgrid_art_urls, search_steamgrid_games as _search_steamgrid_games, fetch_steamgrid_art_urls_by_id as _fetch_steamgrid_art_urls_by_id
 from deckyfin_steam_ctl import is_steam_running, restart_steam
+from deckyfin_game_state import (
+    get_game_state,
+    update_game_state,
+    clear_all_restart_flags,
+    STATE_FIELDS,
+)
 from deckyfin_sources import (
     list_sources as _list_sources,
     add_source as _add_source,
@@ -86,13 +92,19 @@ class Plugin:
             _debug("_main OK")
         except Exception as e:
             _debug(f"_main logger error: {e}")
-        # Clear stale per-game restart flags — Steam (re)started, so all
-        # pending needs_restart / needs_restart_after_add are outdated.
+        # Clear stale per-game restart flags from state store.
         try:
-            games = list_game_configs()
-            for game in games:
-                if game.get("needs_restart_after_add") or game.get("needs_restart"):
-                    update_game_config(game["name"], {"needs_restart_after_add": None, "needs_restart": None})
+            clear_all_restart_flags()
+        except Exception:
+            pass
+        # Also clear legacy restart flags written to source configs before state separation.
+        try:
+            for _src in _list_sources():
+                _spath = _src.get("path")
+                if _spath:
+                    for _g in list_game_configs(Path(_spath)):
+                        if _g.get("needs_restart_after_add") or _g.get("needs_restart"):
+                            update_game_config(_g["name"], {"needs_restart_after_add": None, "needs_restart": None}, Path(_spath))
         except Exception:
             pass
         # Migrate legacy games_folder to sources list (runs once)
@@ -175,12 +187,19 @@ class Plugin:
             self._set_needs_restart_flag(False)
         except Exception:
             pass
-        # Clear per-game restart flags for ALL games — Steam restart processes all shortcuts
+        # Clear per-game restart flags from state store.
         try:
-            games = list_game_configs()
-            for game in games:
-                if game.get("needs_restart_after_add") or game.get("needs_restart"):
-                    update_game_config(game["name"], {"needs_restart_after_add": None, "needs_restart": None})
+            clear_all_restart_flags()
+        except Exception:
+            pass
+        # Also clear legacy flags from source configs (migration).
+        try:
+            for _src in _list_sources():
+                _spath = _src.get("path")
+                if _spath:
+                    for _g in list_game_configs(Path(_spath)):
+                        if _g.get("needs_restart_after_add") or _g.get("needs_restart"):
+                            update_game_config(_g["name"], {"needs_restart_after_add": None, "needs_restart": None}, Path(_spath))
         except Exception:
             pass
         return result
@@ -227,10 +246,7 @@ class Plugin:
         result = initialize_app_structure(games_folder)
         # Clear needs_restart_after_add for all games — Steam has (re)started
         try:
-            games = list_game_configs()
-            for game in games:
-                if game.get("needs_restart_after_add") or game.get("needs_restart"):
-                    update_game_config(game["name"], {"needs_restart_after_add": None, "needs_restart": None})
+            clear_all_restart_flags()
         except Exception:
             pass
         return result
@@ -251,6 +267,10 @@ class Plugin:
                 name = game.get("name", "")
                 if not name:
                     continue
+                # Overlay ephemeral state from central store (state takes precedence over config)
+                state = get_game_state(source["id"], name)
+                if state:
+                    game = {**game, **state}
                 if name not in merged:
                     merged[name] = {"name": name, "sources": []}
                 merged[name]["sources"].append({
@@ -268,6 +288,9 @@ class Plugin:
         path = source.get("path")
         game = get_game_config(name, Path(path) if path else None)
         if game:
+            state = get_game_state(source["id"], name)
+            if state:
+                game = {**game, **state}
             return {"success": True, "game": game}
         return {"success": False, "error": f"Game '{name}' not found"}
 
@@ -284,9 +307,20 @@ class Plugin:
         if not source:
             return {"success": False, "error": "No source configured"}
         path = source.get("path")
+        # Split into permanent config and ephemeral state
+        config_updates = {k: v for k, v in updates.items() if k not in STATE_FIELDS}
+        state_updates = {k: v for k, v in updates.items() if k in STATE_FIELDS}
         try:
-            result = update_game_config(name, updates, Path(path) if path else None)
-            return {"success": True, "game": result}
+            if config_updates:
+                update_game_config(name, config_updates, Path(path) if path else None)
+            if state_updates:
+                update_game_state(source["id"], name, state_updates)
+            game = get_game_config(name, Path(path) if path else None)
+            if game:
+                st = get_game_state(source["id"], name)
+                if st:
+                    game = {**game, **st}
+            return {"success": True, "game": game}
         except GameConfigError as e:
             return {"success": False, "error": str(e)}
 
@@ -298,11 +332,10 @@ class Plugin:
         source = _get_source_by_id(source_id) if source_id else (_list_sources() or [None])[0]
         if not source:
             return {"success": False, "error": "No source configured"}
-        path = source.get("path")
         try:
-            update_game_config(name, {"processing_state": state}, Path(path) if path else None)
+            update_game_state(source["id"], name, {"processing_state": state})
             return {"success": True}
-        except GameConfigError as e:
+        except Exception as e:
             return {"success": False, "error": str(e)}
 
     async def get_game_processing_state(self, name: str, source_id: Optional[str] = None) -> dict | None:
@@ -313,10 +346,9 @@ class Plugin:
         source = _get_source_by_id(source_id) if source_id else (_list_sources() or [None])[0]
         if not source:
             return None
-        path = source.get("path")
         try:
-            game = get_game_config(name, Path(path) if path else None)
-            return game.get("processing_state") if game else None
+            state = get_game_state(source["id"], name)
+            return state.get("processing_state")
         except Exception:
             return None
 
@@ -339,8 +371,13 @@ class Plugin:
             return [{"error": "Games folder not configured"}]
         return detect_game_folders(Path(games_path))
 
-    async def scan_game_exes(self, subfolder: str) -> list:
-        games_path = get_games_folder()
+    async def scan_game_exes(self, subfolder: str, source_id: Optional[str] = None) -> list:
+        if source_id:
+            src = _get_source_by_id(source_id)
+            games_path = src.get("path") if src else None
+        else:
+            folder = get_games_folder()
+            games_path = str(folder) if folder else None
         if not games_path:
             return [{"error": "Games folder not configured"}]
         return find_game_executables(Path(games_path) / subfolder)
@@ -382,20 +419,22 @@ class Plugin:
         launch_options: str = "",
         proton_version: Optional[str] = None,
         collections: Optional[list[str]] = None,
+        source_id: Optional[str] = None,
     ) -> dict:
         if not exe_path:
             return {"success": False, "error": "Executable path is required"}
-        # Resolve relative paths against the configured games folder
+        # Resolve relative paths against the source's folder (fall back to legacy games_folder)
+        source = _get_source_by_id(source_id) if source_id else None
+        base_path = source.get("path") if source else None
+        if not base_path:
+            folder = get_games_folder()
+            base_path = str(folder) if folder else None
         exe = Path(exe_path)
-        if not exe.is_absolute():
-            games_folder = get_games_folder()
-            if games_folder:
-                exe = Path(games_folder) / exe_path
+        if not exe.is_absolute() and base_path:
+            exe = Path(base_path) / exe_path
         resolved_start = start_dir
-        if resolved_start and not Path(resolved_start).is_absolute():
-            games_folder = get_games_folder()
-            if games_folder:
-                resolved_start = str(Path(games_folder) / resolved_start)
+        if resolved_start and not Path(resolved_start).is_absolute() and base_path:
+            resolved_start = str(Path(base_path) / resolved_start)
         app_id = add_nonsteam_game(str(exe), app_name, resolved_start, launch_options, collections=collections)
         _debug(
             f"add_steam_shortcut: app_id={app_id}, proton_version={proton_version!r}, "
@@ -414,9 +453,10 @@ class Plugin:
             except Exception as e:
                 _debug(f"add_steam_shortcut: set_proton_version FAILED: {e}")
                 self.logger.warning("Failed to set Proton version: %s", e)
-        # Mark game as needing restart before Steam-dependent actions work
+        # Mark game as needing restart in state store
         try:
-            update_game_config(app_name, {"needs_restart_after_add": True, "needs_restart": True})
+            sid = source["id"] if source else ""
+            update_game_state(sid, app_name, {"needs_restart_after_add": True, "needs_restart": True})
         except Exception:
             pass
         return {
@@ -433,19 +473,21 @@ class Plugin:
         launch_options: str = "",
         proton_version: Optional[str] = None,
         collections: Optional[list[str]] = None,
+        source_id: Optional[str] = None,
     ) -> dict:
         """Update an existing Steam shortcut in-place. Returns error if not found."""
-        # Resolve relative paths against the configured games folder
+        # Resolve relative paths against the source's folder (fall back to legacy games_folder)
+        source = _get_source_by_id(source_id) if source_id else None
+        base_path = source.get("path") if source else None
+        if not base_path:
+            folder = get_games_folder()
+            base_path = str(folder) if folder else None
         exe = Path(exe_path)
-        if not exe.is_absolute():
-            games_folder = get_games_folder()
-            if games_folder:
-                exe = Path(games_folder) / exe_path
+        if not exe.is_absolute() and base_path:
+            exe = Path(base_path) / exe_path
         resolved_start = start_dir
-        if resolved_start and not Path(resolved_start).is_absolute():
-            games_folder = get_games_folder()
-            if games_folder:
-                resolved_start = str(Path(games_folder) / resolved_start)
+        if resolved_start and not Path(resolved_start).is_absolute() and base_path:
+            resolved_start = str(Path(base_path) / resolved_start)
         app_id = update_nonsteam_game(
             app_name, str(exe), resolved_start or "", launch_options, collections=collections
         )
@@ -462,9 +504,10 @@ class Plugin:
                 set_proton_version(app_id, proton_version, user_id, app_name)
             except Exception as e:
                 self.logger.warning("Failed to set Proton version: %s", e)
-        # Mark game as needing restart (green border only, not warning/lock)
+        # Mark game as needing restart in state store
         try:
-            update_game_config(app_name, {"needs_restart": True})
+            sid = source["id"] if source else ""
+            update_game_state(sid, app_name, {"needs_restart": True})
             self.logger.info("Marked '%s' as needs_restart", app_name)
         except Exception as e:
             self.logger.warning("Failed to mark needs_restart for '%s': %s", app_name, e)
