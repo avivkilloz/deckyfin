@@ -328,6 +328,131 @@ class Plugin:
             _debug(f"copy_game_config: error: {e!r}")
             return {"success": False, "error": str(e)}
 
+    async def start_game_transfer(
+        self, game_name: str, from_source_id: str, to_source_id: str
+    ) -> dict:
+        """Start a background file transfer. Returns {success, transfer_id}."""
+        import functools
+        src_source = _get_source_by_id(from_source_id)
+        dst_source = _get_source_by_id(to_source_id)
+        if not src_source or not dst_source:
+            return {"success": False, "error": "Source not found"}
+        src_path = src_source.get("path")
+        dst_path = dst_source.get("path")
+        if not src_path or not dst_path:
+            return {"success": False, "error": "Source has no path"}
+
+        src_game_dir = Path(src_path) / game_name
+        dst_game_dir = Path(dst_path) / game_name
+
+        src_uid, src_gid = _owner_creds_for(src_path)
+        dst_uid, dst_gid = _owner_creds_for(dst_path)
+        # Pick non-root creds if available (for FUSE mounts)
+        owner_uid = src_uid if src_uid != 0 else dst_uid
+        owner_gid = src_gid if src_gid != 0 else dst_gid
+
+        # Calculate total size (via subprocess if FUSE)
+        try:
+            if os.getuid() == 0 and owner_uid != 0:
+                proc = subprocess.run(
+                    ["python3", "-c",
+                     "import os,sys;from pathlib import Path;"
+                     "t=sum((Path(d)/f).stat().st_size "
+                     "for d,_,fs in os.walk(sys.argv[1]) for f in fs);"
+                     "print(t)",
+                     str(src_game_dir)],
+                    capture_output=True, text=True, timeout=60,
+                    preexec_fn=functools.partial(_drop_privs, owner_uid, owner_gid),
+                )
+                total_bytes = (
+                    int(proc.stdout.strip())
+                    if proc.returncode == 0 and proc.stdout.strip()
+                    else 0
+                )
+            else:
+                from deckyfin_transfer import calculate_total_size
+                total_bytes = calculate_total_size(src_game_dir)
+        except Exception:
+            total_bytes = 0
+
+        transfer_id = str(_uuid.uuid4())[:8]
+        entry = {
+            "transfer_id": transfer_id,
+            "game_name": game_name,
+            "from_source_id": from_source_id,
+            "to_source_id": to_source_id,
+            "status": "running",
+            "bytes_copied": 0,
+            "total_bytes": total_bytes,
+            "error": None,
+            "started_at": _time.time(),
+            "cancelled": False,
+        }
+        _transfer_registry[transfer_id] = entry
+
+        def _run():
+            from deckyfin_transfer import copy_game_folder
+            try:
+                copy_game_folder(
+                    src=src_game_dir,
+                    dst=dst_game_dir,
+                    progress_cb=lambda b: entry.__setitem__("bytes_copied", b),
+                    owner_uid=owner_uid,
+                    owner_gid=owner_gid,
+                    cancelled_flag=entry,
+                )
+                # Write config to destination
+                try:
+                    _write_game_config_to_source(
+                        game_name, src_path, dst_path, dst_uid, dst_gid
+                    )
+                except Exception as cfg_err:
+                    _debug(f"start_game_transfer: config copy warning: {cfg_err!r}")
+                entry["status"] = "done"
+                _debug(f"start_game_transfer: {transfer_id} done")
+            except RuntimeError as exc:
+                entry["status"] = "failed"
+                entry["error"] = str(exc)
+                _debug(f"start_game_transfer: {transfer_id} failed: {exc!r}")
+            except Exception as exc:
+                import shutil
+                shutil.rmtree(str(dst_game_dir), ignore_errors=True)
+                entry["status"] = "failed"
+                entry["error"] = str(exc)
+                _debug(f"start_game_transfer: {transfer_id} error: {exc!r}")
+
+        _threading.Thread(target=_run, daemon=True).start()
+        return {"success": True, "transfer_id": transfer_id}
+
+    async def get_transfer_status(self, transfer_id: str) -> dict:
+        entry = _transfer_registry.get(transfer_id)
+        if not entry:
+            return {"error": "not found"}
+        return {k: v for k, v in entry.items() if k not in ("cancelled", "started_at")}
+
+    async def cancel_transfer(self, transfer_id: str) -> dict:
+        entry = _transfer_registry.get(transfer_id)
+        if not entry:
+            return {"success": False, "error": "not found"}
+        if entry["status"] == "running":
+            entry["cancelled"] = True
+        else:
+            _transfer_registry.pop(transfer_id, None)
+        return {"success": True}
+
+    async def list_active_transfers(self) -> list:
+        now = _time.time()
+        stale = [
+            tid for tid, e in list(_transfer_registry.items())
+            if e["status"] in ("done", "failed") and (now - e["started_at"]) > 600
+        ]
+        for tid in stale:
+            _transfer_registry.pop(tid, None)
+        return [
+            {k: v for k, v in e.items() if k not in ("cancelled", "started_at")}
+            for e in _transfer_registry.values()
+        ]
+
     async def get_source_disk_usage(self, source_id: str) -> dict:
         import functools, json as _json
         source = _get_source_by_id(source_id)
