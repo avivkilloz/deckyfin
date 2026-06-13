@@ -134,6 +134,12 @@ const BTN_STYLE: React.CSSProperties = {
   color: "#e0e0e0",
 };
 
+const fmtBytes = (b: number): string => {
+  if (b >= 1e9) return `${(b / 1e9).toFixed(1)} GB`;
+  if (b >= 1e6) return `${(b / 1e6).toFixed(0)} MB`;
+  return `${(b / 1e3).toFixed(0)} KB`;
+};
+
 export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   // ── Refs ─────────────────────────────────────────────────────────────
   const rootRef = useRef<HTMLDivElement>(null);
@@ -2004,6 +2010,124 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           Remove from Deckyfin
         </Focusable>
       )}
+
+      {/* ── Transfer Progress Banner ───────────────────────────────────────── */}
+      {transferStatus && (() => {
+        const pct =
+          transferStatus.total_bytes > 0
+            ? Math.round((transferStatus.bytes_copied / transferStatus.total_bytes) * 100)
+            : 0;
+        const destName =
+          allSources.find((s) => s.id === transferStatus.to_source_id)?.name ??
+          transferStatus.to_source_id;
+        return (
+          <div
+            style={{
+              border: "1px solid #444",
+              borderRadius: "4px",
+              padding: "8px 10px",
+              marginTop: "16px",
+              background: "#1a1a1a",
+              fontSize: "0.82em",
+            }}
+          >
+            {transferStatus.status === "running" && (
+              <>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: "4px",
+                  }}
+                >
+                  <span>
+                    ▸ Copying to {destName}… {pct}%
+                  </span>
+                  <Focusable
+                    onActivate={handleCancelOrDismissTransfer}
+                    onClick={handleCancelOrDismissTransfer}
+                    focusClassName="is-focused"
+                    style={{ cursor: "pointer", color: "#888", padding: "0 4px" }}
+                  >
+                    ✕
+                  </Focusable>
+                </div>
+                <div
+                  style={{ background: "#333", borderRadius: "2px", height: "4px", marginBottom: "3px" }}
+                >
+                  <div
+                    style={{
+                      width: `${pct}%`,
+                      background: "#0078d4",
+                      borderRadius: "2px",
+                      height: "100%",
+                      transition: "width 0.3s",
+                    }}
+                  />
+                </div>
+                <span style={{ color: "#666" }}>
+                  {fmtBytes(transferStatus.bytes_copied)} / {fmtBytes(transferStatus.total_bytes)}
+                </span>
+              </>
+            )}
+            {transferStatus.status === "done" && (
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <span style={{ color: "#2ecc71" }}>
+                  ✓ Copy complete — go back to refresh the game list
+                </span>
+                <Focusable
+                  onActivate={handleCancelOrDismissTransfer}
+                  onClick={handleCancelOrDismissTransfer}
+                  focusClassName="is-focused"
+                  style={{ cursor: "pointer", color: "#888", padding: "0 4px" }}
+                >
+                  ✕
+                </Focusable>
+              </div>
+            )}
+            {transferStatus.status === "failed" && (
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: "8px",
+                  flexWrap: "wrap",
+                }}
+              >
+                <span style={{ color: "tomato" }}>
+                  ✗ {transferStatus.error ?? "Transfer failed"}
+                </span>
+                <Focusable focusClassName="" style={{ display: "flex", gap: "4px" }}>
+                  <Focusable
+                    onActivate={handleRetryTransfer}
+                    onClick={handleRetryTransfer}
+                    focusClassName="is-focused"
+                    style={{ ...BTN_STYLE, padding: "2px 8px", fontSize: "0.82em" }}
+                  >
+                    Retry
+                  </Focusable>
+                  <Focusable
+                    onActivate={handleCancelOrDismissTransfer}
+                    onClick={handleCancelOrDismissTransfer}
+                    focusClassName="is-focused"
+                    style={{ cursor: "pointer", color: "#888", padding: "0 4px" }}
+                  >
+                    ✕
+                  </Focusable>
+                </Focusable>
+              </div>
+            )}
+          </div>
+        );
+      })()}
     </Focusable>
   );
 };
