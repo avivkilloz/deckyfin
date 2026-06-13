@@ -78,7 +78,7 @@ const startGameTransfer = callable<
 >("start_game_transfer");
 const getTransferStatus = callable<
   [transfer_id: string],
-  import("../types").TransferStatus & { error?: string }
+  import("../types").TransferStatus | { error: string }
 >("get_transfer_status");
 const cancelTransfer = callable<
   [transfer_id: string],
@@ -423,7 +423,10 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
     listAllSources().then(setAllSources).catch(() => {});
     listActiveTransfers()
       .then((transfers) => {
-        const mine = transfers.find((t) => t.game_name === game.name);
+        // Only reconnect to truly running transfers — skip cancelled ones still winding down
+        const mine = transfers.find(
+          (t) => t.game_name === game.name && t.status === "running",
+        );
         if (mine) {
           setTransferId(mine.transfer_id);
           setTransferStatus(mine);
