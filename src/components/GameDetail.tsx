@@ -67,6 +67,27 @@ const getSourceCapabilities = callable<[source_id: string], SourceCapabilities>(
 );
 const restartSteam = callable<[], { success: boolean; message?: string }>("restart_steam");
 const listSteamCollections = callable<[], string[]>("list_steam_collections");
+const listAllSources = callable<[], import("../types").Source[]>("list_sources");
+const copyGameConfig = callable<
+  [game_name: string, from_source_id: string, to_source_id: string],
+  { success: boolean; error?: string }
+>("copy_game_config");
+const startGameTransfer = callable<
+  [game_name: string, from_source_id: string, to_source_id: string],
+  { success: boolean; transfer_id?: string; error?: string }
+>("start_game_transfer");
+const getTransferStatus = callable<
+  [transfer_id: string],
+  import("../types").TransferStatus & { error?: string }
+>("get_transfer_status");
+const cancelTransfer = callable<
+  [transfer_id: string],
+  { success: boolean }
+>("cancel_transfer");
+const listActiveTransfers = callable<
+  [],
+  import("../types").TransferStatus[]
+>("list_active_transfers");
 
 /** Popular Proton dependencies shown as toggle chips. */
 const POPULAR_DEPS = [
@@ -132,6 +153,22 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
     can_write_config: true,
     can_download_to: true,
   });
+
+  // ── All sources (for game copy destination picker) ────────────────────
+  const [allSources, setAllSources] = useState<import("../types").Source[]>([]);
+
+  // ── Config copy state ─────────────────────────────────────────────────
+  const [showCopyConfigPicker, setShowCopyConfigPicker] = useState(false);
+  const [copyConfigDest, setCopyConfigDest] = useState<import("../types").GameSource | null>(null);
+  const [copyConfigConfirming, setCopyConfigConfirming] = useState(false);
+  const [copyConfigFeedback, setCopyConfigFeedback] = useState<string | null>(null);
+
+  // ── Game transfer state ───────────────────────────────────────────────
+  const [showCopyGamePicker, setShowCopyGamePicker] = useState(false);
+  const [copyGameDest, setCopyGameDest] = useState<import("../types").Source | null>(null);
+  const [copyGameConfirming, setCopyGameConfirming] = useState(false);
+  const [transferId, setTransferId] = useState<string | null>(null);
+  const [transferStatus, setTransferStatus] = useState<import("../types").TransferStatus | null>(null);
 
   const selectedSource: GameSource = game.sources[selectedSourceIdx] ?? game.sources[0];
   const currentConfig: GameConfig = selectedSource?.config ?? game.sources[0]?.config ?? { name: game.name, executable: "" };
@@ -374,6 +411,37 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
       }
     }).catch(() => {});
   }, [game.name, selectedSource?.source_id]);
+
+  useEffect(() => {
+    listAllSources().then(setAllSources).catch(() => {});
+    listActiveTransfers()
+      .then((transfers) => {
+        const mine = transfers.find((t) => t.game_name === game.name);
+        if (mine) {
+          setTransferId(mine.transfer_id);
+          setTransferStatus(mine);
+        }
+      })
+      .catch(() => {});
+  }, [game.name]);
+
+  useEffect(() => {
+    if (!transferId || transferStatus?.status !== "running") return;
+    const poll = setInterval(async () => {
+      try {
+        const s = await getTransferStatus(transferId);
+        if ("error" in s && s.error === "not found") {
+          clearInterval(poll);
+          setTransferId(null);
+          setTransferStatus(null);
+          return;
+        }
+        setTransferStatus(s as import("../types").TransferStatus);
+        if (s.status !== "running") clearInterval(poll);
+      } catch (_) {}
+    }, 2000);
+    return () => clearInterval(poll);
+  }, [transferId, transferStatus?.status]);
 
   useEffect(() => {
     getSteamShortcut(game.name)
@@ -733,6 +801,78 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
     return saved.length > 0 && JSON.stringify(saved) !== JSON.stringify(lastInstalledDeps);
   })();
 
+  const handleCopyConfig = async () => {
+    if (!copyConfigDest) return;
+    setCopyConfigConfirming(false);
+    setCopyConfigFeedback(null);
+    try {
+      const res = await copyGameConfig(
+        game.name,
+        selectedSource.source_id,
+        copyConfigDest.source_id,
+      );
+      setCopyConfigFeedback(res.success ? "✓ Config copied" : `✗ ${res.error ?? "Failed"}`);
+    } catch (e) {
+      setCopyConfigFeedback(`✗ ${String(e)}`);
+    }
+    setCopyConfigDest(null);
+  };
+
+  const handleStartTransfer = async () => {
+    if (!copyGameDest) return;
+    setCopyGameConfirming(false);
+    try {
+      const res = await startGameTransfer(
+        game.name,
+        selectedSource.source_id,
+        copyGameDest.id,
+      );
+      if (res.success && res.transfer_id) {
+        setTransferId(res.transfer_id);
+        setTransferStatus({
+          transfer_id: res.transfer_id,
+          game_name: game.name,
+          from_source_id: selectedSource.source_id,
+          to_source_id: copyGameDest.id,
+          status: "running",
+          bytes_copied: 0,
+          total_bytes: 0,
+          error: null,
+        });
+      }
+    } catch (_) {}
+    setCopyGameDest(null);
+  };
+
+  const handleCancelOrDismissTransfer = async () => {
+    if (transferId) await cancelTransfer(transferId).catch(() => {});
+    setTransferId(null);
+    setTransferStatus(null);
+  };
+
+  const handleRetryTransfer = async () => {
+    if (!transferStatus) return;
+    const { from_source_id, to_source_id } = transferStatus;
+    setTransferStatus(null);
+    setTransferId(null);
+    try {
+      const res = await startGameTransfer(game.name, from_source_id, to_source_id);
+      if (res.success && res.transfer_id) {
+        setTransferId(res.transfer_id);
+        setTransferStatus({
+          transfer_id: res.transfer_id,
+          game_name: game.name,
+          from_source_id,
+          to_source_id,
+          status: "running",
+          bytes_copied: 0,
+          total_bytes: 0,
+          error: null,
+        });
+      }
+    } catch (_) {}
+  };
+
   // ── Render ──────────────────────────────────────────────────────────────
 
   return (
@@ -795,6 +935,266 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
             </Focusable>
           ))}
         </Focusable>
+      )}
+
+      {/* ── Transfer Actions ───────────────────────────────────────────────── */}
+      {(game.sources.length >= 2 ||
+        allSources.some(
+          (s) =>
+            s.type !== "agent" &&
+            !game.sources.some((gs) => gs.source_id === s.id),
+        )) && (
+        <div style={{ marginBottom: "10px" }}>
+          {/* Buttons row */}
+          <Focusable
+            focusClassName=""
+            style={{ display: "flex", gap: "6px", marginBottom: "4px" }}
+          >
+            {game.sources.length >= 2 && (
+              <Focusable
+                onActivate={() => {
+                  setShowCopyConfigPicker((v) => !v);
+                  setShowCopyGamePicker(false);
+                  setCopyConfigDest(null);
+                  setCopyConfigConfirming(false);
+                }}
+                onClick={() => {
+                  setShowCopyConfigPicker((v) => !v);
+                  setShowCopyGamePicker(false);
+                  setCopyConfigDest(null);
+                  setCopyConfigConfirming(false);
+                }}
+                focusClassName="is-focused"
+                style={{ ...BTN_STYLE, padding: "4px 10px", fontSize: "0.82em" }}
+              >
+                Copy config →
+              </Focusable>
+            )}
+            {allSources.some(
+              (s) =>
+                s.type !== "agent" &&
+                !game.sources.some((gs) => gs.source_id === s.id),
+            ) && (
+              <Focusable
+                onActivate={() => {
+                  setShowCopyGamePicker((v) => !v);
+                  setShowCopyConfigPicker(false);
+                  setCopyGameDest(null);
+                  setCopyGameConfirming(false);
+                }}
+                onClick={() => {
+                  setShowCopyGamePicker((v) => !v);
+                  setShowCopyConfigPicker(false);
+                  setCopyGameDest(null);
+                  setCopyGameConfirming(false);
+                }}
+                focusClassName="is-focused"
+                style={{ ...BTN_STYLE, padding: "4px 10px", fontSize: "0.82em" }}
+              >
+                Copy game →
+              </Focusable>
+            )}
+          </Focusable>
+
+          {/* Config copy: source picker */}
+          {showCopyConfigPicker && !copyConfigConfirming && (
+            <div
+              style={{
+                border: "1px solid #555",
+                borderRadius: "4px",
+                padding: "2px 0",
+                marginBottom: "4px",
+              }}
+            >
+              {game.sources
+                .filter((s) => s.source_id !== selectedSource.source_id)
+                .map((src) => (
+                  <Focusable
+                    key={src.source_id}
+                    onActivate={() => {
+                      setCopyConfigDest(src);
+                      setShowCopyConfigPicker(false);
+                      setCopyConfigConfirming(true);
+                    }}
+                    onClick={() => {
+                      setCopyConfigDest(src);
+                      setShowCopyConfigPicker(false);
+                      setCopyConfigConfirming(true);
+                    }}
+                    focusClassName="is-focused"
+                    style={{
+                      margin: "0 2px",
+                      padding: "4px 10px",
+                      cursor: "pointer",
+                      fontSize: "0.85em",
+                      borderBottom: "1px solid #333",
+                      color: "#ccc",
+                    }}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.background = "rgba(255,255,255,0.08)")
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.background = "transparent")
+                    }
+                  >
+                    {src.source_name}
+                    <span style={{ marginLeft: "6px", fontSize: "0.78em", color: "#666" }}>
+                      ({src.source_type})
+                    </span>
+                  </Focusable>
+                ))}
+            </div>
+          )}
+
+          {/* Config copy: confirmation */}
+          {copyConfigConfirming && copyConfigDest && (
+            <div
+              style={{
+                fontSize: "0.82em",
+                color: "#ccc",
+                marginBottom: "4px",
+                display: "flex",
+                gap: "8px",
+                alignItems: "center",
+                flexWrap: "wrap",
+              }}
+            >
+              <span>
+                Replace <b>{copyConfigDest.source_name}</b>'s config with{" "}
+                <b>{selectedSource.source_name}</b>'s?
+              </span>
+              <Focusable
+                onActivate={() => setCopyConfigConfirming(false)}
+                onClick={() => setCopyConfigConfirming(false)}
+                focusClassName="is-focused"
+                style={{ ...BTN_STYLE, padding: "2px 8px", fontSize: "0.82em" }}
+              >
+                Cancel
+              </Focusable>
+              <Focusable
+                onActivate={handleCopyConfig}
+                onClick={handleCopyConfig}
+                focusClassName="is-focused"
+                style={{
+                  ...BTN_STYLE,
+                  padding: "2px 8px",
+                  fontSize: "0.82em",
+                  border: "1px solid #27ae60",
+                  color: "#2ecc71",
+                }}
+              >
+                Copy
+              </Focusable>
+            </div>
+          )}
+
+          {copyConfigFeedback && (
+            <p
+              style={{
+                margin: "0 0 4px 0",
+                fontSize: "0.82em",
+                color: copyConfigFeedback.startsWith("✓") ? "#2ecc71" : "tomato",
+              }}
+            >
+              {copyConfigFeedback}
+            </p>
+          )}
+
+          {/* Game copy: source picker */}
+          {showCopyGamePicker && !copyGameConfirming && (
+            <div
+              style={{
+                border: "1px solid #555",
+                borderRadius: "4px",
+                padding: "2px 0",
+                marginBottom: "4px",
+              }}
+            >
+              {allSources
+                .filter(
+                  (s) =>
+                    s.type !== "agent" &&
+                    !game.sources.some((gs) => gs.source_id === s.id),
+                )
+                .map((src) => (
+                  <Focusable
+                    key={src.id}
+                    onActivate={() => {
+                      setCopyGameDest(src);
+                      setShowCopyGamePicker(false);
+                      setCopyGameConfirming(true);
+                    }}
+                    onClick={() => {
+                      setCopyGameDest(src);
+                      setShowCopyGamePicker(false);
+                      setCopyGameConfirming(true);
+                    }}
+                    focusClassName="is-focused"
+                    style={{
+                      margin: "0 2px",
+                      padding: "4px 10px",
+                      cursor: "pointer",
+                      fontSize: "0.85em",
+                      borderBottom: "1px solid #333",
+                      color: "#ccc",
+                    }}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.background = "rgba(255,255,255,0.08)")
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.background = "transparent")
+                    }
+                  >
+                    {src.name}
+                    <span style={{ marginLeft: "6px", fontSize: "0.78em", color: "#666" }}>
+                      ({src.type})
+                    </span>
+                  </Focusable>
+                ))}
+            </div>
+          )}
+
+          {/* Game copy: confirmation */}
+          {copyGameConfirming && copyGameDest && (
+            <div
+              style={{
+                fontSize: "0.82em",
+                color: "#ccc",
+                marginBottom: "4px",
+                display: "flex",
+                gap: "8px",
+                alignItems: "center",
+                flexWrap: "wrap",
+              }}
+            >
+              <span>
+                Copy <b>{game.name}</b> to <b>{copyGameDest.name}</b>?
+              </span>
+              <Focusable
+                onActivate={() => setCopyGameConfirming(false)}
+                onClick={() => setCopyGameConfirming(false)}
+                focusClassName="is-focused"
+                style={{ ...BTN_STYLE, padding: "2px 8px", fontSize: "0.82em" }}
+              >
+                Cancel
+              </Focusable>
+              <Focusable
+                onActivate={handleStartTransfer}
+                onClick={handleStartTransfer}
+                focusClassName="is-focused"
+                style={{
+                  ...BTN_STYLE,
+                  padding: "2px 8px",
+                  fontSize: "0.82em",
+                  border: "1px solid #27ae60",
+                  color: "#2ecc71",
+                }}
+              >
+                Copy
+              </Focusable>
+            </div>
+          )}
+        </div>
       )}
 
       {/* ── Config Fields ──────────────────────────────────────────────── */}
