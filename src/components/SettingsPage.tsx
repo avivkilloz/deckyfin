@@ -5,6 +5,7 @@ import { Source } from "../types";
 import { CompactTextField } from "../components/CompactTextField";
 
 const listSources = callable<[], Source[]>("list_sources");
+const listSubfolders = callable<[path: string], string[]>("list_subfolders");
 const addSource = callable<
   [name: string, type: string, path: string | null, url: string | null],
   { success: boolean; source?: Source; error?: string }
@@ -64,6 +65,49 @@ export const SettingsPage: VFC<Props> = ({ onBack }) => {
   const [newSourcePath, setNewSourcePath] = useState("");
   const [newSourceUrl, setNewSourceUrl] = useState("");
   const [addSourceMsg, setAddSourceMsg] = useState<string | null>(null);
+
+  // Folder browser for path selection
+  const [showFolderBrowser, setShowFolderBrowser] = useState(false);
+  const [browserPath, setBrowserPath] = useState("/");
+  const [browserItems, setBrowserItems] = useState<string[]>([]);
+  const [browserLoading, setBrowserLoading] = useState(false);
+
+  const browseTo = async (path: string) => {
+    setBrowserLoading(true);
+    try {
+      const items = await listSubfolders(path);
+      setBrowserPath(path);
+      setBrowserItems(Array.isArray(items) ? items : []);
+    } catch {
+      setBrowserItems([]);
+    }
+    setBrowserLoading(false);
+  };
+
+  const handleOpenFolderBrowser = async () => {
+    if (showFolderBrowser) {
+      setShowFolderBrowser(false);
+      return;
+    }
+    await browseTo(newSourcePath || "/");
+    setShowFolderBrowser(true);
+  };
+
+  const handleBrowserUp = () => {
+    if (browserPath === "/") return;
+    const parent = browserPath.substring(0, browserPath.lastIndexOf("/")) || "/";
+    browseTo(parent);
+  };
+
+  const handleBrowserEnter = (dir: string) => {
+    const next = browserPath === "/" ? `/${dir}` : `${browserPath}/${dir}`;
+    browseTo(next);
+  };
+
+  const handleBrowserSelect = () => {
+    setNewSourcePath(browserPath);
+    setShowFolderBrowser(false);
+  };
 
   const loadSources = useCallback(async () => {
     try {
@@ -244,7 +288,51 @@ export const SettingsPage: VFC<Props> = ({ onBack }) => {
           {newSourceType !== "agent" ? (
             <>
               <div style={{ fontSize: "0.78em", color: "#888", marginBottom: "4px" }}>Path</div>
-              <CompactTextField value={newSourcePath} onChange={(e) => setNewSourcePath(e.target.value)} placeholder="/home/deck/Games" style={{ width: "100%", marginBottom: "8px" }} />
+              <Focusable focusClassName="" style={{ display: "flex", gap: "6px", alignItems: "center", marginBottom: showFolderBrowser ? "4px" : "8px" }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <CompactTextField value={newSourcePath} onChange={(e) => setNewSourcePath(e.target.value)} placeholder="/home/deck/Games" style={{ width: "100%" }} />
+                </div>
+                <Focusable onActivate={handleOpenFolderBrowser} onClick={handleOpenFolderBrowser} focusClassName="is-focused"
+                  style={{ ...BTN_STYLE, padding: "4px 12px", alignSelf: "center" }}>
+                  {showFolderBrowser ? "✕" : "Browse"}
+                </Focusable>
+              </Focusable>
+
+              {showFolderBrowser && (
+                <div style={{ border: "1px solid #555", borderRadius: "4px", marginBottom: "8px" }}>
+                  {/* Header: up + current path + select */}
+                  <Focusable focusClassName="" style={{ display: "flex", gap: "6px", alignItems: "center", padding: "5px 8px", borderBottom: "1px solid #444" }}>
+                    <Focusable onActivate={handleBrowserUp} onClick={handleBrowserUp} focusClassName="is-focused"
+                      style={{ ...BTN_STYLE, padding: "2px 8px", fontSize: "0.82em", opacity: browserPath === "/" ? 0.4 : 1 }}>
+                      ← Up
+                    </Focusable>
+                    <span style={{ flex: 1, fontSize: "0.78em", color: "#aaa", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {browserPath}
+                    </span>
+                    <Focusable onActivate={handleBrowserSelect} onClick={handleBrowserSelect} focusClassName="is-focused"
+                      style={{ ...BTN_STYLE, padding: "2px 8px", fontSize: "0.82em", borderColor: "#27ae60", color: "#2ecc71" }}>
+                      ✓ Select
+                    </Focusable>
+                  </Focusable>
+                  {/* Directory listing */}
+                  <Focusable focusClassName="" style={{ maxHeight: "180px", overflowY: "auto" }}>
+                    {browserLoading && (
+                      <p style={{ padding: "8px", margin: 0, fontSize: "0.85em", color: "#888" }}>Loading…</p>
+                    )}
+                    {!browserLoading && browserItems.length === 0 && (
+                      <p style={{ padding: "8px", margin: 0, fontSize: "0.85em", color: "#888" }}>No subdirectories</p>
+                    )}
+                    {browserItems.map((dir) => (
+                      <Focusable key={dir} onActivate={() => handleBrowserEnter(dir)} onClick={() => handleBrowserEnter(dir)} focusClassName="is-focused"
+                        style={{ margin: "0 2px", padding: "4px 10px", fontSize: "0.85em", cursor: "pointer", borderBottom: "1px solid #333" }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+                        📁 {dir}
+                      </Focusable>
+                    ))}
+                  </Focusable>
+                </div>
+              )}
             </>
           ) : (
             <>

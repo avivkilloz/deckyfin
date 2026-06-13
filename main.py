@@ -4,7 +4,9 @@ Exposes game management methods to the React frontend via Decky IPC.
 """
 
 import logging
+import os
 import ssl
+import subprocess
 import sys
 import traceback
 from pathlib import Path
@@ -27,6 +29,10 @@ from deckyfin_config import (
     remove_game_config,
     detect_game_folders,
     find_game_executables,
+    get_app_folder,
+    get_saves_folder,
+    get_games_config,
+    save_games_config,
     GameConfigError,
 )
 from steam_games import add_nonsteam_game, list_nonsteam_games, remove_nonsteam_game, get_steam_shortcut_info, update_nonsteam_game, purge_nonsteam_game_data, list_steam_collections
@@ -72,6 +78,105 @@ def _debug(msg: str):
 
 
 _debug("MODULE LOAD START")
+
+_PY_MODULES = str(Path(__file__).resolve().parent / "py_modules")
+
+# Script run in a subprocess (as the FUSE mount owner) to read/write source games.
+# sys.argv: ["-", py_modules, games_path, mode]
+# mode="load" → prints JSON list of games
+# mode="init" → creates .deckyfin dirs, scans folders, saves config, prints result dict
+_SOURCE_GAMES_SCRIPT = """\
+import sys, json
+sys.path.insert(0, sys.argv[1])
+from pathlib import Path
+from deckyfin_config import (
+    get_games_config, detect_game_folders,
+    get_app_folder, get_saves_folder, save_games_config,
+)
+
+games_path = Path(sys.argv[2])
+mode = sys.argv[3]
+
+if mode == "init":
+    games_path.mkdir(parents=True, exist_ok=True)
+    get_app_folder(games_path).mkdir(parents=True, exist_ok=True)
+    get_saves_folder(games_path).mkdir(parents=True, exist_ok=True)
+
+existing_config = get_games_config(games_path)
+existing_games = {g["name"]: g for g in existing_config.get("games", [])}
+
+if mode == "init":
+    # Current folders on disk (name → folder_name)
+    current_folders = {fi["name"]: fi["path"] for fi in detect_game_folders(games_path)}
+
+    # Update path field for existing entries whose path was stored as a slug
+    for name, game in existing_games.items():
+        if name in current_folders and game.get("path") != current_folders[name]:
+            game["path"] = current_folders[name]
+
+    # Remove entries for folders that no longer exist
+    existing_games = {n: g for n, g in existing_games.items() if n in current_folders}
+
+    # Add blank entries for new folders
+    new_games = []
+    for name, folder_path in current_folders.items():
+        if name not in existing_games:
+            existing_games[name] = {
+                "name": name, "path": folder_path, "executable": "",
+                "steam_app_id": None, "proton_version": "",
+                "proton_dependencies": [], "proton_sync_paths": [],
+                "categories": [], "launch_options": "",
+            }
+            new_games.append(name)
+
+    save_games_config({"games": list(existing_games.values())}, games_path)
+    print(json.dumps({"success": True, "games_count": len(existing_games), "games_initialized": new_games}))
+else:
+    print(json.dumps(list(existing_games.values())))
+"""
+
+
+def _run_source_script(mode: str, path: str, owner_uid: int, owner_gid: int) -> dict | list | None:
+    """Run _SOURCE_GAMES_SCRIPT as owner uid/gid.  Returns parsed JSON or None on failure."""
+    import functools, json as _json
+    try:
+        proc = subprocess.run(
+            ["python3", "-", _PY_MODULES, path, mode],
+            input=_SOURCE_GAMES_SCRIPT,
+            capture_output=True, text=True, timeout=30,
+            preexec_fn=functools.partial(_drop_privs, owner_uid, owner_gid),
+        )
+        _debug(f"_run_source_script mode={mode} rc={proc.returncode} err={proc.stderr.strip()[:300]!r}")
+        if proc.returncode == 0 and proc.stdout.strip():
+            return _json.loads(proc.stdout.strip())
+    except Exception as e:
+        _debug(f"_run_source_script mode={mode} failed: {e!r}")
+    return None
+
+
+def _owner_creds_for(path: str) -> tuple:
+    """Return (uid, gid) of the given path, or of the nearest stat-able ancestor.
+
+    FUSE mounts without -o allow_other block stat() from other users — even
+    root.  Walking up to the nearest accessible parent gives us the UID/GID of
+    the user who owns (and likely mounted) the filesystem.
+    """
+    p = Path(path)
+    while True:
+        try:
+            st = os.stat(str(p))
+            return st.st_uid, st.st_gid
+        except OSError:
+            parent = p.parent
+            if parent == p:  # reached filesystem root with no luck
+                return 0, 0
+            p = parent
+
+
+def _drop_privs(uid: int, gid: int) -> None:
+    """Drop to uid/gid. Call as subprocess preexec_fn (must run while still root)."""
+    os.setgid(gid)   # change GID first, while still root
+    os.setuid(uid)
 
 
 
@@ -157,23 +262,95 @@ class Plugin:
         return _detect_capabilities(source)
 
     async def get_source_disk_usage(self, source_id: str) -> dict:
+        import functools, json as _json
         source = _get_source_by_id(source_id)
         if not source:
             return {"used": None, "total": None, "free": None}
+        path = source.get("path", "")
+        current_uid = os.getuid()
+        owner_uid, owner_gid = _owner_creds_for(path) if path else (0, 0)
+        # For FUSE mounts owned by another user, statvfs from root is blocked.
+        # Run a Python subprocess as the path owner to get disk usage.
+        if path and current_uid == 0 and owner_uid != 0:
+            try:
+                proc = subprocess.run(
+                    [
+                        "python3", "-c",
+                        "import shutil,json,sys;"
+                        "u=shutil.disk_usage(sys.argv[1]);"
+                        "print(json.dumps({'used':u.used,'total':u.total,'free':u.free}))",
+                        path,
+                    ],
+                    capture_output=True, text=True, timeout=15,
+                    preexec_fn=functools.partial(_drop_privs, owner_uid, owner_gid),
+                )
+                if proc.returncode == 0 and proc.stdout.strip():
+                    return _json.loads(proc.stdout.strip())
+                _debug(f"get_source_disk_usage: subprocess rc={proc.returncode} err={proc.stderr.strip()[:200]!r}")
+            except Exception as e:
+                _debug(f"get_source_disk_usage: subprocess failed: {e!r}")
         return _get_disk_usage(source)
 
     async def initialize_source(self, source_id: str) -> dict:
         """Re-scan a source for new game folders and create config entries."""
         source = _get_source_by_id(source_id)
         if not source:
-            return {"success": False, "error": f"Source '{source_id}' not found"}
+            return {"success": False, "message": f"Source '{source_id}' not found"}
         if source.get("type") == "agent":
-            return {"success": False, "error": "Agent sources are managed remotely"}
+            return {"success": False, "message": "Agent sources are managed remotely"}
         path = source.get("path")
         if not path:
-            return {"success": False, "error": "Source has no path"}
-        result = initialize_app_structure(path)
-        return result
+            return {"success": False, "message": "Source has no path"}
+
+        try:
+            games_path = Path(path)
+            games_path.mkdir(parents=True, exist_ok=True)
+            get_app_folder(games_path).mkdir(parents=True, exist_ok=True)
+            get_saves_folder(games_path).mkdir(parents=True, exist_ok=True)
+            existing_config = get_games_config(games_path)
+            existing_games = {g["name"]: g for g in existing_config.get("games", [])}
+            current_folders = {fi["name"]: fi["path"] for fi in detect_game_folders(games_path)}
+            # Fix slug paths from older entries
+            for name, game in existing_games.items():
+                if name in current_folders and game.get("path") != current_folders[name]:
+                    game["path"] = current_folders[name]
+            # Remove entries for folders that no longer exist
+            existing_games = {n: g for n, g in existing_games.items() if n in current_folders}
+            # Add blank entries for new folders
+            new_games = []
+            for name, folder_path in current_folders.items():
+                if name not in existing_games:
+                    existing_games[name] = {
+                        "name": name,
+                        "path": folder_path,
+                        "executable": "",
+                        "steam_app_id": None,
+                        "proton_version": "",
+                        "proton_dependencies": [],
+                        "proton_sync_paths": [],
+                        "categories": [],
+                        "launch_options": "",
+                    }
+                    new_games.append(name)
+            save_games_config({"games": list(existing_games.values())}, games_path)
+            return {
+                "success": True,
+                "message": "Source initialized successfully",
+                "games_count": len(existing_games),
+                "games_initialized": new_games,
+            }
+        except PermissionError:
+            # FUSE mount (e.g. SSHFS without -o allow_root) — retry as path owner.
+            # os.seteuid alone is not enough; subprocess with full setuid/setgid required.
+            owner_uid, owner_gid = _owner_creds_for(path)
+            if os.getuid() == 0 and owner_uid != 0:
+                result = _run_source_script("init", path, owner_uid, owner_gid)
+                if result is not None:
+                    return result
+            return {"success": False, "message": "Permission denied on source path"}
+        except Exception as e:
+            _debug(f"initialize_source: error for {path!r}: {e!r}")
+            return {"success": False, "message": str(e)}
 
     # ── Steam ─────────────────────────────────────────────────────────────
 
@@ -257,9 +434,20 @@ class Plugin:
         """Return all games from all sources, merged by name."""
         sources = _list_sources()
         merged: dict[str, dict] = {}
+        current_uid = os.getuid()
         for source in sources:
+            games = []
             try:
                 games = _load_source_games(source)
+            except PermissionError:
+                # FUSE mount — retry as path owner via subprocess
+                path = source.get("path", "")
+                if path and current_uid == 0:
+                    owner_uid, owner_gid = _owner_creds_for(path)
+                    if owner_uid != 0:
+                        result = _run_source_script("load", path, owner_uid, owner_gid)
+                        if isinstance(result, list):
+                            games = result
             except Exception as e:
                 _debug(f"get_games: failed to load source {source['id']}: {e}")
                 continue
@@ -303,6 +491,7 @@ class Plugin:
 
     async def update_game_config(self, name: str, updates: dict, source_id: Optional[str] = None) -> dict:
         """Update specific fields on an existing game config."""
+        import functools, json as _json
         source = _get_source_by_id(source_id) if source_id else (_list_sources() or [None])[0]
         if not source:
             return {"success": False, "error": "No source configured"}
@@ -312,10 +501,41 @@ class Plugin:
         state_updates = {k: v for k, v in updates.items() if k in STATE_FIELDS}
         try:
             if config_updates:
-                update_game_config(name, config_updates, Path(path) if path else None)
+                try:
+                    update_game_config(name, config_updates, Path(path) if path else None)
+                except PermissionError:
+                    # FUSE mount — write config as path owner via subprocess
+                    owner_uid, owner_gid = _owner_creds_for(path or "")
+                    if os.getuid() == 0 and owner_uid != 0:
+                        script = (
+                            "import sys,json; sys.path.insert(0,sys.argv[1]); "
+                            "from pathlib import Path; "
+                            "from deckyfin_config import update_game_config; "
+                            "updates=json.loads(sys.argv[4]); "
+                            "update_game_config(sys.argv[3], updates, Path(sys.argv[2])); "
+                            "print('ok')"
+                        )
+                        proc = subprocess.run(
+                            ["python3", "-c", script, _PY_MODULES, path, name,
+                             _json.dumps(config_updates)],
+                            capture_output=True, text=True, timeout=15,
+                            preexec_fn=functools.partial(_drop_privs, owner_uid, owner_gid),
+                        )
+                        if proc.returncode != 0:
+                            _debug(f"update_game_config: FUSE write failed: {proc.stderr.strip()[:200]!r}")
+                            return {"success": False, "error": "Permission denied on source path"}
+                    else:
+                        raise
             if state_updates:
                 update_game_state(source["id"], name, state_updates)
             game = get_game_config(name, Path(path) if path else None)
+            if game is None and path:
+                # Read game config via subprocess for FUSE paths
+                owner_uid, owner_gid = _owner_creds_for(path)
+                if os.getuid() == 0 and owner_uid != 0:
+                    result = _run_source_script("load", path, owner_uid, owner_gid)
+                    if isinstance(result, list):
+                        game = next((g for g in result if g.get("name") == name), None)
             if game:
                 st = get_game_state(source["id"], name)
                 if st:
@@ -385,25 +605,52 @@ class Plugin:
     async def list_subfolders(self, path: str) -> list:
         """List subdirectory names under the given path. Used by the folder browser."""
         try:
-            root = Path(path)
-            _debug(f"list_subfolders: path={path!r}, exists={root.exists()}, is_dir={root.is_dir() if root.exists() else 'N/A'}")
-            if not root.exists() or not root.is_dir():
+            _debug(f"list_subfolders: path={path!r}")
+            current_uid = os.getuid()
+            owner_uid, owner_gid = _owner_creds_for(path)
+            _debug(f"list_subfolders: current_uid={current_uid} owner_uid={owner_uid} owner_gid={owner_gid}")
+
+            # When running as root and the path is owned by another user, spawn
+            # `find` as that user.  This lets us enter FUSE mounts (e.g. SSHFS
+            # without -o allow_other) that block root at the kernel level.
+            # The kernel FUSE check requires BOTH uid AND gid to match the mount
+            # creator, so we must drop both (gid first, while still root).
+            if current_uid == 0 and owner_uid != 0:
+                try:
+                    import functools
+                    proc = subprocess.run(
+                        ["find", path, "-maxdepth", "1", "-mindepth", "1", "-type", "d"],
+                        capture_output=True, text=True, timeout=10,
+                        preexec_fn=functools.partial(_drop_privs, owner_uid, owner_gid),
+                    )
+                    _debug(f"list_subfolders: find rc={proc.returncode} stderr={proc.stderr.strip()[:200]!r}")
+                    if proc.stdout.strip():
+                        items = sorted(
+                            os.path.basename(p)
+                            for p in proc.stdout.strip().split("\n")
+                            if p.strip()
+                        )
+                        _debug(f"list_subfolders: {len(items)} subdirs (find/uid={owner_uid}/gid={owner_gid})")
+                        return items
+                except Exception as e:
+                    _debug(f"list_subfolders: find failed: {e!r}")
+
+            # Direct scandir: works when already running as the path owner,
+            # or for ordinary (non-FUSE) directories.
+            try:
+                with os.scandir(path) as it:
+                    entries = sorted(it, key=lambda e: e.name)
+            except OSError as e:
+                _debug(f"list_subfolders: OSError scanning {path}: {e}")
                 return []
             items = []
-            try:
-                entries = list(root.iterdir())
-            except PermissionError as pe:
-                _debug(f"list_subfolders: PermissionError iterating {path}: {pe}")
-                return []
-            for item in sorted(entries):
-                if item.name.startswith("."):
-                    continue
+            for entry in entries:
                 try:
-                    if item.is_dir():
-                        items.append(item.name)
-                except PermissionError:
+                    if entry.is_dir():
+                        items.append(entry.name)
+                except OSError:
                     continue
-            _debug(f"list_subfolders: found {len(items)} subdirs: {items}")
+            _debug(f"list_subfolders: {len(items)} subdirs (scandir)")
             return items
         except Exception as e:
             _debug(f"list_subfolders: unexpected error for {path!r}: {e}")

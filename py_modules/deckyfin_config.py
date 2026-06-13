@@ -149,10 +149,9 @@ def detect_game_folders(games_path: Path) -> List[Dict[str, str]]:
             continue
         if item.is_dir():
             folder_name = item.name
-            path_name = folder_name.lower().replace(" ", "-")
             game_folders.append({
                 "name": folder_name,
-                "path": path_name,
+                "path": folder_name,  # actual folder name, used by exe scanner
             })
 
     return sorted(game_folders, key=lambda x: x["name"])

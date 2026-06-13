@@ -144,5 +144,7 @@ def load_source_games(source: dict) -> list:
     try:
         config = get_games_config(Path(path))
         return config.get("games", [])
+    except PermissionError:
+        raise  # propagate so caller can retry as FUSE mount owner
     except Exception:
         return []
