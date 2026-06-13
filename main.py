@@ -215,7 +215,6 @@ def _write_game_config_to_source(
             raise
 
 
-
 class Plugin:
     """Deckyfin plugin backend — methods callable from the React frontend."""
 
