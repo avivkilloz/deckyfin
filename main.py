@@ -259,7 +259,18 @@ class Plugin:
         source = _get_source_by_id(source_id)
         if not source:
             return {"can_play": False, "can_write_config": False, "can_download_to": False}
-        return _detect_capabilities(source)
+        caps = _detect_capabilities(source)
+        # os.access() from root returns False for FUSE mounts (kernel blocks root) and NFS
+        # with root_squash (root → nobody). But our update_game_config subprocess fallback
+        # can write as the path owner, so report True whenever we can actually do the write.
+        if os.getuid() == 0 and not caps["can_write_config"]:
+            path = source.get("path", "")
+            owner_uid, _ = _owner_creds_for(path) if path else (0, 0)
+            if owner_uid != 0:
+                caps = dict(caps)
+                caps["can_write_config"] = True
+                caps["can_download_to"] = True
+        return caps
 
     async def get_source_disk_usage(self, source_id: str) -> dict:
         import functools, json as _json
