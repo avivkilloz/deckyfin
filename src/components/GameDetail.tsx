@@ -744,7 +744,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
       style={{ padding: "8px" }}
     >
       {/* Back + source selector row */}
-      <div style={{ display: "flex", gap: "6px", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", justifyContent: "space-between" }}>
+      <Focusable style={{ display: "flex", gap: "6px", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", justifyContent: "space-between" }} focusClassName="">
         <Focusable
           ref={backRef}
           onActivate={onBack}
@@ -774,7 +774,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
             </Focusable>
           );
         })()}
-      </div>
+      </Focusable>
 
       {/* Source picker dropdown */}
       {showSourcePicker && game.sources.length > 1 && (
@@ -810,7 +810,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
 
       {/* Executable */}
       <label style={LABEL_STYLE}>Executable</label>
-      <div
+      <Focusable
+        focusClassName=""
         style={{
           display: "flex",
           gap: "6px",
@@ -833,7 +834,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         >
           {showExePicker ? "✕" : "Browse"}
         </Focusable>
-      </div>
+      </Focusable>
 
       {/* Executable picker dropdown */}
       {showExePicker && (
@@ -920,7 +921,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         }}
       >
         {steamCollections.length > 0 && (
-          <div
+          <Focusable
+            focusClassName=""
             style={{
               display: "flex",
               flexWrap: "wrap",
@@ -952,7 +954,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
                 </Focusable>
               );
             })}
-          </div>
+          </Focusable>
         )}
 
         {/* Custom collections */}
@@ -1038,7 +1040,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           padding: "8px",
         }}
       >
-        <div
+        <Focusable
+          focusClassName=""
           style={{
             display: "flex",
             flexWrap: "wrap",
@@ -1070,7 +1073,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
               </Focusable>
             );
           })}
-        </div>
+        </Focusable>
 
         {/* Custom dependencies */}
         <label style={{ fontSize: "0.82em", color: "#888", display: "block", marginBottom: "2px" }}>
@@ -1218,7 +1221,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
             : "Add to Steam"}
         </Focusable>
 
-        <div style={{ display: "flex", gap: "6px" }}>
+        <Focusable focusClassName="" style={{ display: "flex", gap: "6px" }}>
           <Focusable
             onActivate={capabilities.can_play ? handleInitPrefix : undefined}
             onClick={capabilities.can_play ? handleInitPrefix : undefined}
@@ -1247,7 +1250,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           >
             {forceReinit ? "☑ Force" : "☐ Force"}
           </Focusable>
-        </div>
+        </Focusable>
 
         <Focusable
           onActivate={capabilities.can_play ? handleInstallDeps : undefined}
@@ -1303,7 +1306,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         </span>
       </label>
 
-      <div style={{ display: "flex", gap: "6px", marginBottom: "6px" }}>
+      <Focusable focusClassName="" style={{ display: "flex", gap: "6px", marginBottom: "6px" }}>
         <Focusable
           onActivate={handleOpenSgdbPicker}
           onClick={handleOpenSgdbPicker}
@@ -1333,7 +1336,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         >
           {loading === "art" ? "Applying…" : "Apply"}
         </Focusable>
-      </div>
+      </Focusable>
 
       {/* SGDB art feedback */}
       {sgdbFeedback && (
