@@ -132,3 +132,42 @@ def test_copy_game_config_fields_creates_entry_if_missing():
 
         games = get_games_config(dst)["games"]
         assert any(g["name"] == "NewGame" and g["proton_version"] == "GE9" for g in games)
+
+
+def test_copy_game_folder_uses_subprocess_when_root_with_fuse_owner():
+    """When running as root (uid=0) with non-root owner_uid, subprocess path is used."""
+    import unittest.mock
+    with tempfile.TemporaryDirectory() as src_tmp, tempfile.TemporaryDirectory() as dst_tmp:
+        from deckyfin_transfer import copy_game_folder
+        src = Path(src_tmp) / "Game"
+        src.mkdir()
+        (src / "game.exe").write_bytes(b"A" * 50)
+
+        dst = Path(dst_tmp) / "Game"
+        calls = []
+
+        # Patch os.getuid to return 0 (simulate running as root)
+        with unittest.mock.patch("deckyfin_transfer.os.getuid", return_value=0):
+            copy_game_folder(src, dst, lambda b: calls.append(b), owner_uid=1000, owner_gid=1000)
+
+        # Files should still be copied (subprocess ran as current user, can access tmp)
+        assert (dst / "game.exe").read_bytes() == b"A" * 50
+        assert calls[-1] == 50
+
+
+def test_copy_game_config_fields_raises_when_game_not_found():
+    import pytest
+    with tempfile.TemporaryDirectory() as tmp:
+        from deckyfin_config import save_games_config
+        from deckyfin_transfer import copy_game_config_fields
+
+        src = Path(tmp) / "src"
+        dst = Path(tmp) / "dst"
+        src.mkdir(); dst.mkdir()
+        (src / ".deckyfin").mkdir(); (dst / ".deckyfin").mkdir()
+
+        save_games_config({"games": []}, src)
+        save_games_config({"games": []}, dst)
+
+        with pytest.raises(ValueError, match="not found"):
+            copy_game_config_fields("NonExistentGame", src, dst)

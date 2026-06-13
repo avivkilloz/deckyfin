@@ -1,8 +1,10 @@
 """File copy engine and config copy utility for Deckyfin transfer operations."""
 
+import functools
 import os
 import json
 import shutil
+import subprocess
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -106,19 +108,19 @@ def _copy_via_subprocess(
     progress_cb: Callable[[int], None],
     cancelled_flag: Optional[dict],
 ) -> None:
-    import functools
-    import subprocess as _sp
     try:
-        proc = _sp.Popen(
+        proc = subprocess.Popen(
             ["python3", "-", str(src), str(dst)],
-            stdin=_sp.PIPE,
-            stdout=_sp.PIPE,
-            stderr=_sp.PIPE,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
             preexec_fn=functools.partial(_drop_privs, owner_uid, owner_gid),
         )
-        proc.stdin.write(_COPY_SCRIPT)
-        proc.stdin.close()
+        try:
+            proc.stdin.write(_COPY_SCRIPT)
+        finally:
+            proc.stdin.close()
         for line in proc.stdout:
             line = line.strip()
             if not line:
