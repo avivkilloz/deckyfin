@@ -130,3 +130,14 @@ export interface SteamGridArtUrls {
   logo: string | null;
   wide: string | null;
 }
+
+export interface TransferStatus {
+  transfer_id: string;
+  game_name: string;
+  from_source_id: string;
+  to_source_id: string;
+  status: "running" | "done" | "failed";
+  bytes_copied: number;
+  total_bytes: number;
+  error: string | null;
+}
