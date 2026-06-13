@@ -77,6 +77,12 @@ def _debug(msg: str):
         pass
 
 
+import time as _time
+import threading as _threading
+import uuid as _uuid
+
+_transfer_registry: dict = {}
+
 _debug("MODULE LOAD START")
 
 _PY_MODULES = str(Path(__file__).resolve().parent / "py_modules")
@@ -179,6 +185,34 @@ def _drop_privs(uid: int, gid: int) -> None:
     os.setuid(uid)
 
 
+def _write_game_config_to_source(
+    game_name: str, src_path: str, dst_path: str,
+    dst_owner_uid: int, dst_owner_gid: int
+) -> None:
+    """Copy portable config fields from src to dst. Falls back to subprocess on PermissionError."""
+    import functools
+    from deckyfin_transfer import copy_game_config_fields
+    try:
+        copy_game_config_fields(game_name, Path(src_path), Path(dst_path))
+    except PermissionError:
+        if os.getuid() == 0 and dst_owner_uid != 0:
+            script = (
+                "import sys; sys.path.insert(0,sys.argv[1]); "
+                "from pathlib import Path; "
+                "from deckyfin_transfer import copy_game_config_fields; "
+                "copy_game_config_fields(sys.argv[2], Path(sys.argv[3]), Path(sys.argv[4]))"
+            )
+            proc = subprocess.run(
+                ["python3", "-c", script, _PY_MODULES, game_name, src_path, dst_path],
+                capture_output=True, text=True, timeout=15,
+                preexec_fn=functools.partial(_drop_privs, dst_owner_uid, dst_owner_gid),
+            )
+            if proc.returncode != 0:
+                raise PermissionError(
+                    f"FUSE config write failed: {proc.stderr.strip()[:200]}"
+                )
+        else:
+            raise
 
 
 
@@ -271,6 +305,29 @@ class Plugin:
                 caps["can_write_config"] = True
                 caps["can_download_to"] = True
         return caps
+
+    async def copy_game_config(
+        self, game_name: str, from_source_id: str, to_source_id: str
+    ) -> dict:
+        """Copy portable config fields for game_name from one source to another."""
+        src_source = _get_source_by_id(from_source_id)
+        dst_source = _get_source_by_id(to_source_id)
+        if not src_source or not dst_source:
+            return {"success": False, "error": "Source not found"}
+        src_path = src_source.get("path")
+        dst_path = dst_source.get("path")
+        if not src_path or not dst_path:
+            return {"success": False, "error": "Source has no path"}
+        try:
+            dst_owner_uid, dst_owner_gid = _owner_creds_for(dst_path)
+            _write_game_config_to_source(
+                game_name, src_path, dst_path, dst_owner_uid, dst_owner_gid
+            )
+            _debug(f"copy_game_config: {game_name!r} {from_source_id!r} → {to_source_id!r}")
+            return {"success": True}
+        except Exception as e:
+            _debug(f"copy_game_config: error: {e!r}")
+            return {"success": False, "error": str(e)}
 
     async def get_source_disk_usage(self, source_id: str) -> dict:
         import functools, json as _json
