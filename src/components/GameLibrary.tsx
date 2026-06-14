@@ -1,7 +1,7 @@
 import { VFC, useState, useEffect, useCallback, useMemo } from "react";
 import { callable } from "@decky/api";
 import { Focusable } from "@decky/ui";
-import { MergedGame } from "../types";
+import { MergedGame, Source, TransferStatus } from "../types";
 import { GameCard } from "../components/GameCard";
 import { SettingsPage } from "../components/SettingsPage";
 import { GameDetail } from "../components/GameDetail";
@@ -12,6 +12,14 @@ const listNonSteamGames = callable<[], { name: string }[]>("list_nonsteam_games"
 const restartSteam = callable<[], { success: boolean; message?: string }>("restart_steam");
 const getNeedsRestart = callable<[], boolean>("get_needs_restart");
 const setNeedsRestart = callable<[value: boolean], { success: boolean }>("set_needs_restart");
+const listActiveTransfers = callable<[], TransferStatus[]>("list_active_transfers");
+const listAllSources = callable<[], Source[]>("list_sources");
+
+function fmtBytes(b: number): string {
+  if (b >= 1e9) return (b / 1e9).toFixed(1) + " GB";
+  if (b >= 1e6) return (b / 1e6).toFixed(1) + " MB";
+  return (b / 1e3).toFixed(0) + " KB";
+}
 
 type SteamFilter = "all" | "in-steam" | "not-in-steam";
 
@@ -122,6 +130,27 @@ export const GameLibrary: VFC = () => {
     loadData();
   }, [loadData]);
 
+  const [activeTransfers, setActiveTransfers] = useState<TransferStatus[]>([]);
+  const [xferSources, setXferSources] = useState<Source[]>([]);
+
+  useEffect(() => {
+    listActiveTransfers().then((t) => setActiveTransfers(t || [])).catch(() => {});
+    listAllSources().then((s) => setXferSources(s || [])).catch(() => {});
+  }, []);
+
+  const hasRunningTransfer = activeTransfers.some((t) => t.status === "running");
+
+  useEffect(() => {
+    if (!hasRunningTransfer) return;
+    const poll = setInterval(async () => {
+      try {
+        const t = await listActiveTransfers();
+        setActiveTransfers(t || []);
+      } catch (_) {}
+    }, 3000);
+    return () => clearInterval(poll);
+  }, [hasRunningTransfer]);
+
   const openGame = (game: MergedGame) => {
     setSelectedGame(game);
     setView("game-detail");
@@ -145,7 +174,11 @@ export const GameLibrary: VFC = () => {
     return (
       <GameDetail
         game={selectedGame}
-        onBack={async () => { await loadData(); setView("library"); }}
+        onBack={async () => {
+          await loadData();
+          listActiveTransfers().then((t) => setActiveTransfers(t || [])).catch(() => {});
+          setView("library");
+        }}
         onNeedsRestart={() => {
           setNeedsRestartState(true);
           setNeedsRestart(true).catch(() => {});
@@ -182,6 +215,70 @@ export const GameLibrary: VFC = () => {
           </Focusable>
         </Focusable>
       </div>
+
+      {/* Active Transfers */}
+      {activeTransfers.length > 0 && (
+        <div style={{ marginBottom: "10px" }}>
+          {activeTransfers.map((xfer) => {
+            const pct =
+              xfer.total_bytes > 0
+                ? Math.round((xfer.bytes_copied / xfer.total_bytes) * 100)
+                : 0;
+            const fromName =
+              xferSources.find((s) => s.id === xfer.from_source_id)?.name ?? xfer.from_source_id;
+            const toName =
+              xferSources.find((s) => s.id === xfer.to_source_id)?.name ?? xfer.to_source_id;
+            return (
+              <div
+                key={xfer.transfer_id}
+                style={{
+                  border: "1px solid #444",
+                  borderRadius: "4px",
+                  padding: "8px 10px",
+                  marginBottom: "6px",
+                  background: "#1a1a1a",
+                  fontSize: "0.82em",
+                }}
+              >
+                {xfer.status === "running" && (
+                  <>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+                      <span>
+                        ▸ <strong>{xfer.game_name}</strong>: {fromName} → {toName}
+                      </span>
+                      <span style={{ color: "#aaa" }}>{pct}%</span>
+                    </div>
+                    <div style={{ background: "#333", borderRadius: "2px", height: "4px", marginBottom: "3px" }}>
+                      <div
+                        style={{
+                          width: `${pct}%`,
+                          background: "#0078d4",
+                          borderRadius: "2px",
+                          height: "100%",
+                          transition: "width 0.3s",
+                        }}
+                      />
+                    </div>
+                    <span style={{ color: "#666" }}>
+                      {fmtBytes(xfer.bytes_copied)} / {fmtBytes(xfer.total_bytes)}
+                    </span>
+                  </>
+                )}
+                {xfer.status === "done" && (
+                  <span style={{ color: "#2ecc71" }}>
+                    ✓ <strong>{xfer.game_name}</strong> copied: {fromName} → {toName}
+                  </span>
+                )}
+                {xfer.status === "failed" && (
+                  <span style={{ color: "tomato" }}>
+                    ✗ <strong>{xfer.game_name}</strong> failed: {xfer.error ?? "Transfer failed"}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Search + Filter row */}
       <Focusable

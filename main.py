@@ -187,32 +187,35 @@ def _drop_privs(uid: int, gid: int) -> None:
 
 def _write_game_config_to_source(
     game_name: str, src_path: str, dst_path: str,
-    dst_owner_uid: int, dst_owner_gid: int
+    owner_uid: int, owner_gid: int
 ) -> None:
-    """Copy portable config fields from src to dst. Falls back to subprocess on PermissionError."""
+    """Copy portable config fields from src to dst.
+
+    When running as root with a non-root owner, always uses subprocess —
+    get_games_config silently returns {} as root on FUSE mounts, so the
+    direct call would silently copy nothing without raising PermissionError.
+    """
     import functools
     from deckyfin_transfer import copy_game_config_fields
-    try:
+    if os.getuid() == 0 and owner_uid != 0:
+        script = (
+            "import sys; sys.path.insert(0,sys.argv[1]); "
+            "from pathlib import Path; "
+            "from deckyfin_transfer import copy_game_config_fields; "
+            "copy_game_config_fields(sys.argv[2], Path(sys.argv[3]), Path(sys.argv[4]))"
+        )
+        proc = subprocess.run(
+            ["python3", "-c", script, _PY_MODULES, game_name, src_path, dst_path],
+            capture_output=True, text=True, timeout=15,
+            preexec_fn=functools.partial(_drop_privs, owner_uid, owner_gid),
+        )
+        _debug(f"_write_game_config_to_source: rc={proc.returncode} stderr={proc.stderr.strip()[:300]!r}")
+        if proc.returncode != 0:
+            raise PermissionError(
+                f"FUSE config write failed: {proc.stderr.strip()[:200]}"
+            )
+    else:
         copy_game_config_fields(game_name, Path(src_path), Path(dst_path))
-    except PermissionError:
-        if os.getuid() == 0 and dst_owner_uid != 0:
-            script = (
-                "import sys; sys.path.insert(0,sys.argv[1]); "
-                "from pathlib import Path; "
-                "from deckyfin_transfer import copy_game_config_fields; "
-                "copy_game_config_fields(sys.argv[2], Path(sys.argv[3]), Path(sys.argv[4]))"
-            )
-            proc = subprocess.run(
-                ["python3", "-c", script, _PY_MODULES, game_name, src_path, dst_path],
-                capture_output=True, text=True, timeout=15,
-                preexec_fn=functools.partial(_drop_privs, dst_owner_uid, dst_owner_gid),
-            )
-            if proc.returncode != 0:
-                raise PermissionError(
-                    f"FUSE config write failed: {proc.stderr.strip()[:200]}"
-                )
-        else:
-            raise
 
 
 class Plugin:
@@ -345,7 +348,28 @@ class Plugin:
         src_game_dir = Path(src_path) / game_name
         dst_game_dir = Path(dst_path) / game_name
 
-        if not src_game_dir.exists():
+        src_uid, src_gid = _owner_creds_for(src_path)
+        dst_uid, dst_gid = _owner_creds_for(dst_path)
+        # Pick non-root creds if available (for FUSE mounts)
+        owner_uid = src_uid if src_uid != 0 else dst_uid
+        owner_gid = src_gid if src_uid != 0 else dst_gid  # track same branch as uid
+
+        # Check source game folder exists — use subprocess for FUSE mounts (root blocked)
+        try:
+            if os.getuid() == 0 and owner_uid != 0:
+                chk = subprocess.run(
+                    ["python3", "-c",
+                     "import sys, os; sys.exit(0 if os.path.isdir(sys.argv[1]) else 1)",
+                     str(src_game_dir)],
+                    capture_output=True, timeout=5,
+                    preexec_fn=functools.partial(_drop_privs, owner_uid, owner_gid),
+                )
+                src_game_exists = chk.returncode == 0
+            else:
+                src_game_exists = src_game_dir.exists()
+        except Exception:
+            src_game_exists = True  # let the copy attempt fail with a real error
+        if not src_game_exists:
             return {"success": False, "error": f"Game folder not found: {src_game_dir}"}
 
         # Reject if a transfer to the same destination is already running
@@ -362,12 +386,6 @@ class Plugin:
                 "error": "Transfer already in progress",
                 "transfer_id": already["transfer_id"],
             }
-
-        src_uid, src_gid = _owner_creds_for(src_path)
-        dst_uid, dst_gid = _owner_creds_for(dst_path)
-        # Pick non-root creds if available (for FUSE mounts)
-        owner_uid = src_uid if src_uid != 0 else dst_uid
-        owner_gid = src_gid if src_uid != 0 else dst_gid  # track same branch as uid
 
         # Calculate total size (via subprocess if FUSE)
         try:
@@ -419,18 +437,19 @@ class Plugin:
                     owner_gid=owner_gid,
                     cancelled_flag=entry,
                 )
-                # Write config to destination
-                try:
-                    _write_game_config_to_source(
-                        game_name, src_path, dst_path, dst_uid, dst_gid
-                    )
-                except Exception as cfg_err:
-                    _debug(f"start_game_transfer: config copy warning: {cfg_err!r}")
-                # Initialise destination source so it picks up the new game
+                # Init destination source first — creates .deckyfin/ and a blank
+                # game entry so the source shows up even if config copy fails.
                 try:
                     _run_source_script("init", dst_path, dst_uid, dst_gid)
                 except Exception as init_err:
                     _debug(f"start_game_transfer: init warning: {init_err!r}")
+                # Copy portable config fields on top of the blank entry.
+                try:
+                    _write_game_config_to_source(
+                        game_name, src_path, dst_path, owner_uid, owner_gid
+                    )
+                except Exception as cfg_err:
+                    _debug(f"start_game_transfer: config copy warning: {cfg_err!r}")
                 entry["status"] = "done"
                 _debug(f"start_game_transfer: {transfer_id} done")
             except RuntimeError as exc:
@@ -693,7 +712,17 @@ class Plugin:
         if not source:
             return {"success": False, "error": "No source configured"}
         path = source.get("path")
-        game = get_game_config(name, Path(path) if path else None)
+        try:
+            game = get_game_config(name, Path(path) if path else None)
+        except PermissionError:
+            game = None
+        if game is None and path:
+            # FUSE/NFS fallback: read via subprocess as the mount owner
+            owner_uid, owner_gid = _owner_creds_for(path)
+            if owner_uid != 0:
+                games = _run_source_script("load", path, owner_uid, owner_gid)
+                if isinstance(games, list):
+                    game = next((g for g in games if g.get("name") == name), None)
         if game:
             state = get_game_state(source["id"], name)
             if state:
@@ -718,43 +747,52 @@ class Plugin:
         # Split into permanent config and ephemeral state
         config_updates = {k: v for k, v in updates.items() if k not in STATE_FIELDS}
         state_updates = {k: v for k, v in updates.items() if k in STATE_FIELDS}
+        owner_uid, owner_gid = _owner_creds_for(path or "") if path else (0, 0)
+        use_subprocess = os.getuid() == 0 and owner_uid != 0
         try:
             if config_updates:
-                try:
+                if use_subprocess:
+                    # FUSE mount — get_games_config silently returns {} as root,
+                    # so the direct call would raise GameConfigError("not found").
+                    # Go straight to subprocess as the mount owner.
+                    script = (
+                        "import sys,json; sys.path.insert(0,sys.argv[1]); "
+                        "from pathlib import Path; "
+                        "from deckyfin_config import update_game_config; "
+                        "updates=json.loads(sys.argv[4]); "
+                        "update_game_config(sys.argv[3], updates, Path(sys.argv[2])); "
+                        "print('ok')"
+                    )
+                    proc = subprocess.run(
+                        ["python3", "-c", script, _PY_MODULES, path, name,
+                         _json.dumps(config_updates)],
+                        capture_output=True, text=True, timeout=15,
+                        preexec_fn=functools.partial(_drop_privs, owner_uid, owner_gid),
+                    )
+                    if proc.returncode != 0:
+                        _debug(f"update_game_config: FUSE write failed: {proc.stderr.strip()[:200]!r}")
+                        return {"success": False, "error": "Permission denied on source path"}
+                    # Write succeeded — handle state and read back, then return.
+                    # Keep read-back errors from masking a successful write.
+                    if state_updates:
+                        update_game_state(source["id"], name, state_updates)
+                    game = None
+                    try:
+                        result = _run_source_script("load", path, owner_uid, owner_gid)
+                        if isinstance(result, list):
+                            game = next((g for g in result if g.get("name") == name), None)
+                        if game:
+                            st = get_game_state(source["id"], name)
+                            if st:
+                                game = {**game, **st}
+                    except Exception as rb_err:
+                        _debug(f"update_game_config: read-back warning: {rb_err!r}")
+                    return {"success": True, "game": game}
+                else:
                     update_game_config(name, config_updates, Path(path) if path else None)
-                except PermissionError:
-                    # FUSE mount — write config as path owner via subprocess
-                    owner_uid, owner_gid = _owner_creds_for(path or "")
-                    if os.getuid() == 0 and owner_uid != 0:
-                        script = (
-                            "import sys,json; sys.path.insert(0,sys.argv[1]); "
-                            "from pathlib import Path; "
-                            "from deckyfin_config import update_game_config; "
-                            "updates=json.loads(sys.argv[4]); "
-                            "update_game_config(sys.argv[3], updates, Path(sys.argv[2])); "
-                            "print('ok')"
-                        )
-                        proc = subprocess.run(
-                            ["python3", "-c", script, _PY_MODULES, path, name,
-                             _json.dumps(config_updates)],
-                            capture_output=True, text=True, timeout=15,
-                            preexec_fn=functools.partial(_drop_privs, owner_uid, owner_gid),
-                        )
-                        if proc.returncode != 0:
-                            _debug(f"update_game_config: FUSE write failed: {proc.stderr.strip()[:200]!r}")
-                            return {"success": False, "error": "Permission denied on source path"}
-                    else:
-                        raise
             if state_updates:
                 update_game_state(source["id"], name, state_updates)
             game = get_game_config(name, Path(path) if path else None)
-            if game is None and path:
-                # Read game config via subprocess for FUSE paths
-                owner_uid, owner_gid = _owner_creds_for(path)
-                if os.getuid() == 0 and owner_uid != 0:
-                    result = _run_source_script("load", path, owner_uid, owner_gid)
-                    if isinstance(result, list):
-                        game = next((g for g in result if g.get("name") == name), None)
             if game:
                 st = get_game_state(source["id"], name)
                 if st:
@@ -811,6 +849,7 @@ class Plugin:
         return detect_game_folders(Path(games_path))
 
     async def scan_game_exes(self, subfolder: str, source_id: Optional[str] = None) -> list:
+        import functools
         if source_id:
             src = _get_source_by_id(source_id)
             games_path = src.get("path") if src else None
@@ -819,7 +858,24 @@ class Plugin:
             games_path = str(folder) if folder else None
         if not games_path:
             return [{"error": "Games folder not configured"}]
-        return find_game_executables(Path(games_path) / subfolder)
+        game_dir = Path(games_path) / subfolder
+        if os.getuid() == 0:
+            owner_uid, owner_gid = _owner_creds_for(games_path)
+            if owner_uid != 0:
+                proc = subprocess.run(
+                    ["python3", "-c",
+                     "import sys; from pathlib import Path; "
+                     "d=Path(sys.argv[1]); "
+                     "exes=sorted(str(p.relative_to(d)) for p in d.rglob('*.exe') if p.is_file()) "
+                     "if d.is_dir() else []; "
+                     "print('\\n'.join(exes))",
+                     str(game_dir)],
+                    capture_output=True, text=True, timeout=30,
+                    preexec_fn=functools.partial(_drop_privs, owner_uid, owner_gid),
+                )
+                if proc.returncode == 0:
+                    return [l for l in proc.stdout.splitlines() if l.strip()]
+        return find_game_executables(game_dir)
 
     async def list_subfolders(self, path: str) -> list:
         """List subdirectory names under the given path. Used by the folder browser."""

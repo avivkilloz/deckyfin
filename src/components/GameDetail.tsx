@@ -436,22 +436,23 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   }, [game.name]);
 
   useEffect(() => {
-    if (!transferId || transferStatus?.status !== "running") return;
+    if (!transferId) return;
     const poll = setInterval(async () => {
       try {
         const s = await getTransferStatus(transferId);
-        if ("error" in s && s.error === "not found") {
+        if ("error" in s && (s as { error: string }).error === "not found") {
           clearInterval(poll);
           setTransferId(null);
           setTransferStatus(null);
           return;
         }
-        setTransferStatus(s as import("../types").TransferStatus);
-        if (s.status !== "running") clearInterval(poll);
+        const ts = s as import("../types").TransferStatus;
+        setTransferStatus(ts);
+        if (ts.status !== "running") clearInterval(poll);
       } catch (_) {}
     }, 2000);
     return () => clearInterval(poll);
-  }, [transferId, transferStatus?.status]);
+  }, [transferId]);
 
   useEffect(() => {
     getSteamShortcut(game.name)
@@ -899,7 +900,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
       style={{ padding: "8px" }}
     >
       {/* Back + source selector row */}
-      <Focusable style={{ display: "flex", gap: "6px", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", justifyContent: "space-between" }} focusClassName="">
+      <Focusable style={{ display: "flex", gap: "6px", alignItems: "center", marginBottom: "12px" }} focusClassName="">
         <Focusable
           ref={backRef}
           onActivate={onBack}
@@ -952,7 +953,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         </Focusable>
       )}
 
-      {/* ── Transfer Actions ───────────────────────────────────────────────── */}
+      {/* ── Transfer Actions ─────────────────────────────────────────────── */}
       {(game.sources.length >= 2 ||
         allSources.some(
           (s) =>
@@ -960,12 +961,11 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
             !game.sources.some((gs) => gs.source_id === s.id),
         )) && (
         <div style={{ marginBottom: "10px" }}>
-          {/* Buttons row */}
-          <Focusable
-            focusClassName=""
-            style={{ display: "flex", gap: "6px", marginBottom: "4px" }}
-          >
-            {game.sources.length >= 2 && (
+          <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.08)", margin: "14px 0 10px" }} />
+          <h4 style={{ margin: "0 0 10px 0" }}>Transfer Actions</h4>
+          {/* Copy config block */}
+          {game.sources.length >= 2 && (
+            <div style={{ marginBottom: "6px" }}>
               <Focusable
                 onActivate={() => {
                   setShowCopyConfigPicker((v) => !v);
@@ -982,14 +982,51 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
                 focusClassName="is-focused"
                 style={{ ...BTN_STYLE, padding: "4px 10px", fontSize: "0.82em" }}
               >
-                Copy config →
+                {copyConfigDest ? `Copy config → ${copyConfigDest.source_name}` : "Copy config →"}
               </Focusable>
-            )}
-            {allSources.some(
-              (s) =>
-                s.type !== "agent" &&
-                !game.sources.some((gs) => gs.source_id === s.id),
-            ) && (
+
+              {showCopyConfigPicker && !copyConfigConfirming && (
+                <div style={{ border: "1px solid #555", borderRadius: "4px", padding: "2px 0", marginTop: "4px" }}>
+                  {game.sources
+                    .filter((s) => s.source_id !== selectedSource.source_id)
+                    .map((src) => (
+                      <Focusable
+                        key={src.source_id}
+                        onActivate={() => { setCopyConfigDest(src); setShowCopyConfigPicker(false); setCopyConfigConfirming(true); }}
+                        onClick={() => { setCopyConfigDest(src); setShowCopyConfigPicker(false); setCopyConfigConfirming(true); }}
+                        focusClassName="is-focused"
+                        style={{ margin: "0 2px", padding: "4px 10px", cursor: "pointer", fontSize: "0.85em", borderBottom: "1px solid #333", color: "#ccc" }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                      >
+                        {src.source_name}
+                        <span style={{ marginLeft: "6px", fontSize: "0.78em", color: "#666" }}>({src.source_type})</span>
+                      </Focusable>
+                    ))}
+                </div>
+              )}
+
+              {copyConfigConfirming && copyConfigDest && (
+                <div style={{ fontSize: "0.82em", color: "#ccc", marginTop: "4px" }}>
+                  <span>Replace <b>{copyConfigDest.source_name}</b>'s config with <b>{selectedSource.source_name}</b>'s?</span>
+                  <Focusable focusClassName="" style={{ display: "flex", gap: "6px", marginTop: "4px" }}>
+                    <Focusable onActivate={() => setCopyConfigConfirming(false)} onClick={() => setCopyConfigConfirming(false)} focusClassName="is-focused" style={{ ...BTN_STYLE, padding: "2px 8px", fontSize: "0.82em" }}>Cancel</Focusable>
+                    <Focusable onActivate={handleCopyConfig} onClick={handleCopyConfig} focusClassName="is-focused" style={{ ...BTN_STYLE, padding: "2px 8px", fontSize: "0.82em", border: "1px solid #27ae60", color: "#2ecc71" }}>Copy</Focusable>
+                  </Focusable>
+                </div>
+              )}
+
+              {copyConfigFeedback && (
+                <p style={{ margin: "4px 0 0", fontSize: "0.82em", color: copyConfigFeedback.startsWith("✓") ? "#2ecc71" : "tomato" }}>
+                  {copyConfigFeedback}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Copy game block */}
+          {allSources.some((s) => s.type !== "agent" && !game.sources.some((gs) => gs.source_id === s.id)) && (
+            <div style={{ marginBottom: "6px" }}>
               <Focusable
                 onActivate={() => {
                   setShowCopyGamePicker((v) => !v);
@@ -1006,221 +1043,164 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
                 focusClassName="is-focused"
                 style={{ ...BTN_STYLE, padding: "4px 10px", fontSize: "0.82em" }}
               >
-                Copy game →
+                {copyGameDest ? `Copy game → ${copyGameDest.name}` : "Copy game →"}
               </Focusable>
-            )}
-          </Focusable>
 
-          {/* Config copy: source picker */}
-          {showCopyConfigPicker && !copyConfigConfirming && (
-            <div
-              style={{
-                border: "1px solid #555",
-                borderRadius: "4px",
-                padding: "2px 0",
-                marginBottom: "4px",
-              }}
-            >
-              {game.sources
-                .filter((s) => s.source_id !== selectedSource.source_id)
-                .map((src) => (
-                  <Focusable
-                    key={src.source_id}
-                    onActivate={() => {
-                      setCopyConfigDest(src);
-                      setShowCopyConfigPicker(false);
-                      setCopyConfigConfirming(true);
-                    }}
-                    onClick={() => {
-                      setCopyConfigDest(src);
-                      setShowCopyConfigPicker(false);
-                      setCopyConfigConfirming(true);
-                    }}
-                    focusClassName="is-focused"
-                    style={{
-                      margin: "0 2px",
-                      padding: "4px 10px",
-                      cursor: "pointer",
-                      fontSize: "0.85em",
-                      borderBottom: "1px solid #333",
-                      color: "#ccc",
-                    }}
-                    onMouseEnter={(e) =>
-                      (e.currentTarget.style.background = "rgba(255,255,255,0.08)")
-                    }
-                    onMouseLeave={(e) =>
-                      (e.currentTarget.style.background = "transparent")
-                    }
-                  >
-                    {src.source_name}
-                    <span style={{ marginLeft: "6px", fontSize: "0.78em", color: "#666" }}>
-                      ({src.source_type})
-                    </span>
+              {showCopyGamePicker && !copyGameConfirming && (
+                <div style={{ border: "1px solid #555", borderRadius: "4px", padding: "2px 0", marginTop: "4px" }}>
+                  {allSources
+                    .filter((s) => s.type !== "agent" && !game.sources.some((gs) => gs.source_id === s.id))
+                    .map((src) => (
+                      <Focusable
+                        key={src.id}
+                        onActivate={() => { setCopyGameDest(src); setShowCopyGamePicker(false); setCopyGameConfirming(true); }}
+                        onClick={() => { setCopyGameDest(src); setShowCopyGamePicker(false); setCopyGameConfirming(true); }}
+                        focusClassName="is-focused"
+                        style={{ margin: "0 2px", padding: "4px 10px", cursor: "pointer", fontSize: "0.85em", borderBottom: "1px solid #333", color: "#ccc" }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                      >
+                        {src.name}
+                        <span style={{ marginLeft: "6px", fontSize: "0.78em", color: "#666" }}>({src.type})</span>
+                      </Focusable>
+                    ))}
+                </div>
+              )}
+
+              {copyGameConfirming && copyGameDest && (
+                <div style={{ fontSize: "0.82em", color: "#ccc", marginTop: "4px" }}>
+                  <span>Copy <b>{game.name}</b> to <b>{copyGameDest.name}</b>?</span>
+                  <Focusable focusClassName="" style={{ display: "flex", gap: "6px", marginTop: "4px" }}>
+                    <Focusable onActivate={() => setCopyGameConfirming(false)} onClick={() => setCopyGameConfirming(false)} focusClassName="is-focused" style={{ ...BTN_STYLE, padding: "2px 8px", fontSize: "0.82em" }}>Cancel</Focusable>
+                    <Focusable onActivate={handleStartTransfer} onClick={handleStartTransfer} focusClassName="is-focused" style={{ ...BTN_STYLE, padding: "2px 8px", fontSize: "0.82em", border: "1px solid #27ae60", color: "#2ecc71" }}>Copy</Focusable>
                   </Focusable>
-                ))}
+                </div>
+              )}
+
+              {copyGameFeedback && (
+                <p style={{ margin: "4px 0 0", fontSize: "0.82em", color: "tomato" }}>
+                  {copyGameFeedback}
+                </p>
+              )}
             </div>
           )}
-
-          {/* Config copy: confirmation */}
-          {copyConfigConfirming && copyConfigDest && (
-            <div
-              style={{
-                fontSize: "0.82em",
-                color: "#ccc",
-                marginBottom: "4px",
-                display: "flex",
-                gap: "8px",
-                alignItems: "center",
-                flexWrap: "wrap",
-              }}
-            >
-              <span>
-                Replace <b>{copyConfigDest.source_name}</b>'s config with{" "}
-                <b>{selectedSource.source_name}</b>'s?
-              </span>
-              <Focusable
-                onActivate={() => setCopyConfigConfirming(false)}
-                onClick={() => setCopyConfigConfirming(false)}
-                focusClassName="is-focused"
-                style={{ ...BTN_STYLE, padding: "2px 8px", fontSize: "0.82em" }}
-              >
-                Cancel
-              </Focusable>
-              <Focusable
-                onActivate={handleCopyConfig}
-                onClick={handleCopyConfig}
-                focusClassName="is-focused"
+          {/* ── Transfer Progress Banner ───────────────────────────────────────── */}
+          {transferStatus && (() => {
+            const pct =
+              transferStatus.total_bytes > 0
+                ? Math.round((transferStatus.bytes_copied / transferStatus.total_bytes) * 100)
+                : 0;
+            const destName =
+              allSources.find((s) => s.id === transferStatus.to_source_id)?.name ??
+              transferStatus.to_source_id;
+            return (
+              <div
                 style={{
-                  ...BTN_STYLE,
-                  padding: "2px 8px",
+                  border: "1px solid #444",
+                  borderRadius: "4px",
+                  padding: "8px 10px",
+                  marginTop: "10px",
+                  background: "#1a1a1a",
                   fontSize: "0.82em",
-                  border: "1px solid #27ae60",
-                  color: "#2ecc71",
                 }}
               >
-                Copy
-              </Focusable>
-            </div>
-          )}
-
-          {copyConfigFeedback && (
-            <p
-              style={{
-                margin: "0 0 4px 0",
-                fontSize: "0.82em",
-                color: copyConfigFeedback.startsWith("✓") ? "#2ecc71" : "tomato",
-              }}
-            >
-              {copyConfigFeedback}
-            </p>
-          )}
-
-          {copyGameFeedback && (
-            <p
-              style={{
-                margin: "0 0 4px 0",
-                fontSize: "0.82em",
-                color: "tomato",
-              }}
-            >
-              {copyGameFeedback}
-            </p>
-          )}
-
-          {/* Game copy: source picker */}
-          {showCopyGamePicker && !copyGameConfirming && (
-            <div
-              style={{
-                border: "1px solid #555",
-                borderRadius: "4px",
-                padding: "2px 0",
-                marginBottom: "4px",
-              }}
-            >
-              {allSources
-                .filter(
-                  (s) =>
-                    s.type !== "agent" &&
-                    !game.sources.some((gs) => gs.source_id === s.id),
-                )
-                .map((src) => (
-                  <Focusable
-                    key={src.id}
-                    onActivate={() => {
-                      setCopyGameDest(src);
-                      setShowCopyGamePicker(false);
-                      setCopyGameConfirming(true);
-                    }}
-                    onClick={() => {
-                      setCopyGameDest(src);
-                      setShowCopyGamePicker(false);
-                      setCopyGameConfirming(true);
-                    }}
-                    focusClassName="is-focused"
-                    style={{
-                      margin: "0 2px",
-                      padding: "4px 10px",
-                      cursor: "pointer",
-                      fontSize: "0.85em",
-                      borderBottom: "1px solid #333",
-                      color: "#ccc",
-                    }}
-                    onMouseEnter={(e) =>
-                      (e.currentTarget.style.background = "rgba(255,255,255,0.08)")
-                    }
-                    onMouseLeave={(e) =>
-                      (e.currentTarget.style.background = "transparent")
-                    }
-                  >
-                    {src.name}
-                    <span style={{ marginLeft: "6px", fontSize: "0.78em", color: "#666" }}>
-                      ({src.type})
+                {transferStatus.status === "running" && (
+                  <>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        marginBottom: "4px",
+                      }}
+                    >
+                      <span>
+                        ▸ Copying to {destName}… {pct}%
+                      </span>
+                      <Focusable
+                        onActivate={handleCancelOrDismissTransfer}
+                        onClick={handleCancelOrDismissTransfer}
+                        focusClassName="is-focused"
+                        style={{ cursor: "pointer", color: "#888", padding: "0 4px" }}
+                      >
+                        ✕
+                      </Focusable>
+                    </div>
+                    <div
+                      style={{ background: "#333", borderRadius: "2px", height: "4px", marginBottom: "3px" }}
+                    >
+                      <div
+                        style={{
+                          width: `${pct}%`,
+                          background: "#0078d4",
+                          borderRadius: "2px",
+                          height: "100%",
+                          transition: "width 0.3s",
+                        }}
+                      />
+                    </div>
+                    <span style={{ color: "#666" }}>
+                      {fmtBytes(transferStatus.bytes_copied)} / {fmtBytes(transferStatus.total_bytes)}
                     </span>
-                  </Focusable>
-                ))}
-            </div>
-          )}
-
-          {/* Game copy: confirmation */}
-          {copyGameConfirming && copyGameDest && (
-            <div
-              style={{
-                fontSize: "0.82em",
-                color: "#ccc",
-                marginBottom: "4px",
-                display: "flex",
-                gap: "8px",
-                alignItems: "center",
-                flexWrap: "wrap",
-              }}
-            >
-              <span>
-                Copy <b>{game.name}</b> to <b>{copyGameDest.name}</b>?
-              </span>
-              <Focusable
-                onActivate={() => setCopyGameConfirming(false)}
-                onClick={() => setCopyGameConfirming(false)}
-                focusClassName="is-focused"
-                style={{ ...BTN_STYLE, padding: "2px 8px", fontSize: "0.82em" }}
-              >
-                Cancel
-              </Focusable>
-              <Focusable
-                onActivate={handleStartTransfer}
-                onClick={handleStartTransfer}
-                focusClassName="is-focused"
-                style={{
-                  ...BTN_STYLE,
-                  padding: "2px 8px",
-                  fontSize: "0.82em",
-                  border: "1px solid #27ae60",
-                  color: "#2ecc71",
-                }}
-              >
-                Copy
-              </Focusable>
-            </div>
-          )}
+                  </>
+                )}
+                {transferStatus.status === "done" && (
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <span style={{ color: "#2ecc71" }}>
+                      ✓ Copy complete — go back to refresh the game list
+                    </span>
+                    <Focusable
+                      onActivate={handleCancelOrDismissTransfer}
+                      onClick={handleCancelOrDismissTransfer}
+                      focusClassName="is-focused"
+                      style={{ cursor: "pointer", color: "#888", padding: "0 4px" }}
+                    >
+                      ✕
+                    </Focusable>
+                  </div>
+                )}
+                {transferStatus.status === "failed" && (
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: "8px",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <span style={{ color: "tomato" }}>
+                      ✗ {transferStatus.error ?? "Transfer failed"}
+                    </span>
+                    <Focusable focusClassName="" style={{ display: "flex", gap: "4px" }}>
+                      <Focusable
+                        onActivate={handleRetryTransfer}
+                        onClick={handleRetryTransfer}
+                        focusClassName="is-focused"
+                        style={{ ...BTN_STYLE, padding: "2px 8px", fontSize: "0.82em" }}
+                      >
+                        Retry
+                      </Focusable>
+                      <Focusable
+                        onActivate={handleCancelOrDismissTransfer}
+                        onClick={handleCancelOrDismissTransfer}
+                        focusClassName="is-focused"
+                        style={{ cursor: "pointer", color: "#888", padding: "0 4px" }}
+                      >
+                        ✕
+                      </Focusable>
+                    </Focusable>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -2014,123 +1994,6 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         </Focusable>
       )}
 
-      {/* ── Transfer Progress Banner ───────────────────────────────────────── */}
-      {transferStatus && (() => {
-        const pct =
-          transferStatus.total_bytes > 0
-            ? Math.round((transferStatus.bytes_copied / transferStatus.total_bytes) * 100)
-            : 0;
-        const destName =
-          allSources.find((s) => s.id === transferStatus.to_source_id)?.name ??
-          transferStatus.to_source_id;
-        return (
-          <div
-            style={{
-              border: "1px solid #444",
-              borderRadius: "4px",
-              padding: "8px 10px",
-              marginTop: "16px",
-              background: "#1a1a1a",
-              fontSize: "0.82em",
-            }}
-          >
-            {transferStatus.status === "running" && (
-              <>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginBottom: "4px",
-                  }}
-                >
-                  <span>
-                    ▸ Copying to {destName}… {pct}%
-                  </span>
-                  <Focusable
-                    onActivate={handleCancelOrDismissTransfer}
-                    onClick={handleCancelOrDismissTransfer}
-                    focusClassName="is-focused"
-                    style={{ cursor: "pointer", color: "#888", padding: "0 4px" }}
-                  >
-                    ✕
-                  </Focusable>
-                </div>
-                <div
-                  style={{ background: "#333", borderRadius: "2px", height: "4px", marginBottom: "3px" }}
-                >
-                  <div
-                    style={{
-                      width: `${pct}%`,
-                      background: "#0078d4",
-                      borderRadius: "2px",
-                      height: "100%",
-                      transition: "width 0.3s",
-                    }}
-                  />
-                </div>
-                <span style={{ color: "#666" }}>
-                  {fmtBytes(transferStatus.bytes_copied)} / {fmtBytes(transferStatus.total_bytes)}
-                </span>
-              </>
-            )}
-            {transferStatus.status === "done" && (
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}
-              >
-                <span style={{ color: "#2ecc71" }}>
-                  ✓ Copy complete — go back to refresh the game list
-                </span>
-                <Focusable
-                  onActivate={handleCancelOrDismissTransfer}
-                  onClick={handleCancelOrDismissTransfer}
-                  focusClassName="is-focused"
-                  style={{ cursor: "pointer", color: "#888", padding: "0 4px" }}
-                >
-                  ✕
-                </Focusable>
-              </div>
-            )}
-            {transferStatus.status === "failed" && (
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  gap: "8px",
-                  flexWrap: "wrap",
-                }}
-              >
-                <span style={{ color: "tomato" }}>
-                  ✗ {transferStatus.error ?? "Transfer failed"}
-                </span>
-                <Focusable focusClassName="" style={{ display: "flex", gap: "4px" }}>
-                  <Focusable
-                    onActivate={handleRetryTransfer}
-                    onClick={handleRetryTransfer}
-                    focusClassName="is-focused"
-                    style={{ ...BTN_STYLE, padding: "2px 8px", fontSize: "0.82em" }}
-                  >
-                    Retry
-                  </Focusable>
-                  <Focusable
-                    onActivate={handleCancelOrDismissTransfer}
-                    onClick={handleCancelOrDismissTransfer}
-                    focusClassName="is-focused"
-                    style={{ cursor: "pointer", color: "#888", padding: "0 4px" }}
-                  >
-                    ✕
-                  </Focusable>
-                </Focusable>
-              </div>
-            )}
-          </div>
-        );
-      })()}
     </Focusable>
   );
 };
