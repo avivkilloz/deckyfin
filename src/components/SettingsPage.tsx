@@ -25,6 +25,23 @@ const listActiveTransfers = callable<
   import("../types").TransferStatus[]
 >("list_active_transfers");
 
+const getMaxParallelTransfers = callable<[], number>("get_max_parallel_transfers");
+const setMaxParallelTransfers = callable<[value: number], { success: boolean; value: number }>("set_max_parallel_transfers");
+const getPopularDeps = callable<[], string[]>("get_popular_deps");
+const setPopularDeps = callable<[deps: string[]], { success: boolean }>("set_popular_deps");
+const listProtonSources = callable<[], { id: string; name: string; repo: string }[]>("list_proton_sources");
+const fetchProtonReleases = callable<
+  [source_id: string, page: number, per_page: number],
+  { source_id: string; releases: { tag_name: string; install_name: string; size_bytes: number; download_url: string; installed: boolean }[]; has_more: boolean }
+>("fetch_proton_releases");
+const startProtonInstall = callable<[install_name: string, download_url: string], { success: boolean; error: string | null }>("start_proton_install");
+const cancelProtonInstall = callable<[install_name: string], { success: boolean; error: string | null }>("cancel_proton_install");
+const deleteProtonVersion = callable<[install_name: string], { success: boolean; error: string | null }>("delete_proton_version");
+const getProtonInstallStatuses = callable<[], Record<string, { status: string; bytes_downloaded: number; total_bytes: number; error: string | null }>>("get_proton_install_statuses");
+const listSteamCollections = callable<[], string[]>("list_steam_collections");
+const createSteamCollection = callable<[name: string], { success: boolean; error: string | null }>("create_steam_collection");
+const deleteSteamCollection = callable<[name: string], { success: boolean; error: string | null }>("delete_steam_collection");
+
 const getSteamGridKey = callable<[], { key: string; has_override: boolean }>(
   "get_steamgrid_key"
 );
@@ -63,6 +80,191 @@ export const SettingsPage: VFC<Props> = ({ onBack }) => {
     const timer = setTimeout(() => backRef.current?.focus(), 150);
     return () => clearTimeout(timer);
   }, []);
+
+  // ── Transfer settings ─────────────────────────────────────────────────────
+  const [maxParallel, setMaxParallel] = useState(1);
+
+  useEffect(() => {
+    getMaxParallelTransfers().then((v) => setMaxParallel(v ?? 1)).catch(() => {});
+  }, []);
+
+  const handleSetMaxParallel = async (v: number) => {
+    setMaxParallel(v);
+    await setMaxParallelTransfers(v).catch(() => {});
+  };
+
+  // ── Popular dependencies ──────────────────────────────────────────────────
+  const [popularDeps, setPopularDepsState] = useState<string[]>([]);
+  const [newDep, setNewDep] = useState("");
+
+  useEffect(() => {
+    getPopularDeps().then((d) => setPopularDepsState(d || [])).catch(() => {});
+  }, []);
+
+  const handleRemoveDep = async (dep: string) => {
+    const next = popularDeps.filter((d) => d !== dep);
+    setPopularDepsState(next);
+    await setPopularDeps(next).catch(() => {});
+  };
+
+  const handleAddDep = async () => {
+    const trimmed = newDep.trim().toLowerCase();
+    if (!trimmed || popularDeps.includes(trimmed)) { setNewDep(""); return; }
+    const next = [...popularDeps, trimmed];
+    setPopularDepsState(next);
+    setNewDep("");
+    await setPopularDeps(next).catch(() => {});
+  };
+
+  // ── Steam Collections ──────────────────────────────────────────────────────
+  const [steamCollections, setSteamCollections] = useState<string[]>([]);
+  const [newCollection, setNewCollection] = useState("");
+  const [collectionMsg, setCollectionMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    listSteamCollections().then((c) => setSteamCollections(c || [])).catch(() => {});
+  }, []);
+
+  const handleAddCollection = async () => {
+    const trimmed = newCollection.trim();
+    if (!trimmed) return;
+    try {
+      const res = await createSteamCollection(trimmed);
+      if (res.success) {
+        setSteamCollections((prev) => prev.includes(trimmed) ? prev : [...prev, trimmed].sort());
+        setNewCollection("");
+        setCollectionMsg(null);
+      } else {
+        setCollectionMsg(`❌ ${res.error || "Failed"}`);
+      }
+    } catch (err: any) {
+      setCollectionMsg(`❌ ${err?.message || "Failed"}`);
+    }
+  };
+
+  const handleRemoveCollection = async (name: string) => {
+    try {
+      const res = await deleteSteamCollection(name);
+      if (res.success) {
+        setSteamCollections((prev) => prev.filter((c) => c !== name));
+        setCollectionMsg(null);
+      } else {
+        setCollectionMsg(`❌ ${res.error || "Failed"}`);
+      }
+    } catch (err: any) {
+      setCollectionMsg(`❌ ${err?.message || "Failed"}`);
+    }
+  };
+
+  // ── Proton multi-source releases ─────────────────────────────────────────
+  type ProtonRelease = { tag_name: string; install_name: string; size_bytes: number; download_url: string; installed: boolean };
+  type InstallStatus = { status: string; bytes_downloaded: number; total_bytes: number; error: string | null };
+  type ProtonSource = { id: string; name: string; repo: string };
+  type SourceState = { releases: ProtonRelease[]; loading: boolean; error: string | null; hasMore: boolean; page: number; expanded: boolean };
+
+  const [protonSources, setProtonSources] = useState<ProtonSource[]>([]);
+  const [sourceStates, setSourceStates] = useState<Record<string, SourceState>>({});
+  const [installStatuses, setInstallStatuses] = useState<Record<string, InstallStatus>>({});
+  const [protonError, setProtonError] = useState<string | null>(null);
+
+  const PER_PAGE = 10;
+
+  const setSourceState = (id: string, patch: Partial<SourceState>) =>
+    setSourceStates((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }));
+
+  const loadReleasesPage = useCallback(async (sourceId: string, page: number) => {
+    setSourceState(sourceId, { loading: true, error: null });
+    try {
+      const res = await fetchProtonReleases(sourceId, page, PER_PAGE);
+      setSourceStates((prev) => {
+        const existing = prev[sourceId]?.releases || [];
+        const merged = page === 1 ? (res.releases || []) : [...existing, ...(res.releases || [])];
+        return { ...prev, [sourceId]: { ...prev[sourceId], releases: merged, loading: false, error: null, hasMore: res.has_more, page } };
+      });
+    } catch (err: any) {
+      setSourceState(sourceId, { loading: false, error: err?.message || "Failed to fetch releases" });
+    }
+  }, []);
+
+  // On mount: load sources + restore active install states + fetch page 1 for each
+  useEffect(() => {
+    getProtonInstallStatuses().then((s) => setInstallStatuses(s || {})).catch(() => {});
+    listProtonSources().then((sources) => {
+      setProtonSources(sources || []);
+      const initial: Record<string, SourceState> = {};
+      (sources || []).forEach((src) => {
+        initial[src.id] = { releases: [], loading: false, error: null, hasMore: false, page: 1, expanded: false };
+      });
+      setSourceStates(initial);
+      (sources || []).forEach((src) => loadReleasesPage(src.id, 1));
+    }).catch((err: any) => setProtonError(err?.message || "Failed to load Proton sources"));
+  }, [loadReleasesPage]);
+
+  // Poll install statuses while any download is active
+  useEffect(() => {
+    const hasActive = Object.values(installStatuses).some(
+      (s) => s.status === "downloading" || s.status === "extracting"
+    );
+    if (!hasActive) return;
+    const id = setInterval(async () => {
+      try {
+        const statuses = await getProtonInstallStatuses();
+        setInstallStatuses(statuses || {});
+        const justDone = Object.entries(statuses || {}).filter(([, s]) => s.status === "done").map(([k]) => k);
+        if (justDone.length > 0) {
+          // Refresh all source release lists to pick up newly installed entries
+          protonSources.forEach((src) => {
+            setSourceStates((prev) => {
+              const updated = (prev[src.id]?.releases || []).map((r) =>
+                justDone.includes(r.install_name) ? { ...r, installed: true } : r
+              );
+              return { ...prev, [src.id]: { ...prev[src.id], releases: updated } };
+            });
+          });
+        }
+      } catch {}
+    }, 1000);
+    return () => clearInterval(id);
+  }, [installStatuses, protonSources]);
+
+  const handleInstallProton = async (install_name: string, download_url: string) => {
+    try {
+      const res = await startProtonInstall(install_name, download_url);
+      if (!res.success) { setProtonError(res.error || "Failed to start"); return; }
+      setInstallStatuses((prev) => ({
+        ...prev,
+        [install_name]: { status: "downloading", bytes_downloaded: 0, total_bytes: 0, error: null },
+      }));
+    } catch (err: any) {
+      setProtonError(err?.message || "Failed");
+    }
+  };
+
+  const handleCancelProton = async (install_name: string) => {
+    try { await cancelProtonInstall(install_name); } catch {}
+    setInstallStatuses((prev) => { const n = { ...prev }; delete n[install_name]; return n; });
+  };
+
+  const handleDeleteProton = async (sourceId: string, install_name: string) => {
+    try {
+      const res = await deleteProtonVersion(install_name);
+      if (res.success) {
+        setSourceStates((prev) => ({
+          ...prev,
+          [sourceId]: {
+            ...prev[sourceId],
+            releases: (prev[sourceId]?.releases || []).map((r) =>
+              r.install_name === install_name ? { ...r, installed: false } : r
+            ),
+          },
+        }));
+      } else {
+        setProtonError(res.error || "Delete failed");
+      }
+    } catch (err: any) {
+      setProtonError(err?.message || "Failed");
+    }
+  };
 
   // ── Sources state ─────────────────────────────────────────────────────────
   const [sources, setSources] = useState<Source[]>([]);
@@ -535,6 +737,266 @@ export const SettingsPage: VFC<Props> = ({ onBack }) => {
           {ptMessage}
         </p>
       )}
+
+      <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.12)", margin: "20px 0" }} />
+
+      {/* ── Popular Dependencies ─────────────────────────────────────────── */}
+      <h4 style={{ margin: "0 0 6px 0" }}>Popular Dependencies</h4>
+      <p style={{ fontSize: "0.85em", color: "#aaa", marginBottom: "10px" }}>
+        These appear as quick-toggle chips on each game's dependency section.
+      </p>
+      <Focusable focusClassName="" style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "10px" }}>
+        {popularDeps.map((dep) => (
+          <Focusable
+            key={dep}
+            onActivate={() => handleRemoveDep(dep)}
+            onClick={() => handleRemoveDep(dep)}
+            focusClassName="is-focused"
+            style={{
+              display: "flex", alignItems: "center", gap: "5px",
+              padding: "3px 10px", borderRadius: "14px", fontSize: "0.82em",
+              border: "1px solid #555", color: "#ccc", cursor: "pointer",
+            }}
+          >
+            {dep}
+            <span style={{ color: "#888", fontSize: "0.85em" }}>✕</span>
+          </Focusable>
+        ))}
+      </Focusable>
+      <Focusable focusClassName="" style={{ display: "flex", gap: "6px", alignItems: "center", marginBottom: "6px" }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <CompactTextField
+            value={newDep}
+            onChange={(e) => setNewDep(e.target.value)}
+            placeholder="Add winetricks verb…"
+            style={{ width: "100%" }}
+          />
+        </div>
+        <Focusable
+          onActivate={handleAddDep}
+          onClick={handleAddDep}
+          focusClassName="is-focused"
+          style={{ ...BTN_STYLE, padding: "6px 12px", whiteSpace: "nowrap" as const }}
+        >
+          Add
+        </Focusable>
+      </Focusable>
+
+      <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.12)", margin: "20px 0" }} />
+
+      {/* ── Steam Collections ────────────────────────────────────────────── */}
+      <h4 style={{ margin: "0 0 6px 0" }}>Steam Collections</h4>
+      <p style={{ fontSize: "0.85em", color: "#aaa", marginBottom: "10px" }}>
+        Manage Steam collections. Adding creates the collection in Steam; removing deletes it.
+      </p>
+      <Focusable focusClassName="" style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "10px" }}>
+        {steamCollections.map((col) => (
+          <Focusable
+            key={col}
+            onActivate={() => handleRemoveCollection(col)}
+            onClick={() => handleRemoveCollection(col)}
+            focusClassName="is-focused"
+            style={{
+              display: "flex", alignItems: "center", gap: "5px",
+              padding: "3px 10px", borderRadius: "14px", fontSize: "0.82em",
+              border: "1px solid #555", color: "#ccc", cursor: "pointer",
+            }}
+          >
+            {col}
+            <span style={{ color: "#888", fontSize: "0.85em" }}>✕</span>
+          </Focusable>
+        ))}
+        {steamCollections.length === 0 && (
+          <span style={{ fontSize: "0.82em", color: "#666" }}>No collections yet</span>
+        )}
+      </Focusable>
+      <Focusable focusClassName="" style={{ display: "flex", gap: "6px", alignItems: "center", marginBottom: "6px" }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <CompactTextField
+            value={newCollection}
+            onChange={(e) => setNewCollection(e.target.value)}
+            placeholder="Collection name…"
+            style={{ width: "100%" }}
+          />
+        </div>
+        <Focusable
+          onActivate={handleAddCollection}
+          onClick={handleAddCollection}
+          focusClassName="is-focused"
+          style={{ ...BTN_STYLE, padding: "6px 12px", whiteSpace: "nowrap" as const }}
+        >
+          Add
+        </Focusable>
+      </Focusable>
+      {collectionMsg && (
+        <p style={{ margin: "4px 0 0", fontSize: "0.82em", color: "tomato" }}>{collectionMsg}</p>
+      )}
+
+      <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.12)", margin: "20px 0" }} />
+
+      {/* ── Transfer ────────────────────────────────────────────────────── */}
+      <h4 style={{ margin: "0 0 10px 0" }}>Transfer</h4>
+      <p style={{ fontSize: "0.85em", color: "#aaa", marginBottom: "10px" }}>
+        Max games copying at once. Extras wait in a queue.
+      </p>
+      <Focusable focusClassName="" style={{ display: "flex", gap: "6px", marginBottom: "10px" }}>
+        {[1, 2, 3, 4].map((n) => (
+          <Focusable
+            key={n}
+            onActivate={() => handleSetMaxParallel(n)}
+            onClick={() => handleSetMaxParallel(n)}
+            focusClassName="is-focused"
+            style={{
+              ...BTN_STYLE,
+              padding: "4px 14px",
+              border: maxParallel === n ? "1px solid #0078d4" : "1px solid #555",
+              color: maxParallel === n ? "#0078d4" : "#e0e0e0",
+            }}
+          >
+            {n}
+          </Focusable>
+        ))}
+      </Focusable>
+
+      <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.12)", margin: "20px 0" }} />
+
+      {/* ── Proton Versions ──────────────────────────────────────────────── */}
+      <h4 style={{ margin: "0 0 6px 0" }}>Proton Versions</h4>
+      <p style={{ fontSize: "0.85em", color: "#aaa", marginBottom: "10px" }}>
+        Download Proton versions into Steam's compatibilitytools.d. Downloads run in the background — you can navigate away freely.
+      </p>
+      {protonError && <p style={{ fontSize: "0.82em", color: "tomato", marginBottom: "8px" }}>{protonError}</p>}
+
+      {protonSources.map((src) => {
+        const ss = sourceStates[src.id];
+        if (!ss) return null;
+        const installedCount = (ss.releases || []).filter((r) => r.installed || installStatuses[r.install_name]?.status === "done").length;
+        const activeInstall = Object.entries(installStatuses).find(
+          ([name, s]) => (s.status === "downloading" || s.status === "extracting") &&
+            (ss.releases || []).some((r) => r.install_name === name)
+        );
+
+        return (
+          <div key={src.id} style={{ border: "1px solid #3a3a3a", borderRadius: "6px", marginBottom: "12px" }}>
+            {/* Source header — always visible, click to expand/collapse */}
+            <Focusable
+              onActivate={() => setSourceState(src.id, { expanded: !ss.expanded })}
+              onClick={() => setSourceState(src.id, { expanded: !ss.expanded })}
+              focusClassName="is-focused"
+              style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", cursor: "pointer", background: "#1e1e1e" }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <span style={{ fontWeight: 600, fontSize: "0.9em", color: "#e0e0e0" }}>{src.name}</span>
+                {installedCount > 0 && (
+                  <span style={{ fontSize: "0.75em", color: "#27ae60" }}>✓ {installedCount} installed</span>
+                )}
+                {activeInstall && (() => {
+                  const [name, s] = activeInstall;
+                  const pct = s.status === "downloading" && s.total_bytes > 0
+                    ? Math.round((s.bytes_downloaded / s.total_bytes) * 100)
+                    : null;
+                  return (
+                    <span style={{ fontSize: "0.75em", color: "#0078d4" }}>
+                      ↓ {name} {pct !== null ? `${pct}%` : "extracting…"}
+                    </span>
+                  );
+                })()}
+              </div>
+              <span style={{ fontSize: "0.78em", color: "#666" }}>{ss.expanded ? "▲" : "▼"}</span>
+            </Focusable>
+
+            {/* Expanded release list */}
+            {ss.expanded && (
+              <div style={{ padding: "8px 12px" }}>
+                {ss.error && <p style={{ fontSize: "0.82em", color: "tomato", margin: "0 0 6px 0" }}>{ss.error}</p>}
+                {!ss.loading && (ss.releases || []).length === 0 && !ss.error && (
+                  <p style={{ fontSize: "0.82em", color: "#666", margin: "4px 0" }}>No releases found. Check internet connection.</p>
+                )}
+
+                {(ss.releases || []).map((release) => {
+                  const install = installStatuses[release.install_name];
+                  const isDownloading = install?.status === "downloading";
+                  const isExtracting = install?.status === "extracting";
+                  const isActive = isDownloading || isExtracting;
+                  const isDone = install?.status === "done";
+                  const isFailed = install?.status === "failed";
+                  const installed = release.installed || isDone;
+                  const pct = isDownloading && install.total_bytes > 0
+                    ? Math.round((install.bytes_downloaded / install.total_bytes) * 100)
+                    : 0;
+                  const sizeMb = release.size_bytes > 0 ? `${(release.size_bytes / 1e6).toFixed(0)} MB` : "";
+
+                  return (
+                    <div key={release.install_name} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "5px 0", borderBottom: "1px solid #2a2a2a" }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ fontSize: "0.85em", color: installed ? "#e0e0e0" : "#aaa" }}>{release.tag_name}</span>
+                        {sizeMb && <span style={{ marginLeft: "6px", fontSize: "0.72em", color: "#555" }}>{sizeMb}</span>}
+                        {isFailed && <span style={{ marginLeft: "6px", fontSize: "0.72em", color: "tomato" }}>✕ {install.error || "Failed"}</span>}
+                        {isActive && (
+                          <div style={{ marginTop: "3px" }}>
+                            <div style={{ height: "3px", background: "#333", borderRadius: "2px", overflow: "hidden" }}>
+                              <div style={{ width: isExtracting ? "100%" : `${pct}%`, height: "100%", background: "#0078d4", borderRadius: "2px", transition: isExtracting ? "none" : "width 0.3s" }} />
+                            </div>
+                            <span style={{ fontSize: "0.7em", color: "#888", display: "block", marginTop: "1px" }}>
+                              {isExtracting ? "Extracting…" : `${pct}%`}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {installed && !isActive && (
+                        <span style={{ fontSize: "0.7em", color: "#27ae60", border: "1px solid #27ae60", borderRadius: "10px", padding: "1px 6px", whiteSpace: "nowrap" as const }}>
+                          ✓
+                        </span>
+                      )}
+
+                      {isActive ? (
+                        <Focusable onActivate={() => handleCancelProton(release.install_name)} onClick={() => handleCancelProton(release.install_name)} focusClassName="is-focused"
+                          style={{ ...BTN_STYLE, fontSize: "0.72em", padding: "2px 8px", whiteSpace: "nowrap" as const, borderColor: "#c0392b", color: "#e74c3c" }}>
+                          Cancel
+                        </Focusable>
+                      ) : installed ? (
+                        <Focusable onActivate={() => handleDeleteProton(src.id, release.install_name)} onClick={() => handleDeleteProton(src.id, release.install_name)} focusClassName="is-focused"
+                          style={{ ...BTN_STYLE, fontSize: "0.72em", padding: "2px 8px", whiteSpace: "nowrap" as const, borderColor: "#c0392b", color: "#e74c3c" }}>
+                          Delete
+                        </Focusable>
+                      ) : (
+                        <Focusable onActivate={() => handleInstallProton(release.install_name, release.download_url)} onClick={() => handleInstallProton(release.install_name, release.download_url)} focusClassName="is-focused"
+                          style={{ ...BTN_STYLE, fontSize: "0.72em", padding: "2px 8px", whiteSpace: "nowrap" as const, borderColor: "#0078d4", color: "#0078d4" }}>
+                          Download
+                        </Focusable>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* Load more / loading indicator */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px" }}>
+                  {ss.loading && <span style={{ fontSize: "0.78em", color: "#666" }}>Loading…</span>}
+                  {!ss.loading && ss.hasMore && (
+                    <Focusable
+                      onActivate={() => loadReleasesPage(src.id, ss.page + 1)}
+                      onClick={() => loadReleasesPage(src.id, ss.page + 1)}
+                      focusClassName="is-focused"
+                      style={{ ...BTN_STYLE, fontSize: "0.78em", padding: "3px 10px" }}
+                    >
+                      Load more
+                    </Focusable>
+                  )}
+                  <Focusable
+                    onActivate={() => loadReleasesPage(src.id, 1)}
+                    onClick={() => loadReleasesPage(src.id, 1)}
+                    focusClassName="is-focused"
+                    style={{ ...BTN_STYLE, fontSize: "0.72em", padding: "2px 8px", marginLeft: "auto", opacity: ss.loading ? 0.5 : 1 }}
+                  >
+                    ↺ Refresh
+                  </Focusable>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
 
       <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.12)", margin: "20px 0" }} />
 

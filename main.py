@@ -35,8 +35,12 @@ from deckyfin_config import (
     save_games_config,
     GameConfigError,
 )
-from steam_games import add_nonsteam_game, list_nonsteam_games, remove_nonsteam_game, get_steam_shortcut_info, update_nonsteam_game, purge_nonsteam_game_data, list_steam_collections
-from deckyfin_proton import list_available_proton, ensure_proton_available, get_proton_version_for_game
+from steam_games import add_nonsteam_game, list_nonsteam_games, remove_nonsteam_game, get_steam_shortcut_info, update_nonsteam_game, purge_nonsteam_game_data, list_steam_collections, create_steam_collection, delete_steam_collection
+from deckyfin_proton import (
+    list_available_proton, ensure_proton_available, get_proton_version_for_game,
+    list_proton_sources, fetch_proton_releases, start_proton_install,
+    cancel_proton_install, delete_proton_version, get_proton_install_statuses,
+)
 from deckyfin_proton_compat import set_proton_version
 from deckyfin_prefix import init_proton_prefix
 from deckyfin_protontricks import (
@@ -82,6 +86,41 @@ import threading as _threading
 import uuid as _uuid
 
 _transfer_registry: dict = {}
+_transfer_run_fns: dict = {}  # transfer_id → _run closure (not serialized to frontend)
+
+_dep_install_registry: dict = {}
+# Key: f"{game_name}|{source_id}"
+# Value: {game_name, source_id, deps, status: "installing"|"done"|"failed", installed, failed_deps, error}
+
+
+def _get_max_parallel_transfers() -> int:
+    try:
+        from deckyfin_config import get_app_config
+        return int(get_app_config().get("max_parallel_transfers", 1))
+    except Exception:
+        return 1
+
+
+def _try_start_next_queued() -> None:
+    """Start as many queued transfers as the current parallel limit allows."""
+    limit = _get_max_parallel_transfers()
+    while True:
+        running = sum(1 for e in _transfer_registry.values() if e["status"] == "running")
+        if running >= limit:
+            return
+        queued = sorted(
+            [(tid, e) for tid, e in _transfer_registry.items() if e["status"] == "queued"],
+            key=lambda x: x[1]["started_at"],
+        )
+        if not queued:
+            return
+        tid, entry = queued[0]
+        run_fn = _transfer_run_fns.pop(tid, None)
+        if run_fn:
+            entry["status"] = "running"
+            _threading.Thread(target=run_fn, daemon=True).start()
+        else:
+            _transfer_registry.pop(tid, None)
 
 _debug("MODULE LOAD START")
 
@@ -187,35 +226,65 @@ def _drop_privs(uid: int, gid: int) -> None:
 
 def _write_game_config_to_source(
     game_name: str, src_path: str, dst_path: str,
-    owner_uid: int, owner_gid: int
+    owner_uid: int, owner_gid: int,
+    src_is_mount: bool = False,
 ) -> None:
     """Copy portable config fields from src to dst.
 
-    When running as root with a non-root owner, always uses subprocess —
-    get_games_config silently returns {} as root on FUSE mounts, so the
-    direct call would silently copy nothing without raising PermissionError.
+    When src is a FUSE/mount and running as root, reads via subprocess as the
+    mount owner (root is blocked from FUSE). Always writes to dst directly as
+    root so that root-owned config files on the dst side are always writable.
     """
-    import functools
-    from deckyfin_transfer import copy_game_config_fields
-    if os.getuid() == 0 and owner_uid != 0:
-        script = (
-            "import sys; sys.path.insert(0,sys.argv[1]); "
+    import functools, json as _json
+    from deckyfin_transfer import PORTABLE_FIELDS
+
+    # Step 1: read portable fields from src
+    if src_is_mount and os.getuid() == 0 and owner_uid != 0:
+        read_script = (
+            "import sys, json; sys.path.insert(0,sys.argv[1]); "
             "from pathlib import Path; "
-            "from deckyfin_transfer import copy_game_config_fields; "
-            "copy_game_config_fields(sys.argv[2], Path(sys.argv[3]), Path(sys.argv[4]))"
+            "from deckyfin_config import get_games_config; "
+            "from deckyfin_transfer import PORTABLE_FIELDS; "
+            "cfg = get_games_config(Path(sys.argv[2])); "
+            "game = next((g for g in cfg.get('games',[]) if g.get('name')==sys.argv[3]), None); "
+            "print(json.dumps({k:v for k,v in game.items() if k in PORTABLE_FIELDS} if game else None))"
         )
         proc = subprocess.run(
-            ["python3", "-c", script, _PY_MODULES, game_name, src_path, dst_path],
-            capture_output=True, text=True, timeout=15,
+            ["python3", "-c", read_script, _PY_MODULES, src_path, game_name],
+            capture_output=True, text=True, timeout=10,
             preexec_fn=functools.partial(_drop_privs, owner_uid, owner_gid),
         )
-        _debug(f"_write_game_config_to_source: rc={proc.returncode} stderr={proc.stderr.strip()[:300]!r}")
-        if proc.returncode != 0:
-            raise PermissionError(
-                f"FUSE config write failed: {proc.stderr.strip()[:200]}"
-            )
+        _debug(f"_write_game_config_to_source read: rc={proc.returncode} stderr={proc.stderr.strip()[:200]!r}")
+        if proc.returncode != 0 or not proc.stdout.strip():
+            raise PermissionError(f"Failed to read source config: {proc.stderr.strip()[:200]}")
+        portable = _json.loads(proc.stdout.strip())
+        if portable is None:
+            raise ValueError(f"Game '{game_name}' not found in source config at {src_path}")
     else:
-        copy_game_config_fields(game_name, Path(src_path), Path(dst_path))
+        from deckyfin_config import get_games_config as _get_cfg
+        src_config = _get_cfg(Path(src_path))
+        src_game = next(
+            (g for g in src_config.get("games", []) if g.get("name") == game_name),
+            None,
+        )
+        if src_game is None:
+            raise ValueError(f"Game '{game_name}' not found in source config at {src_path}")
+        portable = {k: v for k, v in src_game.items() if k in PORTABLE_FIELDS}
+
+    # Step 2: write to dst directly as root (root can write any local file)
+    from deckyfin_config import get_games_config as _get_cfg2, save_games_config
+    dst_config = _get_cfg2(Path(dst_path))
+    dst_games = dst_config.get("games", [])
+    found = False
+    for i, g in enumerate(dst_games):
+        if g.get("name") == game_name:
+            dst_games[i] = {**g, **portable}
+            found = True
+            break
+    if not found:
+        dst_games.append({"name": game_name, **portable})
+    dst_config["games"] = dst_games
+    save_games_config(dst_config, Path(dst_path))
 
 
 class Plugin:
@@ -411,13 +480,18 @@ class Plugin:
         except Exception:
             total_bytes = 0
 
+        # Count before adding the new entry so it doesn't count itself.
+        running_count = sum(1 for e in _transfer_registry.values() if e["status"] == "running")
+        limit = _get_max_parallel_transfers()
+        initial_status = "running" if running_count < limit else "queued"
+
         transfer_id = str(_uuid.uuid4())[:8]
         entry = {
             "transfer_id": transfer_id,
             "game_name": game_name,
             "from_source_id": from_source_id,
             "to_source_id": to_source_id,
-            "status": "running",
+            "status": initial_status,
             "bytes_copied": 0,
             "total_bytes": total_bytes,
             "error": None,
@@ -446,7 +520,8 @@ class Plugin:
                 # Copy portable config fields on top of the blank entry.
                 try:
                     _write_game_config_to_source(
-                        game_name, src_path, dst_path, owner_uid, owner_gid
+                        game_name, src_path, dst_path, owner_uid, owner_gid,
+                        src_is_mount=src_source.get("type", "local") != "local",
                     )
                 except Exception as cfg_err:
                     _debug(f"start_game_transfer: config copy warning: {cfg_err!r}")
@@ -466,8 +541,13 @@ class Plugin:
                 if entry["status"] == "running":
                     entry["status"] = "failed"
                     entry["error"] = entry.get("error") or "Transfer interrupted"
+                _transfer_run_fns.pop(transfer_id, None)
+                _try_start_next_queued()
 
-        _threading.Thread(target=_run, daemon=True).start()
+        if initial_status == "running":
+            _threading.Thread(target=_run, daemon=True).start()
+        else:
+            _transfer_run_fns[transfer_id] = _run
         return {"success": True, "transfer_id": transfer_id}
 
     async def get_transfer_status(self, transfer_id: str) -> dict:
@@ -484,6 +564,9 @@ class Plugin:
             entry["cancelled"] = True
         else:
             _transfer_registry.pop(transfer_id, None)
+            _transfer_run_fns.pop(transfer_id, None)
+            if entry["status"] == "queued":
+                _try_start_next_queued()
         return {"success": True}
 
     async def list_active_transfers(self) -> list:
@@ -494,10 +577,35 @@ class Plugin:
         ]
         for tid in stale:
             _transfer_registry.pop(tid, None)
+            _transfer_run_fns.pop(tid, None)
         return [
             {k: v for k, v in e.items() if k not in ("cancelled", "started_at")}
             for e in _transfer_registry.values()
         ]
+
+    async def get_popular_deps(self) -> list:
+        from deckyfin_config import get_app_config
+        return get_app_config().get("popular_deps", [
+            "vcrun2022", "vcrun2019", "vcrun2013", "vcrun2010", "vcrun2008",
+            "d3dx9", "d3dx10", "d3dx11", "d3dcompiler_47",
+            "dotnet48", "dotnet40", "dotnet35sp1", "dotnet20",
+            "physx", "mfplat", "xna", "dwrite", "corefonts",
+        ])
+
+    async def set_popular_deps(self, deps: list) -> dict:
+        from deckyfin_config import set_app_config
+        set_app_config({"popular_deps": [str(d) for d in deps]})
+        return {"success": True}
+
+    async def get_max_parallel_transfers(self) -> int:
+        return _get_max_parallel_transfers()
+
+    async def set_max_parallel_transfers(self, value: int) -> dict:
+        from deckyfin_config import set_app_config
+        clamped = max(1, min(int(value), 8))
+        set_app_config({"max_parallel_transfers": clamped})
+        _try_start_next_queued()
+        return {"success": True, "value": clamped}
 
     async def get_source_disk_usage(self, source_id: str) -> dict:
         import functools, json as _json
@@ -748,11 +856,18 @@ class Plugin:
         config_updates = {k: v for k, v in updates.items() if k not in STATE_FIELDS}
         state_updates = {k: v for k, v in updates.items() if k in STATE_FIELDS}
         owner_uid, owner_gid = _owner_creds_for(path or "") if path else (0, 0)
-        use_subprocess = os.getuid() == 0 and owner_uid != 0
+        # Only use subprocess for mounted sources (FUSE/network). Root can read
+        # and write local sources directly; using subprocess there is unnecessary
+        # and breaks when the local path owner differs from what we expect.
+        use_subprocess = (
+            os.getuid() == 0
+            and owner_uid != 0
+            and source.get("type", "local") != "local"
+        )
         try:
             if config_updates:
                 if use_subprocess:
-                    # FUSE mount — get_games_config silently returns {} as root,
+                    # Mounted source — get_games_config silently returns {} as root,
                     # so the direct call would raise GameConfigError("not found").
                     # Go straight to subprocess as the mount owner.
                     script = (
@@ -830,12 +945,64 @@ class Plugin:
             return None
 
     async def remove_game(self, name: str, source_id: Optional[str] = None) -> dict:
+        import functools, shutil
         source = _get_source_by_id(source_id) if source_id else (_list_sources() or [None])[0]
         if not source:
             return {"success": False, "error": "No source configured"}
         path = source.get("path")
-        removed = remove_game_config(name, Path(path) if path else None)
-        return {"success": removed, "error": None if removed else f"Game '{name}' not found"}
+        if not path:
+            return {"success": False, "error": "Source has no path"}
+
+        game_dir = Path(path) / name
+        owner_uid, owner_gid = _owner_creds_for(path)
+        use_subprocess = (
+            os.getuid() == 0
+            and owner_uid != 0
+            and source.get("type", "local") != "local"
+        )
+
+        # Delete game folder from disk
+        try:
+            if use_subprocess:
+                subprocess.run(
+                    ["python3", "-c",
+                     "import sys, shutil; shutil.rmtree(sys.argv[1], ignore_errors=True)",
+                     str(game_dir)],
+                    capture_output=True, timeout=60,
+                    preexec_fn=functools.partial(_drop_privs, owner_uid, owner_gid),
+                )
+            else:
+                shutil.rmtree(str(game_dir), ignore_errors=True)
+        except Exception as e:
+            _debug(f"remove_game: folder deletion warning: {e!r}")
+
+        # Remove config entry
+        if use_subprocess:
+            script = (
+                "import sys; sys.path.insert(0,sys.argv[1]); "
+                "from pathlib import Path; "
+                "from deckyfin_config import remove_game_config; "
+                "remove_game_config(sys.argv[3], Path(sys.argv[2]))"
+            )
+            proc = subprocess.run(
+                ["python3", "-c", script, _PY_MODULES, path, name],
+                capture_output=True, text=True, timeout=15,
+                preexec_fn=functools.partial(_drop_privs, owner_uid, owner_gid),
+            )
+            removed = proc.returncode == 0
+        else:
+            removed = remove_game_config(name, Path(path))
+
+        # Clean up ephemeral game state
+        try:
+            update_game_state(source["id"], name, {k: None for k in (
+                "needs_restart", "needs_restart_after_add", "processing_state",
+                "steam_snapshot", "deps_snapshot",
+            )})
+        except Exception:
+            pass
+
+        return {"success": True, "error": None if removed else f"Config for '{name}' not found"}
 
     async def list_nonsteam_games(self) -> list:
         return list_nonsteam_games()
@@ -876,6 +1043,38 @@ class Plugin:
                 if proc.returncode == 0:
                     return [l for l in proc.stdout.splitlines() if l.strip()]
         return find_game_executables(game_dir)
+
+    async def get_game_size(self, game_name: str, source_id: Optional[str] = None) -> dict:
+        """Return total disk usage in bytes for a game folder on a given source."""
+        import functools
+        source = _get_source_by_id(source_id) if source_id else (_list_sources() or [None])[0]
+        if not source:
+            return {"success": False, "size": 0, "error": "Source not found"}
+        path = source.get("path")
+        if not path:
+            return {"success": False, "size": 0, "error": "Source has no path"}
+        game_dir = Path(path) / game_name
+        owner_uid, owner_gid = _owner_creds_for(path)
+        try:
+            if os.getuid() == 0 and owner_uid != 0:
+                proc = subprocess.run(
+                    ["python3", "-c",
+                     "import os,sys;from pathlib import Path;"
+                     "p=Path(sys.argv[1]);"
+                     "t=sum((Path(d)/f).stat().st_size "
+                     "for d,_,fs in os.walk(p) for f in fs) if p.is_dir() else 0;"
+                     "print(t)",
+                     str(game_dir)],
+                    capture_output=True, text=True, timeout=60,
+                    preexec_fn=functools.partial(_drop_privs, owner_uid, owner_gid),
+                )
+                size = int(proc.stdout.strip()) if proc.returncode == 0 and proc.stdout.strip() else 0
+            else:
+                from deckyfin_transfer import calculate_total_size
+                size = calculate_total_size(game_dir)
+            return {"success": True, "size": size}
+        except Exception as e:
+            return {"success": False, "size": 0, "error": str(e)}
 
     async def list_subfolders(self, path: str) -> list:
         """List subdirectory names under the given path. Used by the folder browser."""
@@ -1067,9 +1266,41 @@ class Plugin:
     async def list_proton_versions(self) -> list:
         return list_available_proton()
 
+    async def list_proton_sources(self) -> list:
+        """Return all supported Proton source types (GE-Proton, CachyOS, etc.)."""
+        return list_proton_sources()
+
+    async def fetch_proton_releases(self, source_id: str, page: int = 1, per_page: int = 10) -> dict:
+        """Fetch one page of releases for a Proton source, annotated with installed status."""
+        return fetch_proton_releases(source_id, page, per_page)
+
+    async def start_proton_install(self, install_name: str, download_url: str) -> dict:
+        """Start background download + install of any Proton release."""
+        return start_proton_install(install_name, download_url)
+
+    async def cancel_proton_install(self, install_name: str) -> dict:
+        """Cancel an in-progress Proton download."""
+        return cancel_proton_install(install_name)
+
+    async def delete_proton_version(self, install_name: str) -> dict:
+        """Delete an installed Proton version from compatibilitytools.d."""
+        return delete_proton_version(install_name)
+
+    async def get_proton_install_statuses(self) -> dict:
+        """Return progress snapshots for all tracked Proton installs."""
+        return get_proton_install_statuses()
+
     async def list_steam_collections(self) -> list[str]:
         """List all existing Steam collection names."""
         return list_steam_collections()
+
+    async def create_steam_collection(self, name: str) -> dict:
+        """Create a new empty Steam collection."""
+        return create_steam_collection(name)
+
+    async def delete_steam_collection(self, name: str) -> dict:
+        """Delete a Steam collection by name."""
+        return delete_steam_collection(name)
 
     async def ensure_proton(self, proton_name: str) -> dict:
         ensure_proton_available(proton_name)
@@ -1102,6 +1333,42 @@ class Plugin:
 
     async def install_dependencies(self, pfxid: str, dependencies: str) -> dict:
         return install_protontricks_dependencies(pfxid, dependencies, timeout=1200)
+
+    async def start_dep_install(self, game_name: str, source_id: str, pfxid: str, dependencies: str) -> dict:
+        """Start a background dependency install. Poll get_dep_install_statuses for progress."""
+        key = f"{game_name}|{source_id}"
+        if _dep_install_registry.get(key, {}).get("status") == "installing":
+            return {"success": False, "error": "Already installing"}
+        _dep_install_registry[key] = {
+            "game_name": game_name, "source_id": source_id,
+            "deps": dependencies, "status": "installing",
+            "installed": [], "failed_deps": [], "error": None,
+        }
+        def _run():
+            try:
+                res = install_protontricks_dependencies(pfxid, dependencies, timeout=1200)
+                _dep_install_registry[key]["installed"] = res.get("installed") or []
+                _dep_install_registry[key]["failed_deps"] = res.get("failed") or []
+                if res.get("success"):
+                    _dep_install_registry[key]["status"] = "done"
+                else:
+                    _dep_install_registry[key]["status"] = "failed"
+                    _dep_install_registry[key]["error"] = res.get("error", "Installation failed")
+            except Exception as exc:
+                _dep_install_registry[key]["status"] = "failed"
+                _dep_install_registry[key]["error"] = str(exc)
+        _threading.Thread(target=_run, daemon=True).start()
+        return {"success": True, "error": None}
+
+    async def get_dep_install_statuses(self) -> dict:
+        """Return a snapshot of all tracked dep install operations."""
+        return {k: dict(v) for k, v in _dep_install_registry.items()}
+
+    async def clear_dep_install_status(self, game_name: str, source_id: str) -> dict:
+        """Remove a completed dep install entry from the registry."""
+        key = f"{game_name}|{source_id}"
+        _dep_install_registry.pop(key, None)
+        return {"success": True}
 
     async def get_protontricks_status(self) -> dict:
         """Check protontricks availability — flatpak and native."""

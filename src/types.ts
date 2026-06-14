@@ -136,7 +136,7 @@ export interface TransferStatus {
   game_name: string;
   from_source_id: string;
   to_source_id: string;
-  status: "running" | "done" | "failed";
+  status: "queued" | "running" | "done" | "failed";
   bytes_copied: number;
   total_bytes: number;
   error: string | null;

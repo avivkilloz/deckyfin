@@ -37,10 +37,18 @@ const initPrefix = callable<
   [app_id: number, proton_name?: string, reinitialize?: boolean],
   { success: boolean; error?: string }
 >("init_prefix");
-const installDeps = callable<
-  [pfxid: string, dependencies: string],
-  { success: boolean; installed?: string[]; failed?: string[]; error?: string }
->("install_dependencies");
+const startDepInstall = callable<
+  [game_name: string, source_id: string, pfxid: string, dependencies: string],
+  { success: boolean; error: string | null }
+>("start_dep_install");
+const getDepInstallStatuses = callable<
+  [],
+  Record<string, { status: string; installed: string[]; failed_deps: string[]; error: string | null }>
+>("get_dep_install_statuses");
+const clearDepInstallStatus = callable<
+  [game_name: string, source_id: string],
+  { success: boolean }
+>("clear_dep_install_status");
 const updateGameConfig = callable<
   [name: string, updates: Record<string, any>, source_id: string],
   { success: boolean }
@@ -88,28 +96,11 @@ const listActiveTransfers = callable<
   [],
   import("../types").TransferStatus[]
 >("list_active_transfers");
-
-/** Popular Proton dependencies shown as toggle chips. */
-const POPULAR_DEPS = [
-  "vcrun2022",
-  "vcrun2019",
-  "vcrun2013",
-  "vcrun2010",
-  "vcrun2008",
-  "d3dx9",
-  "d3dx10",
-  "d3dx11",
-  "d3dcompiler_47",
-  "dotnet48",
-  "dotnet40",
-  "dotnet35sp1",
-  "dotnet20",
-  "physx",
-  "mfplat",
-  "xna",
-  "dwrite",
-  "corefonts",
-];
+const getGameSize = callable<
+  [game_name: string, source_id: string],
+  { success: boolean; size: number }
+>("get_game_size");
+const getPopularDeps = callable<[], string[]>("get_popular_deps");
 
 interface Props {
   game: MergedGame;
@@ -162,6 +153,9 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
 
   // ── All sources (for game copy destination picker) ────────────────────
   const [allSources, setAllSources] = useState<import("../types").Source[]>([]);
+
+  // ── Per-source game sizes ─────────────────────────────────────────────
+  const [sourceSizes, setSourceSizes] = useState<Record<string, number | null>>({});
 
   // ── Config copy state ─────────────────────────────────────────────────
   const [showCopyConfigPicker, setShowCopyConfigPicker] = useState(false);
@@ -227,16 +221,24 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
     );
   };
 
-  // ── Dependencies: checkboxes + custom ────────────────────────────────────
-  const existingDeps = currentConfig.proton_dependencies || [];
-  const [checkedDeps, setCheckedDeps] = useState<string[]>(
-    existingDeps.filter((d) => POPULAR_DEPS.includes(d))
-  );
-  const [customDeps, setCustomDeps] = useState<string>(
-    existingDeps
-      .filter((d) => !POPULAR_DEPS.includes(d))
-      .join(", ")
-  );
+  // ── Popular deps list (loaded from settings) ─────────────────────────────
+  const [popularDeps, setPopularDeps] = useState<string[]>([]);
+  // Ref so async callbacks (getGame, etc.) always read the latest list, not a stale closure
+  const popularDepsRef = useRef<string[]>([]);
+  // Start empty; partitioned once popularDeps arrive (same pattern as collections)
+  const [checkedDeps, setCheckedDeps] = useState<string[]>([]);
+  const [customDeps, setCustomDeps] = useState<string>("");
+
+  useEffect(() => {
+    getPopularDeps().then((d) => {
+      const deps = d || [];
+      popularDepsRef.current = deps;
+      setPopularDeps(deps);
+      const existing = currentConfig.proton_dependencies || [];
+      setCheckedDeps(existing.filter((dep) => deps.includes(dep)));
+      setCustomDeps(existing.filter((dep) => !deps.includes(dep)).join(", "));
+    }).catch(() => {});
+  }, [game.name]);
 
   const mergedDeps = ((): string[] => {
     const custom = customDeps
@@ -320,6 +322,11 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   const [showSgdbPicker, setShowSgdbPicker] = useState(false);
   const [selectedSgdbGame, setSelectedSgdbGame] = useState<{ id: number; name: string } | null>(null);
 
+  // ── Dep install background tracking ──────────────────────────────────────
+  type DepInstallEntry = { status: string; installed: string[]; failed_deps: string[]; error: string | null };
+  const [depInstall, setDepInstall] = useState<DepInstallEntry | null>(null);
+  const pendingDepsRef = useRef<string[]>([]);
+
   // ── Proton versions ─────────────────────────────────────────────────────
   const [protonVersions, setProtonVersions] = useState<string[]>([]);
 
@@ -346,8 +353,9 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
     setProtonVersion(currentConfig.proton_version || "");
     setLaunchOptions(currentConfig.launch_options || "");
     const srcDeps = currentConfig.proton_dependencies || [];
-    setCheckedDeps(srcDeps.filter((d) => POPULAR_DEPS.includes(d)));
-    setCustomDeps(srcDeps.filter((d) => !POPULAR_DEPS.includes(d)).join(", "));
+    const pd = popularDepsRef.current;
+    setCheckedDeps(srcDeps.filter((d) => pd.includes(d)));
+    setCustomDeps(srcDeps.filter((d) => !pd.includes(d)).join(", "));
     const srcColls = currentConfig.collections || [];
     setCheckedCollections(srcColls.filter((c) => steamCollections.includes(c)));
     setCustomCollections(srcColls.filter((c) => !steamCollections.includes(c)).join(", "));
@@ -390,8 +398,9 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         setProtonVersion(g.proton_version || "");
         setLaunchOptions(g.launch_options || "");
         const freshDeps = g.proton_dependencies || [];
-        setCheckedDeps(freshDeps.filter((d) => POPULAR_DEPS.includes(d)));
-        setCustomDeps(freshDeps.filter((d) => !POPULAR_DEPS.includes(d)).join(", "));
+        const pd = popularDepsRef.current;
+        setCheckedDeps(freshDeps.filter((d) => pd.includes(d)));
+        setCustomDeps(freshDeps.filter((d) => !pd.includes(d)).join(", "));
         const freshColls = g.collections || [];
         setCheckedCollections(freshColls.filter((c) => steamCollections.includes(c)));
         setCustomCollections(freshColls.filter((c) => !steamCollections.includes(c)).join(", "));
@@ -420,12 +429,26 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   }, [game.name, selectedSource?.source_id]);
 
   useEffect(() => {
+    // Mark all sources as loading (null), then fetch sizes one by one
+    setSourceSizes(Object.fromEntries(game.sources.map((s) => [s.source_id, null])));
+    game.sources.forEach((src) => {
+      getGameSize(game.name, src.source_id)
+        .then((res) => {
+          if (res.success) {
+            setSourceSizes((prev) => ({ ...prev, [src.source_id]: res.size }));
+          }
+        })
+        .catch(() => {});
+    });
+  }, [game.name]);
+
+  useEffect(() => {
     listAllSources().then(setAllSources).catch(() => {});
     listActiveTransfers()
       .then((transfers) => {
         // Only reconnect to truly running transfers — skip cancelled ones still winding down
         const mine = transfers.find(
-          (t) => t.game_name === game.name && t.status === "running",
+          (t) => t.game_name === game.name && (t.status === "running" || t.status === "queued"),
         );
         if (mine) {
           setTransferId(mine.transfer_id);
@@ -448,7 +471,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         }
         const ts = s as import("../types").TransferStatus;
         setTransferStatus(ts);
-        if (ts.status !== "running") clearInterval(poll);
+        if (ts.status !== "running" && ts.status !== "queued") clearInterval(poll);
       } catch (_) {}
     }, 2000);
     return () => clearInterval(poll);
@@ -481,17 +504,51 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
     });
   }, [game.name]);
 
-  // ── Restore processing state on mount (e.g. Installing… survived navigation) ──
+  // ── Restore dep install status on mount (survives navigation) ────────────
   useEffect(() => {
-    getGameProcessingState(game.name, selectedSource.source_id)
-      .then((state: any) => {
-        if (state?.status === "installing") {
-          setLoading("deps");
-          setFeedback({ ok: false, msg: "Installing dependencies — this can take a few minutes" });
+    getDepInstallStatuses()
+      .then((statuses) => {
+        const key = `${game.name}|${selectedSource.source_id}`;
+        const s = statuses?.[key];
+        if (s) {
+          setDepInstall(s);
+          if (s.status === "done") {
+            const installed = s.installed || [];
+            setLastInstalledDeps(installed);
+            updateGameConfig(storedName, { deps_snapshot: installed }, selectedSource.source_id).catch(() => {});
+            clearDepInstallStatus(game.name, selectedSource.source_id).catch(() => {});
+          }
         }
       })
       .catch(() => {});
-  }, [game.name]);
+  }, [game.name, selectedSource?.source_id]);
+
+  // ── Poll dep install status while installing ───────────────────────────
+  useEffect(() => {
+    if (!depInstall || depInstall.status !== "installing") return;
+    const poll = setInterval(async () => {
+      try {
+        const statuses = await getDepInstallStatuses();
+        const key = `${game.name}|${selectedSource.source_id}`;
+        const s = statuses?.[key];
+        if (!s || s.status !== "installing") {
+          clearInterval(poll);
+          if (s) {
+            setDepInstall(s);
+            if (s.status === "done") {
+              const deps = pendingDepsRef.current;
+              setLastInstalledDeps(deps);
+              updateGameConfig(storedName, { deps_snapshot: deps }, selectedSource.source_id).catch(() => {});
+              clearDepInstallStatus(game.name, selectedSource.source_id).catch(() => {});
+            }
+          } else {
+            setDepInstall(null);
+          }
+        }
+      } catch {}
+    }, 2000);
+    return () => clearInterval(poll);
+  }, [depInstall?.status, game.name, selectedSource?.source_id]);
 
   // ── Auto-save (none — use "Apply Config" button) ─────────────────────
 
@@ -716,39 +773,23 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   };
 
   const handleInstallDeps = async () => {
-    if (needsRestartAfterAdd || !steamInfo || mergedDeps.length === 0 || loading === "deps") return;
-    setLoading("deps");
-    setFeedback({ ok: false, msg: "Installing dependencies — this can take a few minutes" });
-    // Persist processing state so it survives navigation away
-    setGameProcessingState(game.name, {
-      status: "installing",
-      deps: mergedDeps,
-      pfxid: String(steamInfo.unsigned_appid),
-    }, selectedSource.source_id).catch(() => {});
+    if (needsRestartAfterAdd || !steamInfo || mergedDeps.length === 0) return;
+    if (depInstall?.status === "installing") return;
+    pendingDepsRef.current = mergedDeps;
+    setDepInstall({ status: "installing", installed: [], failed_deps: [], error: null });
     try {
-      const res = await installDeps(
+      const res = await startDepInstall(
+        game.name,
+        selectedSource.source_id,
         String(steamInfo.unsigned_appid),
         mergedDeps.join(", ")
       );
-      // Clear processing state on completion
-      setGameProcessingState(game.name, null, selectedSource.source_id).catch(() => {});
-      if (res.success) {
-        const installed = (res.installed || []).join(", ");
-        setFeedback({ ok: true, msg: `Installed: ${installed}` });
-        setLastInstalledDeps(mergedDeps);
-        updateGameConfig(storedName, { deps_snapshot: mergedDeps }, selectedSource.source_id).catch(() => {});
-      } else {
-        const failed = (res.failed || []).join(", ");
-        setFeedback({
-          ok: false,
-          msg: `Failed: ${failed || res.error || "Installation failed"}`,
-        });
+      if (!res.success) {
+        setDepInstall({ status: "failed", installed: [], failed_deps: [], error: res.error || "Failed to start" });
       }
     } catch (err: any) {
-      setGameProcessingState(game.name, null, selectedSource.source_id).catch(() => {});
-      setFeedback({ ok: false, msg: err?.message || "Error" });
+      setDepInstall({ status: "failed", installed: [], failed_deps: [], error: err?.message || "Error" });
     }
-    setLoading(null);
   };
 
 
@@ -926,7 +967,16 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
               <span style={{ padding: "1px 5px", fontSize: "0.75em", borderRadius: "8px", background: typeBg, border: `1px solid ${typeColor}` }}>
                 {selectedSource.source_type}
               </span>
-              {selectedSource.source_name} {game.sources.length > 1 ? "▾" : ""}
+              {selectedSource.source_name}
+              {(() => {
+                const sz = sourceSizes[selectedSource.source_id];
+                return (
+                  <span style={{ color: "#888", fontSize: "0.85em", marginLeft: "4px" }}>
+                    {sz === null ? "…" : sz > 0 ? `(${fmtBytes(sz)})` : ""}
+                  </span>
+                );
+              })()}
+              {game.sources.length > 1 ? " ▾" : ""}
             </Focusable>
           );
         })()}
@@ -947,6 +997,12 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
               onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
             >
               {src.source_name}
+              {(() => {
+                const sz = sourceSizes[src.source_id];
+                return sz !== undefined && sz !== null && sz > 0 ? (
+                  <span style={{ marginLeft: "5px", fontSize: "0.82em", color: "#888" }}>{fmtBytes(sz)}</span>
+                ) : null;
+              })()}
               <span style={{ marginLeft: "6px", fontSize: "0.78em", color: "#666" }}>({src.source_type})</span>
             </Focusable>
           ))}
@@ -1104,6 +1160,19 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
                   fontSize: "0.82em",
                 }}
               >
+                {transferStatus.status === "queued" && (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ color: "#888" }}>⏳ Queued — waiting to copy to {destName}…</span>
+                    <Focusable
+                      onActivate={handleCancelOrDismissTransfer}
+                      onClick={handleCancelOrDismissTransfer}
+                      focusClassName="is-focused"
+                      style={{ cursor: "pointer", color: "#888", padding: "0 4px" }}
+                    >
+                      ✕
+                    </Focusable>
+                  </div>
+                )}
                 {transferStatus.status === "running" && (
                   <>
                     <div
@@ -1121,9 +1190,9 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
                         onActivate={handleCancelOrDismissTransfer}
                         onClick={handleCancelOrDismissTransfer}
                         focusClassName="is-focused"
-                        style={{ cursor: "pointer", color: "#888", padding: "0 4px" }}
+                        style={{ cursor: "pointer", color: "#888", fontSize: "0.9em", padding: "0 6px", border: "1px solid #555", borderRadius: "3px" }}
                       >
-                        ✕
+                        Cancel
                       </Focusable>
                     </div>
                     <div
@@ -1377,7 +1446,25 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
       </div>
 
       {/* Proton Version: inline picker */}
-      <label style={LABEL_STYLE}>Proton Version</label>
+      <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "2px" }}>
+        <span style={{ ...LABEL_STYLE, display: "inline", marginBottom: 0 }}>Proton Version</span>
+        <Focusable
+          onActivate={() => Navigation.NavigateToExternalWeb(
+            steamAppId
+              ? `https://www.protondb.com/app/${steamAppId}`
+              : `https://www.protondb.com/search?q=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`
+          )}
+          onClick={() => Navigation.NavigateToExternalWeb(
+            steamAppId
+              ? `https://www.protondb.com/app/${steamAppId}`
+              : `https://www.protondb.com/search?q=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`
+          )}
+          focusClassName="is-focused"
+          style={{ padding: "1px 5px", fontSize: "0.7em", borderRadius: "10px", cursor: "pointer", border: "1px solid #555", color: "#666", lineHeight: 1.2 }}
+        >
+          ℹ
+        </Focusable>
+      </div>
       <Focusable
         onActivate={() => setShowProtonPicker((p) => !p)}
         onClick={() => setShowProtonPicker((p) => !p)}
@@ -1431,13 +1518,28 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
       )}
 
       {/* ── Dependencies: Toggle Chips + Custom ──────────────────────── */}
-      <label style={LABEL_STYLE}>
-        Dependencies
-        <span style={{ color: "#666", fontWeight: "normal" }}>
-          {" "}
-          (click to select)
+      <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "2px" }}>
+        <span style={{ ...LABEL_STYLE, display: "inline", marginBottom: 0 }}>
+          Dependencies
+          <span style={{ color: "#666", fontWeight: "normal" }}> (click to select)</span>
         </span>
-      </label>
+        <Focusable
+          onActivate={() => Navigation.NavigateToExternalWeb(
+            steamAppId
+              ? `https://steamdb.info/app/${steamAppId}/`
+              : `https://steamdb.info/search/?a=all&q=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`
+          )}
+          onClick={() => Navigation.NavigateToExternalWeb(
+            steamAppId
+              ? `https://steamdb.info/app/${steamAppId}/`
+              : `https://steamdb.info/search/?a=all&q=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`
+          )}
+          focusClassName="is-focused"
+          style={{ padding: "1px 5px", fontSize: "0.7em", borderRadius: "10px", cursor: "pointer", border: "1px solid #555", color: "#666", lineHeight: 1.2 }}
+        >
+          ℹ
+        </Focusable>
+      </div>
 
       <div
         style={{
@@ -1456,7 +1558,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
             marginBottom: "10px",
           }}
         >
-          {POPULAR_DEPS.map((dep) => {
+          {popularDeps.map((dep) => {
             const selected = checkedDeps.includes(dep);
             return (
               <Focusable
@@ -1491,35 +1593,6 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           onChange={(e) => setCustomDeps(e.target.value)}
           style={{ width: "100%" }}
         />
-      </div>
-
-      {/* ── SteamDB lookup ──────────────────────────────────────────────── */}
-      <div style={{ fontSize: "0.82em", color: "#888", marginBottom: "8px" }}>
-        Look up dependencies on{" "}
-        <Focusable
-          onActivate={() =>
-            Navigation.NavigateToExternalWeb(
-              steamAppId
-                ? `https://steamdb.info/app/${steamAppId}/`
-                : `https://steamdb.info/search/?a=all&q=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`
-            )
-          }
-          onClick={() =>
-            Navigation.NavigateToExternalWeb(
-              steamAppId
-                ? `https://steamdb.info/app/${steamAppId}/`
-                : `https://steamdb.info/search/?a=all&q=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`
-            )
-          }
-          focusClassName="is-focused"
-          style={{ color: "#0078d4", textDecoration: "underline", cursor: "pointer", display: "inline" }}
-        >
-          SteamDB
-        </Focusable>
-        {" — "}under Depots → Redistributables
-        {steamAppId && (
-          <span style={{ color: "#666" }}> (App {steamAppId})</span>
-        )}
       </div>
 
       {/* Apply Config */}
@@ -1665,12 +1738,12 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           focusClassName="is-focused"
           style={{
             ...BTN_STYLE,
-            opacity: !capabilities.can_play || !steamInfo || needsRestartAfterAdd || mergedDeps.length === 0 || loading === "deps" ? 0.4 : 1,
+            opacity: !capabilities.can_play || !steamInfo || needsRestartAfterAdd || mergedDeps.length === 0 || depInstall?.status === "installing" ? 0.4 : 1,
             border: capabilities.can_play && depsNeedsInstall ? "1px solid #27ae60" : "1px solid #555",
             color: capabilities.can_play && depsNeedsInstall ? "#2ecc71" : "#e0e0e0",
           }}
         >
-          {loading === "deps" ? "Installing…" : "Install Dependencies"}
+          {depInstall?.status === "installing" ? "Installing…" : "Install Dependencies"}
         </Focusable>
 
         {/* Restart Steam */}
@@ -1688,6 +1761,29 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         </Focusable>
 
       </div>
+
+      {/* ── Dep install status banner ──────────────────────────────────────── */}
+      {depInstall && (
+        <div style={{ border: "1px solid #444", borderRadius: "4px", padding: "8px 10px", marginBottom: "6px", background: "#1a1a1a", fontSize: "0.82em" }}>
+          {depInstall.status === "installing" && (
+            <span style={{ color: "#aaa" }}>⟳ Installing dependencies — you can navigate away and come back</span>
+          )}
+          {depInstall.status === "done" && (
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ color: "#2ecc71" }}>✓ Installed: {(depInstall.installed || []).join(", ") || "done"}</span>
+              <Focusable onActivate={() => setDepInstall(null)} onClick={() => setDepInstall(null)} focusClassName="is-focused"
+                style={{ cursor: "pointer", color: "#666", padding: "0 4px", marginLeft: "8px" }}>✕</Focusable>
+            </div>
+          )}
+          {depInstall.status === "failed" && (
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ color: "tomato" }}>✗ {depInstall.error || (depInstall.failed_deps?.length ? `Failed: ${depInstall.failed_deps.join(", ")}` : "Installation failed")}</span>
+              <Focusable onActivate={() => setDepInstall(null)} onClick={() => setDepInstall(null)} focusClassName="is-focused"
+                style={{ cursor: "pointer", color: "#666", padding: "0 4px", marginLeft: "8px" }}>✕</Focusable>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Feedback ───────────────────────────────────────────────────── */}
       {feedback && (
@@ -1875,13 +1971,13 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           {confirming === "purge" ? (
             <div
               style={{
-                border: "1px solid #9b59b6",
+                border: "1px solid #c0392b",
                 borderRadius: "4px",
                 padding: "10px",
                 marginBottom: "8px",
                 textAlign: "center",
                 fontSize: "0.85em",
-                color: "#9b59b6",
+                color: "#e74c3c",
               }}
             >
               <div style={{ marginBottom: "6px" }}>
@@ -1895,8 +1991,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
                   focusClassName="is-focused"
                   style={{
                     ...BTN_STYLE,
-                    border: "1px solid #9b59b6",
-                    background: "#9b59b6",
+                    border: "1px solid #c0392b",
+                    background: "#c0392b",
                     color: "white",
                   }}
                 >
@@ -1923,9 +2019,9 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
                 fontSize: "0.85em",
                 cursor: "pointer",
                 borderRadius: "4px",
-                border: "1px solid #9b59b6",
+                border: "1px solid #c0392b",
                 background: "transparent",
-                color: "#9b59b6",
+                color: "#e74c3c",
                 marginBottom: "8px",
                 textAlign: "center",
                 opacity: loading === "purge" ? 0.5 : 1,
@@ -1948,7 +2044,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
             color: "#e74c3c",
           }}
         >
-          <div style={{ marginBottom: "6px" }}>Remove from Deckyfin? This cannot be undone.</div>
+          <div style={{ marginBottom: "6px" }}>Remove game from source? This will delete the game folder and its config. Cannot be undone.</div>
           <div style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
             <Focusable
               onActivate={() => { setConfirming(null); handleRemove(); }}
@@ -1990,7 +2086,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
             textAlign: "center",
           }}
         >
-          Remove from Deckyfin
+          Remove Game from Source
         </Focusable>
       )}
 
