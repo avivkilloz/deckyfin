@@ -14,6 +14,8 @@ This guide covers mounting a remote games folder (from a home server or NAS) on 
 | Server config needed | None (SSH already running) | Install + configure Samba | Install + configure NFS |
 | Root access from client | Blocked by FUSE (handled by Deckyfin) | Full root access | Configurable via `root_squash` |
 
+**Accessing from outside your home network?** Set up [Tailscale](#tailscale) first, then use any of these methods with the Tailscale IP instead of the LAN IP. SSHFS is the best choice over the internet — it's already encrypted and has no extra firewall requirements.
+
 ---
 
 ## Prerequisites (Steam Deck client — all methods)
@@ -261,6 +263,105 @@ sudo systemctl enable --now home-deck-homeserver-drive.mount
 systemctl status home-deck-homeserver-drive.mount
 ls /home/deck/homeserver/drive
 ```
+
+---
+
+## Tailscale
+
+Tailscale is a zero-config VPN built on WireGuard. Once installed on your server and Steam Deck, both devices get stable private IP addresses (`100.x.x.x`) and can reach each other over the internet as if they were on the same LAN. You then use SSHFS, Samba, or NFS over the Tailscale IP — no router port forwarding required.
+
+**Prefer self-hosting?** [Headscale](https://headscale.net) is an open-source, self-hosted reimplementation of Tailscale's coordination server. You run it on your own machine; the standard Tailscale client on each device is pointed at your Headscale instance instead of Tailscale's cloud. The WireGuard tunnels work identically — Headscale just replaces the cloud control plane. Use it if you don't want a dependency on Tailscale Inc.'s infrastructure.
+
+**When to use Tailscale:**
+- You want to browse your home game library while traveling or away from home
+- Your Steam Deck is on a different network than your server (hotel, mobile hotspot, etc.)
+- You want a stable IP for your server that doesn't change when your ISP reassigns it
+
+**Recommended mount method over Tailscale:** SSHFS. It's already encrypted end-to-end (no double-encryption overhead like Samba+Tailscale), works through any firewall, and needs no server-side config beyond a running SSH daemon.
+
+---
+
+### Step 1: Install Tailscale on your server
+
+> **Running MicroK8s or another container cluster on your server?** Install `tailscaled` as a **host OS service**, not inside the cluster. SSHFS connects to the host's SSH daemon and your game library lives on the host filesystem — routing that through a pod adds unnecessary complexity. The commands below install Tailscale at the OS level regardless of what's running in the cluster.
+
+```bash
+curl -fsSL https://tailscale.com/install.sh | sh
+sudo systemctl enable --now tailscaled
+sudo tailscale up
+```
+
+Follow the auth link printed in the terminal to connect the server to your Tailscale account. Note the server's Tailscale IP:
+
+```bash
+tailscale ip -4
+# → 100.x.x.x
+```
+
+### Step 2: Install Tailscale on your Steam Deck
+
+SteamOS uses a read-only root filesystem, so packages installed via `pacman` are wiped on system updates. You need to reinstall Tailscale after each SteamOS update (takes about 30 seconds).
+
+```bash
+sudo steamos-readonly disable
+sudo pacman -Sy tailscale
+sudo systemctl enable --now tailscaled
+sudo steamos-readonly enable
+```
+
+Authenticate:
+
+```bash
+sudo tailscale up
+```
+
+Open the auth link on any device to approve the Steam Deck in your Tailscale admin panel.
+
+Verify connectivity:
+
+```bash
+tailscale ping 100.x.x.x   # your server's Tailscale IP
+```
+
+### Step 3: Mount over Tailscale
+
+Use the **Tailscale IP** (`100.x.x.x`) everywhere you would otherwise use the LAN IP. Everything else is identical to the LAN setup.
+
+**SSHFS over Tailscale** — replace the server IP in your SSHFS systemd service:
+
+```ini
+ExecStart=/usr/bin/sshfs youruser@100.x.x.x:/path/to/games \
+    /home/deck/homeserver/drive \
+    -f \
+    -o IdentityFile=/home/deck/.ssh/deckyfin-key \
+    -o reconnect \
+    -o ServerAliveInterval=15 \
+    -o ServerAliveCountMax=3 \
+    -o _netdev \
+    -o uid=1000 \
+    -o gid=1000
+```
+
+**Samba over Tailscale** — replace the IP in your `.mount` unit:
+
+```ini
+[Mount]
+What=//100.x.x.x/games
+Where=/home/deck/homeserver/drive
+Type=cifs
+Options=credentials=/home/deck/.smb-credentials,uid=1000,gid=1000,iocharset=utf8,vers=3.0,_netdev,x-systemd.automount
+```
+
+**NFS over Tailscale** is not recommended. NFS is stateful and sensitive to latency and interruptions — it works poorly over the internet even with Tailscale. Use SSHFS instead.
+
+---
+
+### Notes
+
+- Your Tailscale IP (`100.x.x.x`) is stable and permanent for each device — no need to update mount configs if your home IP changes.
+- Tailscale's free tier supports up to 100 devices, which is more than enough.
+- If the Steam Deck loses the Tailscale connection (e.g., Tailscale is wiped by a SteamOS update), the mount will go offline and Deckyfin will show the source as **offline** until reconnected.
+- After reinstalling Tailscale post-update, run `sudo tailscale up` — the device is already registered, so no new auth link is needed.
 
 ---
 

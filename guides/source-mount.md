@@ -12,6 +12,8 @@ Supported mount methods:
 
 For step-by-step setup of all three methods, see [network-mounts.md](network-mounts.md).
 
+**Accessing from outside your home network?** Use [Tailscale](network-mounts.md#tailscale) — a zero-config VPN that makes your server appear on the same private network as your Steam Deck, wherever you are. You then use SSHFS, Samba, or NFS over the Tailscale IP exactly as you would on a LAN.
+
 ---
 
 ## What you need before adding this source
@@ -71,4 +73,4 @@ You do not need to configure anything for this to work — it is automatic.
 
 - If the mount is offline, Deckyfin shows the source as **offline** and skips it when loading games. Your game entries from the last successful scan are not lost.
 - Disk usage (shown in the source card) requires the mount to be online.
-- Game executables are run via Steam's Proton layer — the `.exe` files are read over the mount at launch time. Performance depends on your network speed. For best results, use a wired LAN connection.
+- Game executables are run via Steam's Proton layer — the `.exe` files are read over the mount at launch time. Performance depends on your network speed. For best results, use a wired LAN connection or Tailscale over a fast internet connection.
