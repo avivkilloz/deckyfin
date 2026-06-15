@@ -29,6 +29,8 @@ const getMaxParallelTransfers = callable<[], number>("get_max_parallel_transfers
 const setMaxParallelTransfers = callable<[value: number], { success: boolean; value: number }>("set_max_parallel_transfers");
 const getPopularDeps = callable<[], string[]>("get_popular_deps");
 const setPopularDeps = callable<[deps: string[]], { success: boolean }>("set_popular_deps");
+const getPopularLaunchers = callable<[], { label: string; value: string }[]>("get_popular_launchers");
+const setPopularLaunchers = callable<[launchers: { label: string; value: string }[]], { success: boolean }>("set_popular_launchers");
 const listProtonSources = callable<[], { id: string; name: string; type: string; repo?: string }[]>("list_proton_sources");
 const fetchProtonReleases = callable<
   [source_id: string, page: number, per_page: number],
@@ -114,6 +116,35 @@ export const SettingsPage: VFC<Props> = ({ onBack }) => {
     setPopularDepsState(next);
     setNewDep("");
     await setPopularDeps(next).catch(() => {});
+  };
+
+  // ── Popular Launcher Options ──────────────────────────────────────────────
+  type PopularLauncher = { label: string; value: string };
+  const [popularLaunchers, setPopularLaunchersState] = useState<PopularLauncher[]>([]);
+  const [newLauncherLabel, setNewLauncherLabel] = useState("");
+  const [newLauncherValue, setNewLauncherValue] = useState("");
+
+  useEffect(() => {
+    getPopularLaunchers().then((l) => setPopularLaunchersState(l || [])).catch(() => {});
+  }, []);
+
+  const handleRemoveLauncher = async (label: string) => {
+    const next = popularLaunchers.filter((l) => l.label !== label);
+    setPopularLaunchersState(next);
+    await setPopularLaunchers(next).catch(() => {});
+  };
+
+  const handleAddLauncher = async () => {
+    const label = newLauncherLabel.trim();
+    const value = newLauncherValue.trim();
+    if (!label || !value || popularLaunchers.some((l) => l.label === label)) {
+      return;
+    }
+    const next = [...popularLaunchers, { label, value }];
+    setPopularLaunchersState(next);
+    setNewLauncherLabel("");
+    setNewLauncherValue("");
+    await setPopularLaunchers(next).catch(() => {});
   };
 
   // ── Steam Collections ──────────────────────────────────────────────────────
@@ -782,6 +813,63 @@ export const SettingsPage: VFC<Props> = ({ onBack }) => {
           Add
         </Focusable>
       </Focusable>
+
+      <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.12)", margin: "20px 0" }} />
+
+      {/* ── Popular Launcher Options ──────────────────────────────────────── */}
+      <h4 style={{ margin: "0 0 6px 0" }}>Popular Launcher Options</h4>
+      <p style={{ fontSize: "0.85em", color: "#aaa", marginBottom: "10px" }}>
+        These appear as quick-toggle pills on each game's Launch Options field. Each option has a readable label and the actual value written to Steam.
+      </p>
+      <Focusable focusClassName="" style={{ display: "flex", flexDirection: "column" as const, gap: "4px", marginBottom: "10px" }}>
+        {popularLaunchers.map((pl) => (
+          <Focusable
+            key={pl.label}
+            focusClassName=""
+            style={{ display: "flex", alignItems: "stretch", gap: "8px", padding: "6px 8px", border: "1px solid #3a3a3a", borderRadius: "6px" }}
+          >
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 600, fontSize: "0.85em", color: "#e0e0e0", marginBottom: "2px" }}>{pl.label}</div>
+              <div style={{ fontSize: "0.78em", color: "#666", fontFamily: "monospace", wordBreak: "break-all" as const }}>{pl.value}</div>
+            </div>
+            <Focusable
+              onActivate={() => handleRemoveLauncher(pl.label)}
+              onClick={() => handleRemoveLauncher(pl.label)}
+              focusClassName="is-focused"
+              style={{ ...BTN_STYLE, fontSize: "0.72em", padding: "2px 8px", borderColor: "#c0392b", color: "#e74c3c", flexShrink: 0, alignSelf: "center" }}
+            >
+              Remove
+            </Focusable>
+          </Focusable>
+        ))}
+        {popularLaunchers.length === 0 && (
+          <span style={{ fontSize: "0.82em", color: "#666" }}>No launcher options yet</span>
+        )}
+      </Focusable>
+      <div style={{ border: "1px solid #444", borderRadius: "6px", padding: "10px", marginBottom: "6px" }}>
+        <div style={{ fontSize: "0.78em", color: "#888", marginBottom: "4px" }}>Label <span style={{ color: "#555" }}>(shown in pills)</span></div>
+        <CompactTextField
+          value={newLauncherLabel}
+          onChange={(e) => setNewLauncherLabel(e.target.value)}
+          placeholder="e.g. MangoHud"
+          style={{ width: "100%", marginBottom: "8px" }}
+        />
+        <div style={{ fontSize: "0.78em", color: "#888", marginBottom: "4px" }}>Value <span style={{ color: "#555" }}>(written to Steam launch options)</span></div>
+        <CompactTextField
+          value={newLauncherValue}
+          onChange={(e) => setNewLauncherValue(e.target.value)}
+          placeholder="e.g. mangohud  or  DXVK_HUD=1"
+          style={{ width: "100%", marginBottom: "8px" }}
+        />
+        <Focusable
+          onActivate={handleAddLauncher}
+          onClick={handleAddLauncher}
+          focusClassName="is-focused"
+          style={{ ...BTN_STYLE, padding: "6px 12px", whiteSpace: "nowrap" as const }}
+        >
+          Add
+        </Focusable>
+      </div>
 
       <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.12)", margin: "20px 0" }} />
 

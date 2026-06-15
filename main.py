@@ -569,6 +569,12 @@ class Plugin:
                 _try_start_next_queued()
         return {"success": True}
 
+    async def clear_transfer(self, transfer_id: str) -> dict:
+        """Remove a completed or failed transfer from the registry."""
+        entry = _transfer_registry.pop(transfer_id, None)
+        _transfer_run_fns.pop(transfer_id, None)
+        return {"success": entry is not None}
+
     async def list_active_transfers(self) -> list:
         now = _time.time()
         stale = [
@@ -595,6 +601,23 @@ class Plugin:
     async def set_popular_deps(self, deps: list) -> dict:
         from deckyfin_config import set_app_config
         set_app_config({"popular_deps": [str(d) for d in deps]})
+        return {"success": True}
+
+    async def get_popular_launchers(self) -> list:
+        from deckyfin_config import get_app_config
+        return get_app_config().get("popular_launchers", [
+            {"label": "MangoHud",  "value": "mangohud"},
+            {"label": "GameMode",  "value": "gamemoderun"},
+            {"label": "DXVK HUD", "value": "DXVK_HUD=1"},
+            {"label": "WineD3D",  "value": "PROTON_USE_WINED3D=1"},
+            {"label": "FSR",       "value": "WINE_FULLSCREEN_FSR=1"},
+            {"label": "No EAC",   "value": "PROTON_USE_EAC_LINUX=1"},
+        ])
+
+    async def set_popular_launchers(self, launchers: list) -> dict:
+        from deckyfin_config import set_app_config
+        safe = [{"label": str(l["label"]), "value": str(l["value"])} for l in launchers]
+        set_app_config({"popular_launchers": safe})
         return {"success": True}
 
     async def get_max_parallel_transfers(self) -> int:
@@ -1289,6 +1312,12 @@ class Plugin:
     async def get_proton_install_statuses(self) -> dict:
         """Return progress snapshots for all tracked Proton installs."""
         return get_proton_install_statuses()
+
+    async def clear_proton_install_status(self, install_name: str) -> dict:
+        """Remove a done or failed Proton install entry from the registry."""
+        from deckyfin_proton import _proton_install_registry
+        _proton_install_registry.pop(install_name, None)
+        return {"success": True}
 
     async def list_steam_collections(self) -> list[str]:
         """List all existing Steam collection names."""

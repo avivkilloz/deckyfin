@@ -1,6 +1,7 @@
 """Proton version detection, discovery, and download utilities."""
 
 import os
+import ssl
 import tarfile
 import tempfile
 import threading as _threading
@@ -20,6 +21,24 @@ from deckyfin_consts import (
 )
 
 logger = logging.getLogger(LOGGER_PROTON)
+
+
+def _ssl_context() -> ssl.SSLContext:
+    """SSL context with system CA certs — Decky's bundled Python often can't find them."""
+    for p in (
+        "/etc/ssl/certs/ca-certificates.crt",
+        "/etc/ca-certificates/extracted/tls-ca-bundle.pem",
+        "/etc/pki/tls/certs/ca-bundle.crt",
+        "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem",
+    ):
+        if Path(p).exists():
+            return ssl.create_default_context(cafile=p)
+    try:
+        import certifi
+        return ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        pass
+    return ssl.create_default_context()
 
 
 def list_available_proton() -> list[str]:
@@ -155,17 +174,18 @@ def download_proton_ge(proton_name: str) -> dict:
 
     tmp_path = None
     try:
-        import requests
+        import urllib.request
 
         logger.info("Downloading %s from %s", proton_name, download_url)
-        response = requests.get(download_url, stream=True, timeout=300)
-        response.raise_for_status()
+        response = urllib.request.urlopen(download_url, timeout=300, context=_ssl_context())
 
         with tempfile.NamedTemporaryFile(delete=False, suffix=".tar.gz") as tmp_file:
             tmp_path = tmp_file.name
-            for chunk in response.iter_content(chunk_size=8192):
-                if chunk:
-                    tmp_file.write(chunk)
+            while True:
+                chunk = response.read(8192)
+                if not chunk:
+                    break
+                tmp_file.write(chunk)
 
         logger.info("Extracting %s to %s", proton_name, compat_dir)
         with tarfile.open(tmp_path, "r:gz") as tar:
@@ -310,10 +330,9 @@ def fetch_proton_releases(source_id: str, page: int = 1, per_page: int = 10) -> 
     Pages are cached per-repo for one hour; stale cache served on network error.
     """
     import time
-    try:
-        import requests as _req
-    except ImportError:
-        return {"source_id": source_id, "releases": [], "has_more": False}
+    import urllib.request
+    import urllib.parse
+    import json as _json
 
     source = next((s for s in PROTON_SOURCES if s["id"] == source_id), None)
     if source is None:
@@ -328,15 +347,15 @@ def fetch_proton_releases(source_id: str, page: int = 1, per_page: int = 10) -> 
 
     if page not in cache["pages"] or now - cache["ts"] > _CACHE_TTL:
         try:
-            resp = _req.get(
-                f"https://api.github.com/repos/{repo}/releases",
-                params={"per_page": per_page, "page": page},
-                timeout=15,
+            params = urllib.parse.urlencode({"per_page": per_page, "page": page})
+            req = urllib.request.Request(
+                f"https://api.github.com/repos/{repo}/releases?{params}",
                 headers={"Accept": "application/vnd.github.v3+json"},
             )
-            resp.raise_for_status()
+            with urllib.request.urlopen(req, timeout=15, context=_ssl_context()) as resp:
+                raw_data = _json.loads(resp.read())
             raw_releases = []
-            for release in resp.json():
+            for release in raw_data:
                 if release.get("draft") or release.get("prerelease"):
                     continue
                 asset = _pick_asset(release.get("assets", []))
@@ -402,12 +421,7 @@ def start_proton_install(install_name: str, download_url: str) -> dict:
     def _run() -> None:
         import shutil
         import subprocess as _sp
-        try:
-            import requests as _req
-        except ImportError:
-            _proton_install_registry[install_name]["status"] = "failed"
-            _proton_install_registry[install_name]["error"] = "requests not available"
-            return
+        import urllib.request
 
         entry = _proton_install_registry[install_name]
         steam_root = find_steam_root()
@@ -422,21 +436,22 @@ def start_proton_install(install_name: str, download_url: str) -> dict:
 
         tmp_path = None
         try:
-            resp = _req.get(download_url, stream=True, timeout=300)
-            resp.raise_for_status()
-            entry["total_bytes"] = int(resp.headers.get("content-length", 0))
+            resp = urllib.request.urlopen(download_url, timeout=300, context=_ssl_context())
+            entry["total_bytes"] = int(resp.headers.get("Content-Length") or 0)
 
             with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
                 tmp_path = tmp.name
                 downloaded = 0
-                for chunk in resp.iter_content(chunk_size=65536):
+                while True:
                     if cancel_event.is_set():
                         entry["status"] = "cancelled"
                         return
-                    if chunk:
-                        tmp.write(chunk)
-                        downloaded += len(chunk)
-                        entry["bytes_downloaded"] = downloaded
+                    chunk = resp.read(65536)
+                    if not chunk:
+                        break
+                    tmp.write(chunk)
+                    downloaded += len(chunk)
+                    entry["bytes_downloaded"] = downloaded
 
             if cancel_event.is_set():
                 entry["status"] = "cancelled"

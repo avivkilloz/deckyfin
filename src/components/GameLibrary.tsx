@@ -15,8 +15,10 @@ const setNeedsRestart = callable<[value: boolean], { success: boolean }>("set_ne
 const listActiveTransfers = callable<[], TransferStatus[]>("list_active_transfers");
 const listAllSources = callable<[], Source[]>("list_sources");
 const cancelTransfer = callable<[transfer_id: string], { success: boolean }>("cancel_transfer");
+const clearTransfer = callable<[transfer_id: string], { success: boolean }>("clear_transfer");
 const getProtonInstallStatuses = callable<[], Record<string, { status: string; bytes_downloaded: number; total_bytes: number; error: string | null }>>("get_proton_install_statuses");
 const cancelProtonInstall = callable<[install_name: string], { success: boolean; error: string | null }>("cancel_proton_install");
+const clearProtonInstallStatus = callable<[install_name: string], { success: boolean }>("clear_proton_install_status");
 const getDepInstallStatuses = callable<[], Record<string, { game_name: string; source_id: string; status: string; installed: string[]; failed_deps: string[]; error: string | null }>>("get_dep_install_statuses");
 const clearDepInstallStatus = callable<[game_name: string, source_id: string], { success: boolean }>("clear_dep_install_status");
 
@@ -361,8 +363,8 @@ export const GameLibrary: VFC = () => {
                       ✓ <strong>{xfer.game_name}</strong> copied: {fromName} → {toName}
                     </span>
                     <Focusable
-                      onActivate={() => dismissXfer(xfer.transfer_id)}
-                      onClick={() => dismissXfer(xfer.transfer_id)}
+                      onActivate={() => { dismissXfer(xfer.transfer_id); clearTransfer(xfer.transfer_id).catch(() => {}); }}
+                      onClick={() => { dismissXfer(xfer.transfer_id); clearTransfer(xfer.transfer_id).catch(() => {}); }}
                       focusClassName="is-focused"
                       style={{ cursor: "pointer", color: "#666", padding: "0 4px", marginLeft: "8px" }}
                     >
@@ -376,8 +378,8 @@ export const GameLibrary: VFC = () => {
                       ✗ <strong>{xfer.game_name}</strong> failed: {xfer.error ?? "Transfer failed"}
                     </span>
                     <Focusable
-                      onActivate={() => dismissXfer(xfer.transfer_id)}
-                      onClick={() => dismissXfer(xfer.transfer_id)}
+                      onActivate={() => { dismissXfer(xfer.transfer_id); clearTransfer(xfer.transfer_id).catch(() => {}); }}
+                      onClick={() => { dismissXfer(xfer.transfer_id); clearTransfer(xfer.transfer_id).catch(() => {}); }}
                       focusClassName="is-focused"
                       style={{ cursor: "pointer", color: "#666", padding: "0 4px", marginLeft: "8px" }}
                     >
@@ -426,14 +428,14 @@ export const GameLibrary: VFC = () => {
               {s.status === "done" && (
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span style={{ color: "#2ecc71" }}>✓ <strong>{tag}</strong> installed</span>
-                  <Focusable onActivate={() => dismissProton(tag)} onClick={() => dismissProton(tag)} focusClassName="is-focused"
+                  <Focusable onActivate={() => { dismissProton(tag); clearProtonInstallStatus(tag).catch(() => {}); }} onClick={() => { dismissProton(tag); clearProtonInstallStatus(tag).catch(() => {}); }} focusClassName="is-focused"
                     style={{ cursor: "pointer", color: "#666", padding: "0 4px", marginLeft: "8px" }}>✕</Focusable>
                 </div>
               )}
               {s.status === "failed" && (
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span style={{ color: "tomato" }}>✗ <strong>{tag}</strong> failed: {s.error ?? "Download failed"}</span>
-                  <Focusable onActivate={() => dismissProton(tag)} onClick={() => dismissProton(tag)} focusClassName="is-focused"
+                  <Focusable onActivate={() => { dismissProton(tag); clearProtonInstallStatus(tag).catch(() => {}); }} onClick={() => { dismissProton(tag); clearProtonInstallStatus(tag).catch(() => {}); }} focusClassName="is-focused"
                     style={{ cursor: "pointer", color: "#666", padding: "0 4px", marginLeft: "8px" }}>✕</Focusable>
                 </div>
               )}

@@ -11,6 +11,7 @@ export interface GameConfig {
   proton_sync_paths?: string[];
   categories?: string[];
   launch_options?: string;
+  selected_launchers?: string[];
   collections?: string[];
   needs_restart_after_add?: boolean;
   needs_restart?: boolean;

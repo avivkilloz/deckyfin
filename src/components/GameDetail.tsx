@@ -101,6 +101,58 @@ const getGameSize = callable<
   { success: boolean; size: number }
 >("get_game_size");
 const getPopularDeps = callable<[], string[]>("get_popular_deps");
+const getPopularLaunchers = callable<[], { label: string; value: string }[]>("get_popular_launchers");
+
+export type PopularLauncher = { label: string; value: string };
+
+const ENV_VAR_RE = /^[A-Za-z_][A-Za-z0-9_]*=/;
+
+/** Build the final Steam launch options string from selected popular options + custom text.
+ *
+ * Order: popular env vars → custom env vars → popular wrappers → %command% → custom args
+ *
+ * %command% is auto-inserted unless already present anywhere in the combined string.
+ * Env vars in the custom field (KEY=VALUE tokens) are automatically hoisted before
+ * %command% so they are treated as environment variables, not game arguments. */
+function buildLaunchOptions(
+  selectedLabels: string[],
+  launchers: PopularLauncher[],
+  customText: string,
+): string {
+  const values = selectedLabels
+    .map((label) => launchers.find((l) => l.label === label)?.value)
+    .filter((v): v is string => Boolean(v));
+
+  const popEnvVars = values.filter((v) => ENV_VAR_RE.test(v));
+  const popWrappers = values.filter((v) => !ENV_VAR_RE.test(v));
+  const custom = customText.trim();
+
+  if (popEnvVars.length === 0 && popWrappers.length === 0) return custom;
+
+  // If %command% already appears anywhere, just concatenate popular options + custom as-is
+  const allText = [...popEnvVars, ...popWrappers, custom].filter(Boolean).join(" ");
+  if (allText.includes("%command%")) {
+    return [...popEnvVars, ...popWrappers, custom].filter(Boolean).join(" ");
+  }
+
+  // Auto-insert %command%: classify each custom token by shape
+  //   KEY=VALUE  → env var  → before %command%
+  //   plain word (no = and no leading - or +) → wrapper → before %command%
+  //   starts with - or +  → game arg → after %command%
+  const customTokens = custom.split(/\s+/).filter(Boolean);
+  const customEnvVars = customTokens.filter((t) => ENV_VAR_RE.test(t));
+  const customWrappers = customTokens.filter((t) => !ENV_VAR_RE.test(t) && !/^[-+]/.test(t));
+  const customArgs = customTokens.filter((t) => !ENV_VAR_RE.test(t) && /^[-+]/.test(t));
+
+  return [
+    ...popEnvVars,
+    ...customEnvVars,
+    ...popWrappers,
+    ...customWrappers,
+    "%command%",
+    ...customArgs,
+  ].filter(Boolean).join(" ");
+}
 
 interface Props {
   game: MergedGame;
@@ -229,6 +281,11 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   const [checkedDeps, setCheckedDeps] = useState<string[]>([]);
   const [customDeps, setCustomDeps] = useState<string>("");
 
+  // ── Popular launchers list (loaded from settings) ─────────────────────────
+  const [popularLaunchers, setPopularLaunchers] = useState<PopularLauncher[]>([]);
+  const popularLaunchersRef = useRef<PopularLauncher[]>([]);
+  const [checkedLaunchers, setCheckedLaunchers] = useState<string[]>([]);
+
   useEffect(() => {
     getPopularDeps().then((d) => {
       const deps = d || [];
@@ -237,6 +294,13 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
       const existing = currentConfig.proton_dependencies || [];
       setCheckedDeps(existing.filter((dep) => deps.includes(dep)));
       setCustomDeps(existing.filter((dep) => !deps.includes(dep)).join(", "));
+    }).catch(() => {});
+    getPopularLaunchers().then((l) => {
+      const launchers = l || [];
+      popularLaunchersRef.current = launchers;
+      setPopularLaunchers(launchers);
+      const existing = currentConfig.selected_launchers || [];
+      setCheckedLaunchers(existing.filter((lbl) => launchers.some((pl) => pl.label === lbl)));
     }).catch(() => {});
   }, [game.name]);
 
@@ -260,6 +324,14 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
       prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]
     );
   };
+
+  const toggleCheckedLauncher = (label: string) => {
+    setCheckedLaunchers((prev) =>
+      prev.includes(label) ? prev.filter((l) => l !== label) : [...prev, label]
+    );
+  };
+
+  const finalLaunchOptions = buildLaunchOptions(checkedLaunchers, popularLaunchers, launchOptions);
 
   // ── Steam integration ───────────────────────────────────────────────────
   const [steamInfo, setSteamInfo] = useState<{
@@ -300,6 +372,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
     proton_version: currentConfig.proton_version || null,
     proton_dependencies: currentConfig.proton_dependencies || [],
     launch_options: currentConfig.launch_options || null,
+    selected_launchers: currentConfig.selected_launchers || [],
     collections: currentConfig.collections || [],
   }));
 
@@ -356,6 +429,9 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
     const pd = popularDepsRef.current;
     setCheckedDeps(srcDeps.filter((d) => pd.includes(d)));
     setCustomDeps(srcDeps.filter((d) => !pd.includes(d)).join(", "));
+    const srcLaunchers = currentConfig.selected_launchers || [];
+    const pl = popularLaunchersRef.current;
+    setCheckedLaunchers(srcLaunchers.filter((lbl) => pl.some((l) => l.label === lbl)));
     const srcColls = currentConfig.collections || [];
     setCheckedCollections(srcColls.filter((c) => steamCollections.includes(c)));
     setCustomCollections(srcColls.filter((c) => !steamCollections.includes(c)).join(", "));
@@ -373,6 +449,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
       proton_version: currentConfig.proton_version || null,
       proton_dependencies: currentConfig.proton_dependencies || [],
       launch_options: currentConfig.launch_options || null,
+      selected_launchers: currentConfig.selected_launchers || [],
       collections: currentConfig.collections || [],
     });
     setNeedsRestartAfterAdd(currentConfig.needs_restart_after_add ?? false);
@@ -401,6 +478,9 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         const pd = popularDepsRef.current;
         setCheckedDeps(freshDeps.filter((d) => pd.includes(d)));
         setCustomDeps(freshDeps.filter((d) => !pd.includes(d)).join(", "));
+        const freshLaunchers = g.selected_launchers || [];
+        const pl = popularLaunchersRef.current;
+        setCheckedLaunchers(freshLaunchers.filter((lbl) => pl.some((l) => l.label === lbl)));
         const freshColls = g.collections || [];
         setCheckedCollections(freshColls.filter((c) => steamCollections.includes(c)));
         setCustomCollections(freshColls.filter((c) => !steamCollections.includes(c)).join(", "));
@@ -415,6 +495,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           proton_version: g.proton_version || null,
           proton_dependencies: g.proton_dependencies || [],
           launch_options: g.launch_options || null,
+          selected_launchers: g.selected_launchers || [],
           collections: g.collections || [],
         });
         // Restore persisted snapshots so green state survives navigation
@@ -607,6 +688,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         proton_version: protonVersion || null,
         proton_dependencies: mergedDeps,
         launch_options: launchOptions || null,
+        selected_launchers: checkedLaunchers,
         collections: mergedCollections,
       };
       const res = await updateGameConfig(storedName, payload, selectedSource.source_id);
@@ -657,7 +739,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         executable,
         name,
         startDir || undefined,
-        launchOptions || "",
+        finalLaunchOptions || "",
         protonVersion || undefined,
         mergedCollections.length > 0 ? mergedCollections : undefined,
         selectedSource.source_id
@@ -666,8 +748,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         setSteamInfo({ app_id: res.app_id, unsigned_appid: res.unsigned_appid });
         setNeedsRestartAfterAdd(true);
         setNeedsRestart(true);
-        setLastSyncedSnapshot({ name, executable, start_dir: startDir || null, launch_options: launchOptions || null, proton_version: protonVersion || null, collections: mergedCollections });
-        updateGameConfig(storedName, { steam_snapshot: JSON.stringify({ name, executable, start_dir: startDir || null, launch_options: launchOptions || null, proton_version: protonVersion || null, collections: mergedCollections }), needs_restart_after_add: true, needs_restart: true }, selectedSource.source_id).catch(() => {});
+        setLastSyncedSnapshot({ name, executable, start_dir: startDir || null, launch_options: finalLaunchOptions || null, proton_version: protonVersion || null, collections: mergedCollections });
+        updateGameConfig(storedName, { steam_snapshot: JSON.stringify({ name, executable, start_dir: startDir || null, launch_options: finalLaunchOptions || null, proton_version: protonVersion || null, collections: mergedCollections }), needs_restart_after_add: true, needs_restart: true }, selectedSource.source_id).catch(() => {});
         setFeedback({
           ok: true,
           msg: `Added to Steam (App ID: ${res.unsigned_appid}) — restart Steam to unlock actions`,
@@ -690,7 +772,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         name,
         executable,
         startDir || undefined,
-        launchOptions || "",
+        finalLaunchOptions || "",
         protonVersion || undefined,
         mergedCollections.length > 0 ? mergedCollections : undefined,
         selectedSource.source_id
@@ -698,8 +780,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
       if (res.success && res.app_id && res.unsigned_appid) {
         setSteamInfo({ app_id: res.app_id, unsigned_appid: res.unsigned_appid });
         setNeedsRestart(true);
-        setLastSyncedSnapshot({ name, executable, start_dir: startDir || null, launch_options: launchOptions || null, proton_version: protonVersion || null, collections: mergedCollections });
-        updateGameConfig(storedName, { steam_snapshot: JSON.stringify({ name, executable, start_dir: startDir || null, launch_options: launchOptions || null, proton_version: protonVersion || null, collections: mergedCollections }), needs_restart: true }, selectedSource.source_id).catch(() => {});
+        setLastSyncedSnapshot({ name, executable, start_dir: startDir || null, launch_options: finalLaunchOptions || null, proton_version: protonVersion || null, collections: mergedCollections });
+        updateGameConfig(storedName, { steam_snapshot: JSON.stringify({ name, executable, start_dir: startDir || null, launch_options: finalLaunchOptions || null, proton_version: protonVersion || null, collections: mergedCollections }), needs_restart: true }, selectedSource.source_id).catch(() => {});
         setFeedback({
           ok: true,
           msg: "Steam updated — restart Steam to apply",
@@ -826,6 +908,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
       proton_version: protonVersion || null,
       proton_dependencies: mergedDeps,
       launch_options: launchOptions || null,
+      selected_launchers: checkedLaunchers,
       collections: mergedCollections,
     };
     return JSON.stringify(current) !== JSON.stringify(configSnapshot);
@@ -833,15 +916,18 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
 
   // ── Sync/install needed comparisons — drives green on action buttons ──
   const steamNeedsSync = (() => {
-    // null = no prior sync at all (e.g. game was never Added/Updated to Steam
-    // or was imported from an older config). Show green to encourage first sync.
     if (!lastSyncedSnapshot) return true;
+    const assembledLaunchOpts = buildLaunchOptions(
+      configSnapshot.selected_launchers || [],
+      popularLaunchersRef.current,
+      configSnapshot.launch_options || "",
+    );
     const a = lastSyncedSnapshot;
     const b = {
       name: configSnapshot.name,
       executable: configSnapshot.executable,
       start_dir: configSnapshot.start_dir,
-      launch_options: configSnapshot.launch_options,
+      launch_options: assembledLaunchOpts || null,
       proton_version: configSnapshot.proton_version,
       collections: configSnapshot.collections,
     };
@@ -1372,12 +1458,47 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
       />
 
       {/* Launch Options */}
-      <label style={LABEL_STYLE}>Launch Options</label>
-      <CompactTextField
-        value={launchOptions}
-        onChange={(e) => setLaunchOptions(e.target.value)}
-        style={{ width: "100%", marginBottom: "10px" }}
-      />
+      <label style={LABEL_STYLE}>
+        Launch Options
+        <span style={{ color: "#666", fontWeight: "normal" }}> (click to toggle)</span>
+      </label>
+      <div style={{ marginBottom: "8px", border: "1px solid #444", borderRadius: "4px", padding: "8px" }}>
+        {popularLaunchers.length > 0 && (
+          <Focusable focusClassName="" style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "8px" }}>
+            {popularLaunchers.map((pl) => {
+              const active = checkedLaunchers.includes(pl.label);
+              return (
+                <Focusable
+                  key={pl.label}
+                  onActivate={() => toggleCheckedLauncher(pl.label)}
+                  onClick={() => toggleCheckedLauncher(pl.label)}
+                  focusClassName="is-focused"
+                  style={{
+                    margin: "0 2px", padding: "4px 10px", borderRadius: "12px",
+                    fontSize: "0.82em", cursor: "pointer",
+                    border: active ? "1px solid #0078d4" : "1px solid #555",
+                    background: active ? "#0078d4" : "transparent",
+                    color: active ? "white" : "#ccc",
+                  }}
+                >
+                  {pl.label}
+                </Focusable>
+              );
+            })}
+          </Focusable>
+        )}
+        <CompactTextField
+          value={launchOptions}
+          onChange={(e) => setLaunchOptions(e.target.value)}
+          placeholder="Extra launch options…"
+          style={{ width: "100%", marginBottom: finalLaunchOptions ? "6px" : "0" }}
+        />
+        {finalLaunchOptions && (
+          <div style={{ fontSize: "0.75em", color: "#555", wordBreak: "break-all" as const, marginTop: "4px" }}>
+            → {finalLaunchOptions}
+          </div>
+        )}
+      </div>
 
       {/* ── Collections: Toggle Chips + Custom ──────────────────────────── */}
       <label style={LABEL_STYLE}>

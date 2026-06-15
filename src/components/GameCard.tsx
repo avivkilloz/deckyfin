@@ -89,11 +89,6 @@ export const GameCard: VFC<Props> = ({ game, isInSteam, sourceCount, onClick }) 
       )}
 
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "auto" }}>
-        {game.proton_version && (
-          <p style={{ margin: 0, fontSize: "11px", color: "#aaa" }}>
-            Proton: {game.proton_version}
-          </p>
-        )}
         {sourceCount !== undefined && sourceCount > 1 && (
           <span style={{ fontSize: "10px", padding: "2px 6px", borderRadius: "4px", background: "rgba(0,120,212,0.25)", color: "#74b9ff" }}>
             {sourceCount} sources

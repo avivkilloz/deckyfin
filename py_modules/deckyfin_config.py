@@ -228,6 +228,7 @@ def initialize_app_structure(games_folder: Optional[str] = None) -> Dict[str, An
                 "proton_sync_paths": [],
                 "categories": [],
                 "launch_options": "",
+                "selected_launchers": [],
             }
             existing_games[folder_name] = game_config
             games_initialized.append(folder_name)
