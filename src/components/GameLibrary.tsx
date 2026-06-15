@@ -65,18 +65,22 @@ export const GameLibrary: VFC = () => {
   const [showFilterDialog, setShowFilterDialog] = useState(false);
   const [filterSourceIds, setFilterSourceIds] = useState<Set<string>>(new Set());
   const [filterSteamStatus, setFilterSteamStatus] = useState<SteamFilter>("all");
+  const [filterCollections, setFilterCollections] = useState<Set<string>>(new Set());
   const [showSteamPicker, setShowSteamPicker] = useState(false);
 
   const hasActiveFilters =
-    searchQuery !== "" || filterSourceIds.size > 0 || filterSteamStatus !== "all";
+    searchQuery !== "" || filterSourceIds.size > 0 || filterSteamStatus !== "all" || filterCollections.size > 0;
 
   const activeFilterCount =
-    (filterSourceIds.size > 0 ? 1 : 0) + (filterSteamStatus !== "all" ? 1 : 0);
+    (filterSourceIds.size > 0 ? 1 : 0) +
+    (filterSteamStatus !== "all" ? 1 : 0) +
+    (filterCollections.size > 0 ? 1 : 0);
 
   const clearFilters = () => {
     setSearchQuery("");
     setFilterSourceIds(new Set());
     setFilterSteamStatus("all");
+    setFilterCollections(new Set());
   };
 
   const toggleSourceFilter = (id: string) => {
@@ -84,6 +88,15 @@ export const GameLibrary: VFC = () => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleCollectionFilter = (col: string) => {
+    setFilterCollections((prev) => {
+      const next = new Set(prev);
+      if (next.has(col)) next.delete(col);
+      else next.add(col);
       return next;
     });
   };
@@ -98,6 +111,17 @@ export const GameLibrary: VFC = () => {
       })
     );
     return Array.from(seen.values());
+  }, [games]);
+
+  // Derive all collection names across all games (from config, regardless of Steam sync)
+  const allCollections = useMemo(() => {
+    const seen = new Set<string>();
+    games.forEach((g) =>
+      g.sources.forEach((s) =>
+        (s.config.collections || []).forEach((c) => seen.add(c))
+      )
+    );
+    return Array.from(seen).sort();
   }, [games]);
 
   const handleRestartSteam = useCallback(async () => {
@@ -197,6 +221,12 @@ export const GameLibrary: VFC = () => {
       return false;
     if (filterSteamStatus === "in-steam" && !steamNames.has(g.name)) return false;
     if (filterSteamStatus === "not-in-steam" && steamNames.has(g.name)) return false;
+    if (filterCollections.size > 0) {
+      const gameCollections = new Set(g.sources.flatMap((s) => s.config.collections || []));
+      for (const col of filterCollections) {
+        if (!gameCollections.has(col)) return false;
+      }
+    }
     return true;
   });
 
@@ -516,6 +546,31 @@ export const GameLibrary: VFC = () => {
                     style={CHIP(filterSourceIds.has(src.id))}
                   >
                     {src.name}
+                  </Focusable>
+                ))}
+              </Focusable>
+            </>
+          )}
+
+          {/* Collections */}
+          {allCollections.length > 0 && (
+            <>
+              <div style={{ fontSize: "0.75em", color: "#888", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                Collections
+              </div>
+              <Focusable
+                focusClassName=""
+                style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "12px" }}
+              >
+                {allCollections.map((col) => (
+                  <Focusable
+                    key={col}
+                    onActivate={() => toggleCollectionFilter(col)}
+                    onClick={() => toggleCollectionFilter(col)}
+                    focusClassName="is-focused"
+                    style={CHIP(filterCollections.has(col))}
+                  >
+                    {col}
                   </Focusable>
                 ))}
               </Focusable>

@@ -29,10 +29,10 @@ const getMaxParallelTransfers = callable<[], number>("get_max_parallel_transfers
 const setMaxParallelTransfers = callable<[value: number], { success: boolean; value: number }>("set_max_parallel_transfers");
 const getPopularDeps = callable<[], string[]>("get_popular_deps");
 const setPopularDeps = callable<[deps: string[]], { success: boolean }>("set_popular_deps");
-const listProtonSources = callable<[], { id: string; name: string; repo: string }[]>("list_proton_sources");
+const listProtonSources = callable<[], { id: string; name: string; type: string; repo?: string }[]>("list_proton_sources");
 const fetchProtonReleases = callable<
   [source_id: string, page: number, per_page: number],
-  { source_id: string; releases: { tag_name: string; install_name: string; size_bytes: number; download_url: string; installed: boolean }[]; has_more: boolean }
+  { source_id: string; releases: { tag_name: string; install_name: string; size_bytes: number; download_url: string | null; installed: boolean }[]; has_more: boolean }
 >("fetch_proton_releases");
 const startProtonInstall = callable<[install_name: string, download_url: string], { success: boolean; error: string | null }>("start_proton_install");
 const cancelProtonInstall = callable<[install_name: string], { success: boolean; error: string | null }>("cancel_proton_install");
@@ -157,9 +157,10 @@ export const SettingsPage: VFC<Props> = ({ onBack }) => {
   };
 
   // ── Proton multi-source releases ─────────────────────────────────────────
-  type ProtonRelease = { tag_name: string; install_name: string; size_bytes: number; download_url: string; installed: boolean };
+  type ProtonRelease = { tag_name: string; install_name: string; size_bytes: number; download_url: string | null; installed: boolean };
   type InstallStatus = { status: string; bytes_downloaded: number; total_bytes: number; error: string | null };
-  type ProtonSource = { id: string; name: string; repo: string };
+  type ProtonSource = { id: string; name: string; type: string; repo?: string };
+  const isSteamSource = (src: ProtonSource) => src.type === "steam";
   type SourceState = { releases: ProtonRelease[]; loading: boolean; error: string | null; hasMore: boolean; page: number; expanded: boolean };
 
   const [protonSources, setProtonSources] = useState<ProtonSource[]>([]);
@@ -909,8 +910,17 @@ export const SettingsPage: VFC<Props> = ({ onBack }) => {
             {ss.expanded && (
               <div style={{ padding: "8px 12px" }}>
                 {ss.error && <p style={{ fontSize: "0.82em", color: "tomato", margin: "0 0 6px 0" }}>{ss.error}</p>}
+                {isSteamSource(src) && (
+                  <p style={{ fontSize: "0.78em", color: "#666", margin: "0 0 8px 0" }}>
+                    Install more via Steam Tools Library.
+                  </p>
+                )}
                 {!ss.loading && (ss.releases || []).length === 0 && !ss.error && (
-                  <p style={{ fontSize: "0.82em", color: "#666", margin: "4px 0" }}>No releases found. Check internet connection.</p>
+                  <p style={{ fontSize: "0.82em", color: "#666", margin: "4px 0" }}>
+                    {isSteamSource(src)
+                      ? "No Steam Proton versions found."
+                      : "No releases found. Check internet connection."}
+                  </p>
                 )}
 
                 {(ss.releases || []).map((release) => {
@@ -950,7 +960,7 @@ export const SettingsPage: VFC<Props> = ({ onBack }) => {
                         </span>
                       )}
 
-                      {isActive ? (
+                      {!release.download_url ? null : isActive ? (
                         <Focusable onActivate={() => handleCancelProton(release.install_name)} onClick={() => handleCancelProton(release.install_name)} focusClassName="is-focused"
                           style={{ ...BTN_STYLE, fontSize: "0.72em", padding: "2px 8px", whiteSpace: "nowrap" as const, borderColor: "#c0392b", color: "#e74c3c" }}>
                           Cancel
@@ -961,7 +971,7 @@ export const SettingsPage: VFC<Props> = ({ onBack }) => {
                           Delete
                         </Focusable>
                       ) : (
-                        <Focusable onActivate={() => handleInstallProton(release.install_name, release.download_url)} onClick={() => handleInstallProton(release.install_name, release.download_url)} focusClassName="is-focused"
+                        <Focusable onActivate={() => handleInstallProton(release.install_name, release.download_url!)} onClick={() => handleInstallProton(release.install_name, release.download_url!)} focusClassName="is-focused"
                           style={{ ...BTN_STYLE, fontSize: "0.72em", padding: "2px 8px", whiteSpace: "nowrap" as const, borderColor: "#0078d4", color: "#0078d4" }}>
                           Download
                         </Focusable>
@@ -970,28 +980,29 @@ export const SettingsPage: VFC<Props> = ({ onBack }) => {
                   );
                 })}
 
-                {/* Load more / loading indicator */}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px" }}>
-                  {ss.loading && <span style={{ fontSize: "0.78em", color: "#666" }}>Loading…</span>}
-                  {!ss.loading && ss.hasMore && (
+                {!isSteamSource(src) && (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px" }}>
+                    {ss.loading && <span style={{ fontSize: "0.78em", color: "#666" }}>Loading…</span>}
+                    {!ss.loading && ss.hasMore && (
+                      <Focusable
+                        onActivate={() => loadReleasesPage(src.id, ss.page + 1)}
+                        onClick={() => loadReleasesPage(src.id, ss.page + 1)}
+                        focusClassName="is-focused"
+                        style={{ ...BTN_STYLE, fontSize: "0.78em", padding: "3px 10px" }}
+                      >
+                        Load more
+                      </Focusable>
+                    )}
                     <Focusable
-                      onActivate={() => loadReleasesPage(src.id, ss.page + 1)}
-                      onClick={() => loadReleasesPage(src.id, ss.page + 1)}
+                      onActivate={() => loadReleasesPage(src.id, 1)}
+                      onClick={() => loadReleasesPage(src.id, 1)}
                       focusClassName="is-focused"
-                      style={{ ...BTN_STYLE, fontSize: "0.78em", padding: "3px 10px" }}
+                      style={{ ...BTN_STYLE, fontSize: "0.72em", padding: "2px 8px", marginLeft: "auto", opacity: ss.loading ? 0.5 : 1 }}
                     >
-                      Load more
+                      ↺ Refresh
                     </Focusable>
-                  )}
-                  <Focusable
-                    onActivate={() => loadReleasesPage(src.id, 1)}
-                    onClick={() => loadReleasesPage(src.id, 1)}
-                    focusClassName="is-focused"
-                    style={{ ...BTN_STYLE, fontSize: "0.72em", padding: "2px 8px", marginLeft: "auto", opacity: ss.loading ? 0.5 : 1 }}
-                  >
-                    ↺ Refresh
-                  </Focusable>
-                </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

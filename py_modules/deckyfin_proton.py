@@ -258,8 +258,9 @@ def ensure_proton_available(proton_name: str) -> None:
 # ── Multi-source Proton release catalogue + background install ─────────────────
 
 PROTON_SOURCES = [
-    {"id": "ge", "name": "GE-Proton", "repo": "GloriousEggroll/proton-ge-custom"},
-    {"id": "cachyos", "name": "CachyOS Proton", "repo": "CachyOS/proton-cachyos"},
+    {"id": "steam",   "name": "Steam Proton",   "type": "steam"},
+    {"id": "ge",      "name": "GE-Proton",       "type": "github", "repo": "GloriousEggroll/proton-ge-custom"},
+    {"id": "cachyos", "name": "CachyOS Proton",  "type": "github", "repo": "CachyOS/proton-cachyos"},
 ]
 
 _releases_cache: dict = {}   # repo → {"pages": {page: [...]}, "ts": float}
@@ -272,6 +273,24 @@ _proton_cancel_events: dict = {}      # install_name → threading.Event
 def list_proton_sources() -> list[dict]:
     """Return the list of supported Proton source types."""
     return list(PROTON_SOURCES)
+
+
+def _list_steam_proton_releases() -> list[dict]:
+    """Return Proton versions installed by Steam from steamapps/common/."""
+    steam_root = find_steam_root()
+    common_dir = steam_root / STEAM_STEAMAPPS_FOLDER / STEAM_COMMON_FOLDER
+    releases = []
+    if common_dir.exists():
+        for d in sorted(common_dir.iterdir(), reverse=True):
+            if d.is_dir() and "proton" in d.name.lower():
+                releases.append({
+                    "tag_name": d.name,
+                    "install_name": d.name,
+                    "size_bytes": 0,
+                    "download_url": None,
+                    "installed": True,
+                })
+    return releases
 
 
 def _pick_asset(assets: list) -> dict | None:
@@ -299,6 +318,9 @@ def fetch_proton_releases(source_id: str, page: int = 1, per_page: int = 10) -> 
     source = next((s for s in PROTON_SOURCES if s["id"] == source_id), None)
     if source is None:
         return {"source_id": source_id, "releases": [], "has_more": False}
+
+    if source.get("type") == "steam":
+        return {"source_id": source_id, "releases": _list_steam_proton_releases(), "has_more": False}
 
     repo = source["repo"]
     now = time.time()
@@ -423,11 +445,22 @@ def start_proton_install(install_name: str, download_url: str) -> dict:
             entry["status"] = "extracting"
 
             with tempfile.TemporaryDirectory() as extract_tmp:
-                # Use system tar — handles gz, zst, xz without Python lib dependencies
-                _sp.run(
-                    ["tar", "-xf", tmp_path, "-C", extract_tmp],
-                    check=True, timeout=600,
-                )
+                if download_url.endswith(".tar.zst"):
+                    # Python tarfile doesn't support zstd — use system tar
+                    result = _sp.run(
+                        ["tar", "-xf", tmp_path, "-C", extract_tmp],
+                        check=False, timeout=600,
+                        capture_output=True, text=True,
+                    )
+                    if result.returncode != 0:
+                        raise RuntimeError(
+                            f"tar exited {result.returncode}: {result.stderr.strip() or result.stdout.strip()}"
+                        )
+                else:
+                    # gz and xz are handled natively by Python's tarfile (no xz binary needed)
+                    with tarfile.open(tmp_path, "r:*") as tar:
+                        tar.extractall(extract_tmp)
+
                 # Find the directory containing a proton script
                 extracted_dir = None
                 for root, dirs, files in os.walk(extract_tmp):
