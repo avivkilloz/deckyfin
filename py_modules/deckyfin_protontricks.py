@@ -173,6 +173,27 @@ def _resolve_xdg_runtime_dir() -> Optional[str]:
     return None
 
 
+def _get_session_env() -> dict:
+    """Return display/session env vars needed by flatpak/bwrap/wine.
+
+    When Decky runs plugins as a non-root user (deck), the systemd service
+    environment lacks DISPLAY and DBUS_SESSION_BUS_ADDRESS. Subprocesses that
+    need the X11 session (flatpak, bwrap) must have these injected explicitly.
+    """
+    env: dict = {}
+    xdg = _resolve_xdg_runtime_dir()
+    if xdg:
+        env["XDG_RUNTIME_DIR"] = xdg
+        # D-Bus session socket lives under XDG_RUNTIME_DIR
+        dbus_sock = f"{xdg}/bus"
+        if Path(dbus_sock).exists():
+            env["DBUS_SESSION_BUS_ADDRESS"] = f"unix:path={dbus_sock}"
+    display = _detect_display()
+    if display:
+        env["DISPLAY"] = display
+    return env
+
+
 def _detect_display() -> Optional[str]:
     """Detect the X11 display number by scanning /tmp/.X11-unix/.
 
@@ -569,6 +590,7 @@ def _build_methods(pfxid, dep, pfx_path, proton_wine, steam_root):
                 return _run_with_clean_env(
                     cmd, capture_output=True, text=True, timeout=t,
                 )
+            extra_env.update(_get_session_env())
             return _run_with_clean_env(
                 cmd,
                 extra_env=extra_env or None,
@@ -584,12 +606,13 @@ def _build_methods(pfxid, dep, pfx_path, proton_wine, steam_root):
                 cmd = [
                     "flatpak", "run",
                     "--filesystem=host",
+                    "--socket=session-bus",
                 ]
                 if steam_root:
                     cmd.append(f"--env=STEAM_DIR={str(steam_root)}")
                 cmd.extend([
                     PROTONTRICKS_FLATPAK,
-                    pfxid, "--", "--force", "--unattended", dep,
+                    "--no-bwrap", pfxid, "--", "--force", "--unattended", dep,
                 ])
                 real_user = _get_real_user()
                 if real_user:
@@ -599,7 +622,8 @@ def _build_methods(pfxid, dep, pfx_path, proton_wine, steam_root):
                     )
                 else:
                     result = _run_with_clean_env(
-                        cmd, capture_output=True, text=True, timeout=t,
+                        cmd, extra_env=_get_session_env() or None,
+                        capture_output=True, text=True, timeout=t,
                     )
                 # Flatpak emits F:/W: deprecation warnings on stderr even on
                 # success — override returncode when no real error is present
@@ -640,6 +664,7 @@ def _build_methods(pfxid, dep, pfx_path, proton_wine, steam_root):
             else:
                 winetricks_env = os.environ.copy()
                 winetricks_env.update(wine_env)
+                winetricks_env.update(_get_session_env())
                 for var in _BAD_ENV_VARS:
                     winetricks_env.pop(var, None)
                 no_xvfb = subprocess.run(
@@ -696,6 +721,7 @@ def _build_methods(pfxid, dep, pfx_path, proton_wine, steam_root):
             else:
                 env = os.environ.copy()
                 env.update(wine_env)
+                env.update(_get_session_env())
                 for var in _BAD_ENV_VARS:
                     env.pop(var, None)
                 return subprocess.run(

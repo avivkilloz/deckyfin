@@ -19,6 +19,7 @@ export interface GameConfig {
   steam_snapshot?: string;
   /** Persisted snapshot of deps at last install time. */
   deps_snapshot?: string[];
+  steamgriddb_game_id?: number;
 }
 
 export interface GameFolder {

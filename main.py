@@ -60,6 +60,7 @@ from deckyfin_sources import (
     list_sources as _list_sources,
     add_source as _add_source,
     remove_source as _remove_source,
+    reorder_source as _reorder_source,
     get_source_by_id as _get_source_by_id,
     detect_capabilities as _detect_capabilities,
     get_disk_usage as _get_disk_usage,
@@ -91,6 +92,24 @@ _transfer_run_fns: dict = {}  # transfer_id → _run closure (not serialized to 
 _dep_install_registry: dict = {}
 # Key: f"{game_name}|{source_id}"
 # Value: {game_name, source_id, deps, status: "installing"|"done"|"failed", installed, failed_deps, error}
+
+_config_copy_registry: dict = {}
+# Key: copy_id (UUID hex[:8])
+# Value: {copy_id, game_name, from_source_id, to_source_id, status: "running"|"done"|"failed", error}
+
+_prefix_init_registry: dict = {}
+# Key: prefix_id (UUID hex[:8])
+# Value: {prefix_id, game_name, app_id, status: "running"|"done"|"failed", error}
+
+_save_sync_registry: dict = {}
+# Key: sync_id (UUID hex[:8])
+# Value: {sync_id, game_name, source_id, direction: "backup"|"restore"|"copy",
+#         from_source_id?, to_source_id?, status: "running"|"done"|"failed", error, copied}
+
+# Navigation state — in-memory only, intentionally cleared on Python restart (Steam restart).
+# Sidebar close/reopen keeps the Python process alive so state is preserved.
+# Keys: view, game_name, source_id, draft
+_session_nav: dict = {}
 
 
 def _get_max_parallel_transfers() -> int:
@@ -228,18 +247,20 @@ def _write_game_config_to_source(
     game_name: str, src_path: str, dst_path: str,
     owner_uid: int, owner_gid: int,
     src_is_mount: bool = False,
+    dst_is_mount: bool = False,
 ) -> None:
     """Copy portable config fields from src to dst.
 
-    When src is a FUSE/mount and running as root, reads via subprocess as the
-    mount owner (root is blocked from FUSE). Always writes to dst directly as
-    root so that root-owned config files on the dst side are always writable.
+    When src or dst is a FUSE/mount and running as root, uses subprocess as
+    the mount owner (root is blocked from FUSE without -o allow_root/allow_other).
     """
     import functools, json as _json
     from deckyfin_transfer import PORTABLE_FIELDS
 
+    needs_unpriv = os.getuid() == 0 and owner_uid != 0
+
     # Step 1: read portable fields from src
-    if src_is_mount and os.getuid() == 0 and owner_uid != 0:
+    if src_is_mount and needs_unpriv:
         read_script = (
             "import sys, json; sys.path.insert(0,sys.argv[1]); "
             "from pathlib import Path; "
@@ -271,20 +292,42 @@ def _write_game_config_to_source(
             raise ValueError(f"Game '{game_name}' not found in source config at {src_path}")
         portable = {k: v for k, v in src_game.items() if k in PORTABLE_FIELDS}
 
-    # Step 2: write to dst directly as root (root can write any local file)
-    from deckyfin_config import get_games_config as _get_cfg2, save_games_config
-    dst_config = _get_cfg2(Path(dst_path))
-    dst_games = dst_config.get("games", [])
-    found = False
-    for i, g in enumerate(dst_games):
-        if g.get("name") == game_name:
-            dst_games[i] = {**g, **portable}
-            found = True
-            break
-    if not found:
-        dst_games.append({"name": game_name, **portable})
-    dst_config["games"] = dst_games
-    save_games_config(dst_config, Path(dst_path))
+    # Step 2: write to dst — use subprocess when dst is a FUSE/user mount
+    if dst_is_mount and needs_unpriv:
+        write_script = (
+            "import sys, json; sys.path.insert(0, sys.argv[1]); "
+            "from pathlib import Path; "
+            "from deckyfin_config import get_games_config, save_games_config; "
+            "game_name = sys.argv[3]; portable = json.loads(sys.argv[4]); "
+            "dst_config = get_games_config(Path(sys.argv[2])); "
+            "games = dst_config.get('games', []); "
+            "names = [g.get('name') for g in games]; "
+            "updated = [({**g, **portable} if g.get('name') == game_name else g) for g in games]; "
+            "final = updated if game_name in names else updated + [{'name': game_name, **portable}]; "
+            "dst_config['games'] = final; save_games_config(dst_config, Path(sys.argv[2]))"
+        )
+        proc = subprocess.run(
+            ["python3", "-c", write_script, _PY_MODULES, dst_path, game_name, _json.dumps(portable)],
+            capture_output=True, text=True, timeout=10,
+            preexec_fn=functools.partial(_drop_privs, owner_uid, owner_gid),
+        )
+        _debug(f"_write_game_config_to_source write: rc={proc.returncode} stderr={proc.stderr.strip()[:200]!r}")
+        if proc.returncode != 0:
+            raise PermissionError(f"Failed to write dest config: {proc.stderr.strip()[:200]}")
+    else:
+        from deckyfin_config import get_games_config as _get_cfg2, save_games_config
+        dst_config = _get_cfg2(Path(dst_path))
+        dst_games = dst_config.get("games", [])
+        found = False
+        for i, g in enumerate(dst_games):
+            if g.get("name") == game_name:
+                dst_games[i] = {**g, **portable}
+                found = True
+                break
+        if not found:
+            dst_games.append({"name": game_name, **portable})
+        dst_config["games"] = dst_games
+        save_games_config(dst_config, Path(dst_path))
 
 
 class Plugin:
@@ -360,6 +403,10 @@ class Plugin:
         removed = _remove_source(source_id)
         return {"success": removed, "error": None if removed else f"Source '{source_id}' not found"}
 
+    async def reorder_source(self, source_id: str, direction: str) -> dict:
+        moved = _reorder_source(source_id, direction)
+        return {"success": moved}
+
     async def get_source_capabilities(self, source_id: str) -> dict:
         source = _get_source_by_id(source_id)
         if not source:
@@ -380,7 +427,7 @@ class Plugin:
     async def copy_game_config(
         self, game_name: str, from_source_id: str, to_source_id: str
     ) -> dict:
-        """Copy portable config fields for game_name from one source to another."""
+        """Start a background config copy. Poll list_config_copy_statuses for progress."""
         src_source = _get_source_by_id(from_source_id)
         dst_source = _get_source_by_id(to_source_id)
         if not src_source or not dst_source:
@@ -389,16 +436,46 @@ class Plugin:
         dst_path = dst_source.get("path")
         if not src_path or not dst_path:
             return {"success": False, "error": "Source has no path"}
-        try:
-            dst_owner_uid, dst_owner_gid = _owner_creds_for(dst_path)
-            _write_game_config_to_source(
-                game_name, src_path, dst_path, dst_owner_uid, dst_owner_gid
-            )
-            _debug(f"copy_game_config: {game_name!r} {from_source_id!r} → {to_source_id!r}")
-            return {"success": True}
-        except Exception as e:
-            _debug(f"copy_game_config: error: {e!r}")
-            return {"success": False, "error": str(e)}
+
+        copy_id = _uuid.uuid4().hex[:8]
+        _config_copy_registry[copy_id] = {
+            "copy_id": copy_id,
+            "game_name": game_name,
+            "from_source_id": from_source_id,
+            "to_source_id": to_source_id,
+            "status": "running",
+            "error": None,
+        }
+
+        def _run():
+            try:
+                src_is_mount = src_source.get("type") == "mount"
+                dst_is_mount = dst_source.get("type") == "mount"
+                dst_owner_uid, dst_owner_gid = _owner_creds_for(dst_path)
+                _write_game_config_to_source(
+                    game_name, src_path, dst_path,
+                    dst_owner_uid, dst_owner_gid,
+                    src_is_mount=src_is_mount,
+                    dst_is_mount=dst_is_mount,
+                )
+                _config_copy_registry[copy_id]["status"] = "done"
+                _debug(f"copy_game_config: {game_name!r} {from_source_id!r} → {to_source_id!r} done")
+            except Exception as e:
+                _debug(f"copy_game_config: error: {e!r}")
+                _config_copy_registry[copy_id]["status"] = "failed"
+                _config_copy_registry[copy_id]["error"] = str(e)
+
+        _threading.Thread(target=_run, daemon=True).start()
+        return {"success": True, "copy_id": copy_id}
+
+    async def list_config_copy_statuses(self) -> dict:
+        """Return a snapshot of all tracked config copy operations."""
+        return {k: dict(v) for k, v in _config_copy_registry.items()}
+
+    async def clear_config_copy_status(self, copy_id: str) -> dict:
+        """Remove a completed config copy entry from the registry."""
+        _config_copy_registry.pop(copy_id, None)
+        return {"success": True}
 
     async def start_game_transfer(
         self, game_name: str, from_source_id: str, to_source_id: str
@@ -620,6 +697,16 @@ class Plugin:
         set_app_config({"popular_launchers": safe})
         return {"success": True}
 
+    async def get_popular_save_prefixes(self) -> list:
+        from deckyfin_config import get_app_config
+        return get_app_config().get("popular_save_prefixes", [])
+
+    async def set_popular_save_prefixes(self, prefixes: list) -> dict:
+        from deckyfin_config import set_app_config
+        safe = [{"label": str(p["label"]), "path": str(p["path"])} for p in prefixes]
+        set_app_config({"popular_save_prefixes": safe})
+        return {"success": True}
+
     async def get_max_parallel_transfers(self) -> int:
         return _get_max_parallel_transfers()
 
@@ -777,6 +864,64 @@ class Plugin:
 
     async def list_steam_users(self) -> list:
         return list_steam_users()
+
+    # ── UI State ──────────────────────────────────────────────────────────
+
+    async def get_ui_state(self) -> dict:
+        """Return UI state. Nav keys are session-scoped: if Steam's PID changed
+        since they were saved, the nav state is stale (Steam restarted) and is
+        discarded. Sidebar close/reopen within the same Steam session preserves it."""
+        _NAV_KEYS = {"view", "game_name", "source_id", "draft"}
+        nav: dict = {}
+        if _session_nav:
+            saved_pid = _session_nav.get("_steam_pid")
+            pid_valid = False
+            if saved_pid:
+                try:
+                    import psutil as _ps
+                    proc = _ps.Process(saved_pid)
+                    pid_valid = proc.is_running() and "steam" in proc.name().lower()
+                except Exception:
+                    pass
+            if pid_valid:
+                nav = {k: v for k, v in _session_nav.items() if k in _NAV_KEYS}
+            else:
+                _session_nav.clear()
+        return nav
+
+    async def save_ui_state(self, state: dict) -> dict:
+        """Save UI state. Nav keys go to memory tagged with Steam's current PID."""
+        _NAV_KEYS = {"view", "game_name", "source_id", "draft"}
+        nav = {k: v for k, v in state.items() if k in _NAV_KEYS}
+        if nav:
+            try:
+                from deckyfin_steam_ctl import _find_steam_processes
+                procs = _find_steam_processes()
+                steam_pid = next(
+                    (p.info["pid"] for p in procs if "steam" in (p.info.get("name") or "").lower()
+                     and "webhelper" not in (p.info.get("name") or "").lower()),
+                    None,
+                )
+            except Exception:
+                steam_pid = None
+            _session_nav.clear()
+            _session_nav.update(nav)
+            if steam_pid:
+                _session_nav["_steam_pid"] = steam_pid
+        else:
+            _session_nav.clear()
+        return {"success": True}
+
+    async def get_view_mode(self) -> str:
+        """Return persisted library view mode ('card' or 'list')."""
+        from deckyfin_config import get_app_config
+        return get_app_config().get("view_mode", "card")
+
+    async def set_view_mode(self, mode: str) -> dict:
+        """Persist library view mode across sidebar closes and Steam restarts."""
+        from deckyfin_config import set_app_config
+        set_app_config({"view_mode": mode if mode in ("card", "list") else "card"})
+        return {"success": True}
 
     # ── Games Folder ──────────────────────────────────────────────────────
 
@@ -1153,6 +1298,30 @@ class Plugin:
             _debug(f"list_subfolders: unexpected error for {path!r}: {e}")
             return []
 
+    async def get_game_prefix_path(self, shortcut_app_id: int) -> Optional[str]:
+        """Return the Proton prefix path for a non-Steam shortcut, or None if not initialised."""
+        from deckyfin_saves import get_prefix_path
+        return get_prefix_path(shortcut_app_id)
+
+    async def list_dir_contents(self, path: str) -> dict:
+        """List files and subdirectories at path. Returns {dirs, files}."""
+        try:
+            with os.scandir(path) as it:
+                entries = sorted(it, key=lambda e: e.name.lower())
+            dirs, files = [], []
+            for entry in entries:
+                try:
+                    if entry.is_dir(follow_symlinks=False):
+                        dirs.append(entry.name)
+                    else:
+                        files.append(entry.name)
+                except OSError:
+                    continue
+            return {"dirs": dirs, "files": files}
+        except Exception as e:
+            _debug(f"list_dir_contents: error for {path!r}: {e}")
+            return {"dirs": [], "files": []}
+
     # ── Steam Actions ─────────────────────────────────────────────────────
 
     async def add_steam_shortcut(
@@ -1284,6 +1453,14 @@ class Plugin:
             return {"success": True, **info}
         return {"success": False, "error": f"'{app_name}' not found in Steam shortcuts"}
 
+    async def calc_shortcut_app_id(self, app_name: str, exe_path: str) -> dict:
+        """Calculate the unsigned shortcut app_id from app name and exe path (same formula Steam uses)."""
+        from steam_games import calc_shortcut_app_id, convert_appid_to_unsigned_32bit
+        exe_formatted = f'"{exe_path}"'
+        signed = calc_shortcut_app_id(app_name, exe_formatted)
+        unsigned = convert_appid_to_unsigned_32bit(signed)
+        return {"success": True, "unsigned_appid": unsigned}
+
     # ── Proton ────────────────────────────────────────────────────────────
 
     async def list_proton_versions(self) -> list:
@@ -1345,20 +1522,291 @@ class Plugin:
         app_id: int,
         proton_name: Optional[str] = None,
         reinitialize: bool = False,
+        game_name: Optional[str] = None,
         user_id: Optional[str] = None,
     ) -> dict:
+        """Start a background prefix initialization. Poll list_prefix_init_statuses for progress."""
+        prefix_id = _uuid.uuid4().hex[:8]
+        _prefix_init_registry[prefix_id] = {
+            "prefix_id": prefix_id,
+            "game_name": game_name or str(app_id),
+            "app_id": app_id,
+            "status": "running",
+            "error": None,
+        }
         uid = user_id or get_user_id()
+
+        def _run():
+            try:
+                init_proton_prefix(app_id, uid, proton_name=proton_name, reinitialize=reinitialize)
+                _prefix_init_registry[prefix_id]["status"] = "done"
+            except FileExistsError as e:
+                _prefix_init_registry[prefix_id]["status"] = "failed"
+                _prefix_init_registry[prefix_id]["error"] = str(e)
+            except (ValueError, RuntimeError) as e:
+                _prefix_init_registry[prefix_id]["status"] = "failed"
+                _prefix_init_registry[prefix_id]["error"] = str(e)
+            except Exception as e:
+                _prefix_init_registry[prefix_id]["status"] = "failed"
+                _prefix_init_registry[prefix_id]["error"] = f"Failed to init prefix: {str(e)}"
+
+        _threading.Thread(target=_run, daemon=True).start()
+        return {"success": True, "prefix_id": prefix_id, "app_id": app_id}
+
+    async def list_prefix_init_statuses(self) -> dict:
+        """Return a snapshot of all tracked prefix init operations."""
+        return {k: dict(v) for k, v in _prefix_init_registry.items()}
+
+    async def clear_prefix_init_status(self, prefix_id: str) -> dict:
+        """Remove a completed prefix init entry from the registry."""
+        _prefix_init_registry.pop(prefix_id, None)
+        return {"success": True}
+
+    # ── Save Sync ─────────────────────────────────────────────────────────────
+
+    async def sync_saves(
+        self,
+        game_name: str,
+        source_id: str,
+        direction: str,
+        shortcut_app_id: int,
+    ) -> dict:
+        """Background task: backup (prefix→source) or restore (source→prefix) save files."""
         try:
-            init_proton_prefix(app_id, uid, proton_name=proton_name, reinitialize=reinitialize)
-            return {"success": True, "app_id": app_id}
-        except FileExistsError as e:
-            return {"success": False, "error": str(e)}
-        except ValueError as e:
-            return {"success": False, "error": str(e)}
-        except RuntimeError as e:
-            return {"success": False, "error": str(e)}
+            from deckyfin_saves import get_prefix_path, get_saves_dir, backup_saves, restore_saves
+            from deckyfin_config import get_game_config
+
+            source = _get_source_by_id(source_id)
+            if not source or not source.get("path"):
+                return {"success": False, "error": "Source not found or has no path"}
+
+            cfg = get_game_config(game_name, source.get("path"))
+            if not cfg:
+                return {"success": False, "error": "Game config not found"}
+
+            sync_paths = cfg.get("proton_sync_paths", [])
+            if not sync_paths:
+                return {"success": False, "error": "No save paths configured — add paths in the Save Paths section"}
+
+            game_rel = cfg.get("path")
+            if not game_rel:
+                return {"success": False, "error": "Game folder path not set in config"}
+            game_folder = os.path.join(source.get("path"), game_rel)
+
+            has_prefix_paths = any(
+                not p.startswith("game://") and not p.startswith("userdata://")
+                for p in sync_paths
+            )
+            prefix_path = get_prefix_path(shortcut_app_id) if has_prefix_paths else None
+            if has_prefix_paths and not prefix_path:
+                return {"success": False, "error": f"Proton prefix not found for app {shortcut_app_id} — init the prefix first"}
+
+            saves_dir = get_saves_dir(source.get("path"), game_name)
+            sync_id = _uuid.uuid4().hex[:8]
+            _save_sync_registry[sync_id] = {
+                "sync_id": sync_id, "game_name": game_name, "source_id": source_id,
+                "direction": direction, "status": "running", "error": None, "copied": [],
+                "saves_dir": saves_dir,
+            }
+            _debug(f"sync_saves: {game_name!r} {direction} saves_dir={saves_dir!r} paths={sync_paths!r}")
+
+            def _run():
+                try:
+                    if direction == "backup":
+                        result = backup_saves(prefix_path, sync_paths, saves_dir, game_folder)
+                    elif direction == "restore":
+                        result = restore_saves(saves_dir, sync_paths, prefix_path, game_folder)
+                    else:
+                        result = {"copied": [], "errors": [f"Unknown direction: {direction}"]}
+                    if result.get("errors"):
+                        _save_sync_registry[sync_id]["status"] = "failed"
+                        _save_sync_registry[sync_id]["error"] = "; ".join(result["errors"])
+                    else:
+                        _save_sync_registry[sync_id]["status"] = "done"
+                    _save_sync_registry[sync_id]["copied"] = result.get("copied", [])
+                    _debug(f"sync_saves: done {game_name!r} {direction} copied={result.get('copied')} errors={result.get('errors')}")
+                except Exception as e:
+                    _debug(f"sync_saves thread error: {e!r}")
+                    _save_sync_registry[sync_id]["status"] = "failed"
+                    _save_sync_registry[sync_id]["error"] = str(e)
+
+            _threading.Thread(target=_run, daemon=True).start()
+            return {"success": True, "sync_id": sync_id}
         except Exception as e:
-            return {"success": False, "error": f"Failed to init prefix: {str(e)}"}
+            _debug(f"sync_saves callable error: {e!r}")
+            return {"success": False, "error": str(e)}
+
+    async def copy_saves_between_sources(
+        self, game_name: str, from_source_id: str, to_source_id: str
+    ) -> dict:
+        """Background task: copy the saves directory from one source to another."""
+        try:
+            from deckyfin_saves import get_saves_dir, copy_saves_between
+
+            from_source = _get_source_by_id(from_source_id)
+            to_source = _get_source_by_id(to_source_id)
+            if not from_source or not to_source:
+                return {"success": False, "error": "Source not found"}
+
+            from_saves = get_saves_dir(from_source.get("path"), game_name)
+            to_saves = get_saves_dir(to_source.get("path"), game_name)
+            _debug(f"copy_saves_between_sources: {game_name!r} {from_saves!r} → {to_saves!r}")
+
+            sync_id = _uuid.uuid4().hex[:8]
+            _save_sync_registry[sync_id] = {
+                "sync_id": sync_id, "game_name": game_name, "source_id": from_source_id,
+                "direction": "copy",
+                "from_source_id": from_source_id, "to_source_id": to_source_id,
+                "status": "running", "error": None, "copied": [],
+                "saves_dir": to_saves,
+            }
+
+            def _run():
+                try:
+                    result = copy_saves_between(from_saves, to_saves)
+                    if result["success"]:
+                        _save_sync_registry[sync_id]["status"] = "done"
+                        _debug(f"copy_saves_between_sources: {game_name!r} done")
+                    else:
+                        _save_sync_registry[sync_id]["status"] = "failed"
+                        _save_sync_registry[sync_id]["error"] = result.get("error", "Unknown error")
+                        _debug(f"copy_saves_between_sources: error: {result.get('error')!r}")
+                except Exception as e:
+                    _debug(f"copy_saves_between_sources thread error: {e!r}")
+                    _save_sync_registry[sync_id]["status"] = "failed"
+                    _save_sync_registry[sync_id]["error"] = str(e)
+
+            _threading.Thread(target=_run, daemon=True).start()
+            return {"success": True, "sync_id": sync_id}
+        except Exception as e:
+            _debug(f"copy_saves_between_sources callable error: {e!r}")
+            return {"success": False, "error": str(e)}
+
+    async def backup_all_saves(self, source_id: str) -> dict:
+        """Start a backup for every game in a source that has save paths configured."""
+        try:
+            from deckyfin_saves import get_prefix_path, get_saves_dir, backup_saves
+
+            source = _get_source_by_id(source_id)
+            if not source or not source.get("path"):
+                return {"success": False, "error": "Source not found or has no path"}
+
+            uid = str(get_user_id())
+            source_name = source.get("name", source_id)
+            games = _load_source_games(source)
+
+            # First pass: categorize without starting any threads
+            to_backup = []
+            skipped = []
+            pre_failed = []
+
+            for cfg in games:
+                game_name = cfg.get("name", "")
+                sync_paths = cfg.get("proton_sync_paths") or []
+                if not sync_paths:
+                    skipped.append(game_name)
+                    continue
+                info = get_steam_shortcut_info(game_name, uid)
+                if not info or not info.get("unsigned_appid"):
+                    pre_failed.append(f"{game_name} (not in Steam)")
+                    continue
+                game_rel = cfg.get("path")
+                if not game_rel:
+                    pre_failed.append(f"{game_name} (no game path)")
+                    continue
+                has_prefix_paths = any(
+                    not p.startswith("game://") and not p.startswith("userdata://")
+                    for p in sync_paths
+                )
+                prefix_path = get_prefix_path(info["unsigned_appid"]) if has_prefix_paths else None
+                if has_prefix_paths and not prefix_path:
+                    pre_failed.append(f"{game_name} (prefix not found)")
+                    continue
+                to_backup.append({
+                    "name": game_name,
+                    "sync_paths": sync_paths,
+                    "prefix_path": prefix_path,
+                    "game_folder": os.path.join(source["path"], game_rel),
+                    "saves_dir": get_saves_dir(source["path"], game_name),
+                })
+
+            total_with_paths = len(to_backup) + len(pre_failed)
+
+            # Create batch tracking entry immediately so it shows in the tasks view right away
+            batch_id = _uuid.uuid4().hex[:8]
+            _save_sync_registry[batch_id] = {
+                "sync_id": batch_id,
+                "game_name": f"Backup All — {source_name}",
+                "source_id": source_id,
+                "direction": "batch_backup",
+                "status": "running" if to_backup else "done",
+                "error": None,
+                "copied": [],
+                "saves_dir": None,
+                "total_games": total_with_paths,
+                "completed_games": 0,
+                "failed_games": len(pre_failed),
+                "skipped_games": len(skipped),
+            }
+            _debug(f"backup_all_saves: batch_id={batch_id} to_backup={len(to_backup)} skipped={len(skipped)} pre_failed={len(pre_failed)}")
+
+            if not to_backup:
+                return {"success": True, "batch_id": batch_id, "started": [], "skipped": skipped, "failed": pre_failed}
+
+            lock = _threading.Lock()
+            counters = {"done": 0, "failed": len(pre_failed)}
+            total_to_complete = len(to_backup)
+
+            for g in to_backup:
+                sync_id = _uuid.uuid4().hex[:8]
+                _save_sync_registry[sync_id] = {
+                    "sync_id": sync_id, "game_name": g["name"], "source_id": source_id,
+                    "direction": "backup", "status": "running", "error": None, "copied": [],
+                    "saves_dir": g["saves_dir"],
+                }
+
+                def _run(item=g, sid=sync_id, bid=batch_id):
+                    try:
+                        result = backup_saves(item["prefix_path"], item["sync_paths"], item["saves_dir"], item["game_folder"])
+                        ok = not result.get("errors")
+                        if ok:
+                            _save_sync_registry[sid]["status"] = "done"
+                        else:
+                            _save_sync_registry[sid]["status"] = "failed"
+                            _save_sync_registry[sid]["error"] = "; ".join(result["errors"])
+                        _save_sync_registry[sid]["copied"] = result.get("copied", [])
+                        _debug(f"backup_all_saves: {item['name']!r} {'done' if ok else 'failed'}")
+                    except Exception as e:
+                        _debug(f"backup_all_saves thread error {item['name']!r}: {e!r}")
+                        _save_sync_registry[sid]["status"] = "failed"
+                        _save_sync_registry[sid]["error"] = str(e)
+                        ok = False
+
+                    with lock:
+                        if ok:
+                            counters["done"] += 1
+                        else:
+                            counters["failed"] += 1
+                        _save_sync_registry[bid]["completed_games"] = counters["done"]
+                        _save_sync_registry[bid]["failed_games"] = counters["failed"]
+                        if counters["done"] + counters["failed"] - len(pre_failed) >= total_to_complete:
+                            _save_sync_registry[bid]["status"] = "done"
+
+                _threading.Thread(target=_run, daemon=True).start()
+
+            return {"success": True, "batch_id": batch_id, "started": [g["name"] for g in to_backup], "skipped": skipped, "failed": pre_failed}
+        except Exception as e:
+            _debug(f"backup_all_saves callable error: {e!r}")
+            return {"success": False, "error": str(e)}
+
+    async def list_save_sync_statuses(self) -> dict:
+        """Return a snapshot of all tracked save sync operations."""
+        return {k: dict(v) for k, v in _save_sync_registry.items()}
+
+    async def clear_save_sync_status(self, sync_id: str) -> dict:
+        """Remove a completed save sync entry from the registry."""
+        _save_sync_registry.pop(sync_id, None)
+        return {"success": True}
 
     async def install_dependencies(self, pfxid: str, dependencies: str) -> dict:
         return install_protontricks_dependencies(pfxid, dependencies, timeout=1200)
@@ -1448,6 +1896,60 @@ class Plugin:
         """
         return _fetch_steamgrid_art_urls(game_name)
 
+    async def search_steam_app(self, game_name: str) -> dict:
+        """Search Steam for games matching a name.
+
+        Uses the Steam Community SearchApps endpoint (more reliable than storesearch).
+        Tries several candidate terms in order, catching per-query exceptions so a
+        single bad request does not abort the whole search.
+        """
+        import urllib.request
+        import urllib.parse
+        import json
+        import re
+        from deckyfin_steamgrid import _ssl_context
+
+        def _query(term: str) -> list:
+            url = f"https://steamcommunity.com/actions/SearchApps/{urllib.parse.quote(term)}"
+            ctx = _ssl_context()
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, context=ctx, timeout=10) as resp:
+                items = json.loads(resp.read().decode())
+                return [{"id": int(item["appid"]), "name": item["name"]} for item in items if item.get("appid")]
+
+        def _candidates(full_name: str) -> list:
+            """Return search terms to try, ordered from most to least specific."""
+            terms = []
+            # 1. Strip subtitle separators to get main title first
+            main = re.split(r"\s*[-–:]\s+", full_name)[0].strip()
+            if main and main != full_name:
+                terms.append(main)
+            # 2. Full name
+            terms.append(full_name)
+            # 3. Progressive word-dropping (skip punctuation-only tokens)
+            words = [w for w in full_name.split() if re.search(r"\w", w)]
+            for end in range(len(words) - 1, 0, -1):
+                t = " ".join(words[:end])
+                if t not in terms:
+                    terms.append(t)
+            return terms
+
+        try:
+            results = []
+            for term in _candidates(game_name.strip()):
+                try:
+                    _debug(f"search_steam_app: querying '{term}'")
+                    results = _query(term)
+                    if results:
+                        break
+                except Exception as qe:
+                    _debug(f"search_steam_app: query '{term}' failed: {qe!r}")
+            _debug(f"search_steam_app: got {len(results)} results")
+            return {"success": True, "results": results[:15]}
+        except Exception as e:
+            _debug(f"search_steam_app: error {e!r}")
+            return {"success": False, "results": [], "error": str(e)}
+
     async def search_steamgrid_games(self, game_name: str) -> dict:
         """Search SteamGridDB for games matching a name. Returns all matches.
 
@@ -1480,11 +1982,11 @@ class Plugin:
         _set_steamgrid_key(key)
         return {"success": True}
 
-    async def get_game_card_art(self, game_name: str) -> dict:
+    async def get_game_card_art(self, game_name: str, unsigned_appid: Optional[int] = None) -> dict:
         """Get art for a game as a base64 data URI (for the library card).
 
-        Reads from the Steam grid folder (only for games already in Steam).
-        Games not yet in Steam show the gradient placeholder.
+        If unsigned_appid is provided, reads the grid files directly without requiring
+        the game to be in Steam's shortcuts (supports pre-Steam art application).
         """
         import base64
         try:
@@ -1493,29 +1995,32 @@ class Plugin:
             from deckyfin_consts import STEAM_USERDATA_FOLDER
 
             uid = get_user_id()
-            info = get_steam_shortcut_info(game_name, uid)
-            if info:
-                unsigned_appid = info.get("unsigned_appid")
-                if unsigned_appid:
-                    steam_root = find_steam_root()
-                    grid_folder = steam_root / STEAM_USERDATA_FOLDER / uid / "config" / "grid"
-                    appid_str = str(unsigned_appid)
-                    candidates = [
-                        grid_folder / f"{appid_str}.png",
-                        grid_folder / f"{appid_str}.jpg",
-                        grid_folder / f"{appid_str}_p.png",
-                        grid_folder / f"{appid_str}_p.jpg",
-                        grid_folder / f"{appid_str}_hero.png",
-                        grid_folder / f"{appid_str}_hero.jpg",
-                        grid_folder / f"{appid_str}_logo.png",
-                    ]
-                    for path in candidates:
-                        if path.exists():
-                            with open(path, "rb") as f:
-                                raw = f.read()
-                            ext = path.suffix.lstrip(".")
-                            b64 = base64.b64encode(raw).decode("ascii")
-                            return {"data_uri": f"data:image/{ext};base64,{b64}"}
+
+            if unsigned_appid is None:
+                info = get_steam_shortcut_info(game_name, uid)
+                if info:
+                    unsigned_appid = info.get("unsigned_appid")
+
+            if unsigned_appid:
+                steam_root = find_steam_root()
+                grid_folder = steam_root / STEAM_USERDATA_FOLDER / uid / "config" / "grid"
+                appid_str = str(unsigned_appid)
+                candidates = [
+                    grid_folder / f"{appid_str}.png",
+                    grid_folder / f"{appid_str}.jpg",
+                    grid_folder / f"{appid_str}_p.png",
+                    grid_folder / f"{appid_str}_p.jpg",
+                    grid_folder / f"{appid_str}_hero.png",
+                    grid_folder / f"{appid_str}_hero.jpg",
+                    grid_folder / f"{appid_str}_logo.png",
+                ]
+                for path in candidates:
+                    if path.exists():
+                        with open(path, "rb") as f:
+                            raw = f.read()
+                        ext = path.suffix.lstrip(".")
+                        b64 = base64.b64encode(raw).decode("ascii")
+                        return {"data_uri": f"data:image/{ext};base64,{b64}"}
 
             return {"data_uri": None}
         except Exception as e:

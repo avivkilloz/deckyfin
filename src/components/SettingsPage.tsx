@@ -18,6 +18,7 @@ const addSource = callable<
   { success: boolean; source?: Source; error?: string }
 >("add_source");
 const removeSource = callable<[source_id: string], { success: boolean }>("remove_source");
+const reorderSource = callable<[source_id: string, direction: string], { success: boolean }>("reorder_source");
 const getSourceDiskUsage = callable<[source_id: string], { used: number | null; total: number | null; free: number | null }>("get_source_disk_usage");
 const initializeSource = callable<[source_id: string], { success: boolean; message?: string }>("initialize_source");
 const listActiveTransfers = callable<
@@ -31,6 +32,8 @@ const getPopularDeps = callable<[], string[]>("get_popular_deps");
 const setPopularDeps = callable<[deps: string[]], { success: boolean }>("set_popular_deps");
 const getPopularLaunchers = callable<[], { label: string; value: string }[]>("get_popular_launchers");
 const setPopularLaunchers = callable<[launchers: { label: string; value: string }[]], { success: boolean }>("set_popular_launchers");
+const getPopularSavePrefixes = callable<[], { label: string; path: string }[]>("get_popular_save_prefixes");
+const setPopularSavePrefixes = callable<[prefixes: { label: string; path: string }[]], { success: boolean }>("set_popular_save_prefixes");
 const listProtonSources = callable<[], { id: string; name: string; type: string; repo?: string }[]>("list_proton_sources");
 const fetchProtonReleases = callable<
   [source_id: string, page: number, per_page: number],
@@ -145,6 +148,33 @@ export const SettingsPage: VFC<Props> = ({ onBack }) => {
     setNewLauncherLabel("");
     setNewLauncherValue("");
     await setPopularLaunchers(next).catch(() => {});
+  };
+
+  // ── Popular Save Prefixes ────────────────────────────────────────────────
+  type SavePrefix = { label: string; path: string };
+  const [popularSavePrefixes, setPopularSavePrefixesState] = useState<SavePrefix[]>([]);
+  const [newPfxLabel, setNewPfxLabel] = useState("");
+  const [newPfxPath, setNewPfxPath] = useState("");
+
+  useEffect(() => {
+    getPopularSavePrefixes().then((p) => setPopularSavePrefixesState(p || [])).catch(() => {});
+  }, []);
+
+  const handleRemoveSavePrefix = async (label: string) => {
+    const next = popularSavePrefixes.filter((p) => p.label !== label);
+    setPopularSavePrefixesState(next);
+    await setPopularSavePrefixes(next).catch(() => {});
+  };
+
+  const handleAddSavePrefix = async () => {
+    const label = newPfxLabel.trim();
+    const path = newPfxPath.trim().replace(/^\/+|\/+$/g, "");
+    if (!label || !path || popularSavePrefixes.some((p) => p.label === label)) return;
+    const next = [...popularSavePrefixes, { label, path }];
+    setPopularSavePrefixesState(next);
+    setNewPfxLabel("");
+    setNewPfxPath("");
+    await setPopularSavePrefixes(next).catch(() => {});
   };
 
   // ── Steam Collections ──────────────────────────────────────────────────────
@@ -402,6 +432,13 @@ export const SettingsPage: VFC<Props> = ({ onBack }) => {
     } catch {}
   };
 
+  const handleReorderSource = async (source_id: string, direction: "up" | "down") => {
+    try {
+      await reorderSource(source_id, direction);
+      await loadSources();
+    } catch {}
+  };
+
   const handleRescanSource = async (source_id: string) => {
     try {
       const res = await initializeSource(source_id);
@@ -607,61 +644,70 @@ export const SettingsPage: VFC<Props> = ({ onBack }) => {
       {sources.length === 0 && !showAddForm && (
         <p style={{ fontSize: "0.85em", color: "#888" }}>No sources configured. Add one above.</p>
       )}
-      {sources.map((src) => {
+      {sources.map((src, srcIdx) => {
         const usage = diskUsages[src.id];
         const usedPct = usage?.total ? Math.round((usage.used! / usage.total) * 100) : null;
         const typeColor = src.type === "local" ? "#27ae60" : src.type === "mount" ? "#e67e22" : "#0984e3";
         const typeBg = src.type === "local" ? "#1a3a1a" : src.type === "mount" ? "#2a2a1a" : "#1a1a3a";
         const offline = !usage?.total && usage?.total !== undefined;
+        const xfer = activeTransfers.find((t) => t.to_source_id === src.id && t.status === "running");
         return (
-          <div key={src.id} style={{ border: "1px solid #444", borderRadius: "6px", padding: "10px", marginBottom: "8px", opacity: offline ? 0.7 : 1 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-              <div>
-                <span style={{ fontWeight: 600, color: "#e0e0e0" }}>{src.name}</span>
+          <div key={src.id} style={{ border: "1px solid #3a3a3a", borderRadius: "6px", marginBottom: "8px", opacity: offline ? 0.7 : 1 }}>
+            {/* Header */}
+            <Focusable focusClassName="" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "#1e1e1e", borderRadius: "6px 6px 0 0" }}>
+              <span style={{ fontWeight: 600, fontSize: "0.9em", color: "#e0e0e0" }}>
+                {src.name}
                 {offline && <span style={{ marginLeft: "6px", fontSize: "0.75em", color: "#e74c3c" }}>⚠ offline</span>}
-              </div>
-              <div style={{ display: "flex", gap: "4px" }}>
-                <Focusable onActivate={() => handleRescanSource(src.id)} onClick={() => handleRescanSource(src.id)} focusClassName="is-focused"
-                  style={{ ...BTN_STYLE, fontSize: "0.75em", padding: "2px 8px" }}>
-                  {sourceMessage?.id === src.id ? sourceMessage.msg : "Rescan"}
+              </span>
+              <Focusable focusClassName="" style={{ display: "flex", gap: "4px" }}>
+                <Focusable onActivate={() => handleReorderSource(src.id, "up")} onClick={() => handleReorderSource(src.id, "up")} focusClassName="is-focused"
+                  style={{ ...BTN_STYLE, fontSize: "0.75em", padding: "2px 6px", opacity: srcIdx === 0 ? 0.3 : 1 }}>
+                  ▲
                 </Focusable>
-                <Focusable onActivate={() => handleRemoveSource(src.id)} onClick={() => handleRemoveSource(src.id)} focusClassName="is-focused"
-                  style={{ ...BTN_STYLE, fontSize: "0.75em", padding: "2px 8px", borderColor: "#c0392b", color: "#e74c3c" }}>
-                  Remove
+                <Focusable onActivate={() => handleReorderSource(src.id, "down")} onClick={() => handleReorderSource(src.id, "down")} focusClassName="is-focused"
+                  style={{ ...BTN_STYLE, fontSize: "0.75em", padding: "2px 6px", opacity: srcIdx === sources.length - 1 ? 0.3 : 1 }}>
+                  ▼
+                </Focusable>
+              </Focusable>
+            </Focusable>
+            {/* Content */}
+            <div style={{ padding: "8px 12px", borderTop: "1px solid #2a2a2a" }}>
+              {/* Type pill + action buttons */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                <span style={{ padding: "2px 7px", fontSize: "0.75em", borderRadius: "10px", background: typeBg, color: typeColor, border: `1px solid ${typeColor}` }}>
+                  {src.type}
+                </span>
+                <Focusable focusClassName="" style={{ display: "flex", gap: "4px" }}>
+                  <Focusable onActivate={() => handleRescanSource(src.id)} onClick={() => handleRescanSource(src.id)} focusClassName="is-focused"
+                    style={{ ...BTN_STYLE, fontSize: "0.75em", padding: "2px 8px" }}>
+                    {sourceMessage?.id === src.id ? sourceMessage.msg : "Rescan"}
+                  </Focusable>
+                  <Focusable onActivate={() => handleRemoveSource(src.id)} onClick={() => handleRemoveSource(src.id)} focusClassName="is-focused"
+                    style={{ ...BTN_STYLE, fontSize: "0.75em", padding: "2px 8px", borderColor: "#c0392b", color: "#e74c3c" }}>
+                    Remove
+                  </Focusable>
                 </Focusable>
               </div>
+              {/* Path */}
+              <div style={{ fontSize: "0.78em", color: "#666", marginBottom: "6px" }}>{src.path || src.url}</div>
+              {/* Disk usage */}
+              {usedPct !== null && (
+                <>
+                  <div style={{ fontSize: "0.75em", color: "#888", marginBottom: "3px", display: "flex", justifyContent: "space-between" }}>
+                    <span>Disk</span>
+                    <span>{Math.round(usage!.used! / 1e9)} GB / {Math.round(usage!.total! / 1e9)} GB</span>
+                  </div>
+                  <div style={{ height: "5px", background: "#333", borderRadius: "3px", overflow: "hidden" }}>
+                    <div style={{ width: `${usedPct}%`, height: "100%", background: typeColor, borderRadius: "3px" }} />
+                  </div>
+                </>
+              )}
+              {offline && <div style={{ fontSize: "0.75em", color: "#555" }}>Disk info unavailable</div>}
+              {xfer && (() => {
+                const pct = xfer.total_bytes > 0 ? Math.round((xfer.bytes_copied / xfer.total_bytes) * 100) : 0;
+                return <div style={{ fontSize: "0.75em", color: "#e67e22", marginTop: "4px" }}>⟳ Receiving {xfer.game_name}… {pct}%</div>;
+              })()}
             </div>
-            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "4px" }}>
-              <span style={{ padding: "2px 7px", fontSize: "0.75em", borderRadius: "10px", background: typeBg, color: typeColor, border: `1px solid ${typeColor}` }}>{src.type}</span>
-            </div>
-            <div style={{ fontSize: "0.78em", color: "#666", marginBottom: "6px" }}>{src.path || src.url}</div>
-            {usedPct !== null && (
-              <>
-                <div style={{ fontSize: "0.75em", color: "#888", marginBottom: "3px", display: "flex", justifyContent: "space-between" }}>
-                  <span>Disk</span>
-                  <span>{Math.round(usage!.used! / 1e9)} GB / {Math.round(usage!.total! / 1e9)} GB</span>
-                </div>
-                <div style={{ height: "5px", background: "#333", borderRadius: "3px", overflow: "hidden" }}>
-                  <div style={{ width: `${usedPct}%`, height: "100%", background: typeColor, borderRadius: "3px" }} />
-                </div>
-              </>
-            )}
-            {offline && <div style={{ fontSize: "0.75em", color: "#555" }}>Disk info unavailable</div>}
-            {(() => {
-              const xfer = activeTransfers.find(
-                (t) => t.to_source_id === src.id && t.status === "running",
-              );
-              if (!xfer) return null;
-              const pct =
-                xfer.total_bytes > 0
-                  ? Math.round((xfer.bytes_copied / xfer.total_bytes) * 100)
-                  : 0;
-              return (
-                <div style={{ fontSize: "0.75em", color: "#e67e22", marginTop: "4px" }}>
-                  ⟳ Receiving {xfer.game_name}… {pct}%
-                </div>
-              );
-            })()}
           </div>
         );
       })}
@@ -864,6 +910,63 @@ export const SettingsPage: VFC<Props> = ({ onBack }) => {
         <Focusable
           onActivate={handleAddLauncher}
           onClick={handleAddLauncher}
+          focusClassName="is-focused"
+          style={{ ...BTN_STYLE, padding: "6px 12px", whiteSpace: "nowrap" as const }}
+        >
+          Add
+        </Focusable>
+      </div>
+
+      <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.12)", margin: "20px 0" }} />
+
+      {/* ── Popular Save Prefixes ─────────────────────────────────────────── */}
+      <h4 style={{ margin: "0 0 6px 0" }}>Popular Save Prefixes</h4>
+      <p style={{ fontSize: "0.85em", color: "#aaa", marginBottom: "10px" }}>
+        Custom prefix shortcuts that appear in each game's Save Paths picker, alongside the built-in ones (Roaming, Local, etc.).
+      </p>
+      <Focusable focusClassName="" style={{ display: "flex", flexDirection: "column" as const, gap: "4px", marginBottom: "10px" }}>
+        {popularSavePrefixes.map((pfx) => (
+          <Focusable
+            key={pfx.label}
+            focusClassName=""
+            style={{ display: "flex", alignItems: "stretch", gap: "8px", padding: "6px 8px", border: "1px solid #3a3a3a", borderRadius: "6px" }}
+          >
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 600, fontSize: "0.85em", color: "#e0e0e0", marginBottom: "2px" }}>{pfx.label}</div>
+              <div style={{ fontSize: "0.78em", color: "#666", fontFamily: "monospace", wordBreak: "break-all" as const }}>{pfx.path}</div>
+            </div>
+            <Focusable
+              onActivate={() => handleRemoveSavePrefix(pfx.label)}
+              onClick={() => handleRemoveSavePrefix(pfx.label)}
+              focusClassName="is-focused"
+              style={{ ...BTN_STYLE, fontSize: "0.72em", padding: "2px 8px", borderColor: "#c0392b", color: "#e74c3c", flexShrink: 0, alignSelf: "center" }}
+            >
+              Remove
+            </Focusable>
+          </Focusable>
+        ))}
+        {popularSavePrefixes.length === 0 && (
+          <span style={{ fontSize: "0.82em", color: "#666" }}>No custom prefixes yet</span>
+        )}
+      </Focusable>
+      <div style={{ border: "1px solid #444", borderRadius: "6px", padding: "10px", marginBottom: "6px" }}>
+        <div style={{ fontSize: "0.78em", color: "#888", marginBottom: "4px" }}>Label <span style={{ color: "#555" }}>(shown in picker chips)</span></div>
+        <CompactTextField
+          value={newPfxLabel}
+          onChange={(e) => setNewPfxLabel(e.target.value)}
+          placeholder="e.g. AppData"
+          style={{ width: "100%", marginBottom: "8px" }}
+        />
+        <div style={{ fontSize: "0.78em", color: "#888", marginBottom: "4px" }}>Path <span style={{ color: "#555" }}>(relative to prefix root, no leading slash)</span></div>
+        <CompactTextField
+          value={newPfxPath}
+          onChange={(e) => setNewPfxPath(e.target.value)}
+          placeholder="e.g. drive_c/users/steamuser/AppData"
+          style={{ width: "100%", marginBottom: "8px" }}
+        />
+        <Focusable
+          onActivate={handleAddSavePrefix}
+          onClick={handleAddSavePrefix}
           focusClassName="is-focused"
           style={{ ...BTN_STYLE, padding: "6px 12px", whiteSpace: "nowrap" as const }}
         >

@@ -34,8 +34,8 @@ const setGameProton = callable<
   { success: boolean; app_id?: number; proton_name?: string; error?: string }
 >("set_game_proton");
 const initPrefix = callable<
-  [app_id: number, proton_name?: string, reinitialize?: boolean],
-  { success: boolean; error?: string }
+  [app_id: number, proton_name?: string, reinitialize?: boolean, game_name?: string],
+  { success: boolean; prefix_id?: string; app_id?: number; error?: string }
 >("init_prefix");
 const startDepInstall = callable<
   [game_name: string, source_id: string, pfxid: string, dependencies: string],
@@ -62,6 +62,11 @@ const searchSteamgridGames = callable<
   [game_name: string],
   { success: boolean; games: Array<{ id: number; name: string }> }
 >("search_steamgrid_games");
+const searchSteamApp = callable<
+  [game_name: string],
+  { success: boolean; results: Array<{ id: number; name: string }>; error?: string }
+>("search_steam_app");
+const getGameCardArt = callable<[game_name: string, unsigned_appid?: number], { data_uri: string | null }>("get_game_card_art");
 const setGameProcessingState = callable<
   [name: string, state: Record<string, any> | null, source_id: string],
   { success: boolean }
@@ -78,8 +83,35 @@ const listSteamCollections = callable<[], string[]>("list_steam_collections");
 const listAllSources = callable<[], import("../types").Source[]>("list_sources");
 const copyGameConfig = callable<
   [game_name: string, from_source_id: string, to_source_id: string],
-  { success: boolean; error?: string }
+  { success: boolean; copy_id?: string; error?: string }
 >("copy_game_config");
+const listConfigCopyStatuses = callable<
+  [],
+  Record<string, { copy_id: string; game_name: string; from_source_id: string; to_source_id: string; status: string; error: string | null }>
+>("list_config_copy_statuses");
+const clearConfigCopyStatus = callable<[copy_id: string], { success: boolean }>("clear_config_copy_status");
+const listPrefixInitStatuses = callable<
+  [],
+  Record<string, { prefix_id: string; game_name: string; app_id: number; status: string; error: string | null }>
+>("list_prefix_init_statuses");
+const clearPrefixInitStatus = callable<[prefix_id: string], { success: boolean }>("clear_prefix_init_status");
+const getUiState = callable<[], Record<string, any>>("get_ui_state");
+const saveUiState = callable<[state: Record<string, any>], { success: boolean }>("save_ui_state");
+const getGamePrefixPath = callable<[shortcut_app_id: number], string | null>("get_game_prefix_path");
+const listDirContents = callable<[path: string], { dirs: string[]; files: string[] }>("list_dir_contents");
+const syncSaves = callable<
+  [game_name: string, source_id: string, direction: string, shortcut_app_id: number],
+  { success: boolean; sync_id?: string; error?: string }
+>("sync_saves");
+const copySavesBetweenSources = callable<
+  [game_name: string, from_source_id: string, to_source_id: string],
+  { success: boolean; sync_id?: string; error?: string }
+>("copy_saves_between_sources");
+const listSaveSyncStatuses = callable<
+  [],
+  Record<string, { sync_id: string; game_name: string; source_id: string; direction: string; from_source_id?: string; to_source_id?: string; status: string; error: string | null; copied: string[]; saves_dir?: string }>
+>("list_save_sync_statuses");
+const clearSaveSyncStatus = callable<[sync_id: string], { success: boolean }>("clear_save_sync_status");
 const startGameTransfer = callable<
   [game_name: string, from_source_id: string, to_source_id: string],
   { success: boolean; transfer_id?: string; error?: string }
@@ -102,6 +134,15 @@ const getGameSize = callable<
 >("get_game_size");
 const getPopularDeps = callable<[], string[]>("get_popular_deps");
 const getPopularLaunchers = callable<[], { label: string; value: string }[]>("get_popular_launchers");
+const getPopularSavePrefixes = callable<[], { label: string; path: string }[]>("get_popular_save_prefixes");
+const applySteamGridLegacy = callable<
+  [game_name: string, unsigned_appid: number],
+  { success: boolean; applied: string[]; errors: string[] }
+>("apply_steam_grid");
+const calcShortcutAppId = callable<
+  [app_name: string, exe_path: string],
+  { success: boolean; unsigned_appid?: number }
+>("calc_shortcut_app_id");
 
 export type PopularLauncher = { label: string; value: string };
 
@@ -158,6 +199,9 @@ interface Props {
   game: MergedGame;
   onBack: () => void;
   onNeedsRestart?: () => void;
+  onNavigateToSettings?: () => void;
+  initialSourceId?: string | null;
+  runningTaskCount?: number;
 }
 
 const LABEL_STYLE: React.CSSProperties = {
@@ -183,7 +227,7 @@ const fmtBytes = (b: number): string => {
   return `${(b / 1e3).toFixed(0)} KB`;
 };
 
-export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
+export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigateToSettings, initialSourceId, runningTaskCount = 0 }) => {
   // ── Refs ─────────────────────────────────────────────────────────────
   const rootRef = useRef<HTMLDivElement>(null);
   const backRef = useRef<HTMLDivElement>(null);
@@ -195,7 +239,13 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   }, []);
 
   // ── Source selector ────────────────────────────────────────────────────────
-  const [selectedSourceIdx, setSelectedSourceIdx] = useState(0);
+  const [selectedSourceIdx, setSelectedSourceIdx] = useState(() => {
+    if (initialSourceId) {
+      const idx = game.sources.findIndex((s) => s.source_id === initialSourceId);
+      if (idx >= 0) return idx;
+    }
+    return 0;
+  });
   const [showSourcePicker, setShowSourcePicker] = useState(false);
   const [capabilities, setCapabilities] = useState<SourceCapabilities>({
     can_play: true,
@@ -235,7 +285,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
     currentConfig.steam_app_id
   );
   const [steamAppIdInput, setSteamAppIdInput] = useState(
-    currentConfig.steam_app_id !== undefined ? String(currentConfig.steam_app_id) : ""
+    currentConfig.steam_app_id != null ? String(currentConfig.steam_app_id) : ""
   );
 
   const [protonVersion, setProtonVersion] = useState(
@@ -286,23 +336,96 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   const popularLaunchersRef = useRef<PopularLauncher[]>([]);
   const [checkedLaunchers, setCheckedLaunchers] = useState<string[]>([]);
 
+  // ── Custom save prefixes (loaded from settings) ───────────────────────────
+  const [customSavePrefixes, setCustomSavePrefixes] = useState<{ label: string; path: string }[]>([]);
+
+  // ── Combined init: game config, popular deps/launchers, ui_state draft ────
+  // Runs on mount and whenever game or source changes.
+  // Loads everything in parallel so the draft is applied AFTER the saved config,
+  // ensuring unsaved form changes survive sidebar close/reopen.
   useEffect(() => {
-    getPopularDeps().then((d) => {
-      const deps = d || [];
-      popularDepsRef.current = deps;
-      setPopularDeps(deps);
-      const existing = currentConfig.proton_dependencies || [];
-      setCheckedDeps(existing.filter((dep) => deps.includes(dep)));
-      setCustomDeps(existing.filter((dep) => !deps.includes(dep)).join(", "));
-    }).catch(() => {});
-    getPopularLaunchers().then((l) => {
-      const launchers = l || [];
-      popularLaunchersRef.current = launchers;
-      setPopularLaunchers(launchers);
-      const existing = currentConfig.selected_launchers || [];
-      setCheckedLaunchers(existing.filter((lbl) => launchers.some((pl) => pl.label === lbl)));
-    }).catch(() => {});
-  }, [game.name]);
+    let cancelled = false;
+    const init = async () => {
+      const [gameRes, uiStateRes, depsRes, launchersRes, savePfxRes] = await Promise.allSettled([
+        getGame(game.name, selectedSource.source_id),
+        getUiState(),
+        getPopularDeps(),
+        getPopularLaunchers(),
+        getPopularSavePrefixes(),
+      ]);
+      if (cancelled) return;
+
+      const popularDeps = depsRes.status === "fulfilled" ? (depsRes.value || []) : [];
+      const popularLaunchers = launchersRes.status === "fulfilled" ? (launchersRes.value || []) : [];
+      popularDepsRef.current = popularDeps;
+      setPopularDeps(popularDeps);
+      popularLaunchersRef.current = popularLaunchers;
+      setPopularLaunchers(popularLaunchers);
+      setCustomSavePrefixes(savePfxRes.status === "fulfilled" ? (savePfxRes.value || []) : []);
+
+      if (gameRes.status === "fulfilled" && gameRes.value?.success && gameRes.value.game) {
+        const g = gameRes.value.game;
+        setName(g.name);
+        setStoredName(g.name);
+        setExecutable(g.executable);
+        setStartDir(g.start_dir || "");
+        setSteamAppId(g.steam_app_id);
+        setSteamAppIdInput(g.steam_app_id != null ? String(g.steam_app_id) : "");
+        setProtonVersion(g.proton_version || "");
+        setLaunchOptions(g.launch_options || "");
+        const freshDeps = g.proton_dependencies || [];
+        setCheckedDeps(freshDeps.filter((d: string) => popularDeps.includes(d)));
+        setCustomDeps(freshDeps.filter((d: string) => !popularDeps.includes(d)).join(", "));
+        const freshLaunchers = g.selected_launchers || [];
+        setCheckedLaunchers(freshLaunchers.filter((lbl: string) => popularLaunchers.some((l: PopularLauncher) => l.label === lbl)));
+        const freshColls = g.collections || [];
+        setCheckedCollections(freshColls.filter((c: string) => steamCollections.includes(c)));
+        setCustomCollections(freshColls.filter((c: string) => !steamCollections.includes(c)).join(", "));
+        setNeedsRestart(g.needs_restart ?? false);
+        setNeedsRestartAfterAdd(g.needs_restart_after_add ?? false);
+        setSyncPaths(g.proton_sync_paths || []);
+        setConfigSnapshot({
+          name: g.name, executable: g.executable, start_dir: g.start_dir || null,
+          steam_app_id: g.steam_app_id ?? null, proton_version: g.proton_version || null,
+          proton_dependencies: g.proton_dependencies || [],
+          proton_sync_paths: g.proton_sync_paths || [],
+          launch_options: g.launch_options || null,
+          selected_launchers: g.selected_launchers || [], collections: g.collections || [],
+          steamgriddb_game_id: g.steamgriddb_game_id ?? null,
+        });
+        if (g.steam_snapshot) {
+          try { setLastSyncedSnapshot(JSON.parse(g.steam_snapshot)); } catch {}
+        } else {
+          setLastSyncedSnapshot(null);
+        }
+        setLastInstalledDeps(g.deps_snapshot ?? []);
+      }
+
+      // Apply saved draft on top to restore any unsaved form changes
+      const uiState = uiStateRes.status === "fulfilled" ? uiStateRes.value : null;
+      const draft = (uiState?.game_name === game.name && uiState?.source_id === selectedSource.source_id && uiState?.draft)
+        ? uiState.draft : null;
+      if (draft) {
+        if (draft.name !== undefined) setName(draft.name);
+        if (draft.executable !== undefined) setExecutable(draft.executable);
+        if (draft.start_dir !== undefined) setStartDir(draft.start_dir);
+        if (draft.steam_app_id !== undefined) {
+          setSteamAppId(draft.steam_app_id ?? undefined);
+          setSteamAppIdInput(draft.steam_app_id != null ? String(draft.steam_app_id) : "");
+        }
+        if (draft.proton_version !== undefined) setProtonVersion(draft.proton_version);
+        if (draft.launch_options !== undefined) setLaunchOptions(draft.launch_options);
+        if (draft.checked_launchers !== undefined) setCheckedLaunchers(draft.checked_launchers);
+        if (draft.checked_deps !== undefined) setCheckedDeps(draft.checked_deps);
+        if (draft.custom_deps !== undefined) setCustomDeps(draft.custom_deps);
+        if (draft.checked_collections !== undefined) setCheckedCollections(draft.checked_collections);
+        if (draft.custom_collections !== undefined) setCustomCollections(draft.custom_collections);
+        if (draft.sync_paths !== undefined) setSyncPaths(draft.sync_paths);
+      }
+    };
+    init().catch(() => {});
+    return () => { cancelled = true; };
+  }, [game.name, selectedSource?.source_id]);
 
   const mergedDeps = ((): string[] => {
     const custom = customDeps
@@ -345,7 +468,6 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
   const [configFeedback, setConfigFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
   const [sgdbFeedback, setSgdbFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
-  const [forceReinit, setForceReinit] = useState(false);
   const [restarting, setRestarting] = useState(false);
 
   // ── Green button state ────────────────────────────────────────────────────
@@ -371,9 +493,11 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
     steam_app_id: currentConfig.steam_app_id ?? null,
     proton_version: currentConfig.proton_version || null,
     proton_dependencies: currentConfig.proton_dependencies || [],
+    proton_sync_paths: currentConfig.proton_sync_paths || [],
     launch_options: currentConfig.launch_options || null,
     selected_launchers: currentConfig.selected_launchers || [],
     collections: currentConfig.collections || [],
+    steamgriddb_game_id: currentConfig.steamgriddb_game_id ?? null,
   }));
 
   // ── Confirmation state (inline, CEF confirm() is blocked) ──────────────
@@ -394,17 +518,66 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
   const [sgdbGames, setSgdbGames] = useState<Array<{ id: number; name: string }>>([]);
   const [showSgdbPicker, setShowSgdbPicker] = useState(false);
   const [selectedSgdbGame, setSelectedSgdbGame] = useState<{ id: number; name: string } | null>(null);
+  const [sgdbGameId, setSgdbGameId] = useState<number | null>(currentConfig.steamgriddb_game_id ?? null);
+  const [sgdbGameIdInput, setSgdbGameIdInput] = useState(currentConfig.steamgriddb_game_id != null ? String(currentConfig.steamgriddb_game_id) : "");
+  const [showSteamAppPicker, setShowSteamAppPicker] = useState(false);
+  const [steamAppResults, setSteamAppResults] = useState<Array<{ id: number; name: string }>>([]);
 
   // ── Dep install background tracking ──────────────────────────────────────
   type DepInstallEntry = { status: string; installed: string[]; failed_deps: string[]; error: string | null };
   const [depInstall, setDepInstall] = useState<DepInstallEntry | null>(null);
   const pendingDepsRef = useRef<string[]>([]);
 
+  // ── Config copy background tracking ──────────────────────────────────────
+  type ConfigCopyEntry = { copy_id: string; status: string; error: string | null };
+  const [configCopy, setConfigCopy] = useState<ConfigCopyEntry | null>(null);
+
+  // ── Prefix init background tracking ──────────────────────────────────────
+  type PrefixInitEntry = { prefix_id: string; status: string; error: string | null };
+  const [prefixInit, setPrefixInit] = useState<PrefixInitEntry | null>(null);
+
+  // ── Save paths & sync tracking ────────────────────────────────────────────
+  const [syncPaths, setSyncPaths] = useState<string[]>(currentConfig.proton_sync_paths || []);
+  const [selectedPfx, setSelectedPfx] = useState("Roaming");
+  const [syncSuffix, setSyncSuffix] = useState("");
+  type SaveSyncEntry = { sync_id: string; direction: string; status: string; error: string | null; copied: string[]; from_source_id?: string; to_source_id?: string; saves_dir?: string };
+  const [saveSync, setSaveSync] = useState<SaveSyncEntry | null>(null);
+  const [showCopySavesPicker, setShowCopySavesPicker] = useState(false);
+  const [copySavesDest, setCopySavesDest] = useState<GameSource | null>(null);
+  const [copySavesConfirming, setCopySavesConfirming] = useState(false);
+
   // ── Proton versions ─────────────────────────────────────────────────────
   const [protonVersions, setProtonVersions] = useState<string[]>([]);
 
+  // ── Prefix file browser ───────────────────────────────────────────────────
+  const [showPrefixBrowser, setShowPrefixBrowser] = useState(false);
+  const [showLaunchOptions, setShowLaunchOptions] = useState(false);
+  const [showCollections, setShowCollections] = useState(false);
+  const [showDependencies, setShowDependencies] = useState(false);
+  const [showProtonVersion, setShowProtonVersion] = useState(false);
+  const [showSavePaths, setShowSavePaths] = useState(false);
+  const [showGameSettings, setShowGameSettings] = useState(false);
+  const [showSteamActions, setShowSteamActions] = useState(false);
+  const [showArtActions, setShowArtActions] = useState(false);
+  const [showPrefixActions, setShowPrefixActions] = useState(false);
+  const [showTransferActions, setShowTransferActions] = useState(false);
+  const [showSaveActions, setShowSaveActions] = useState(false);
+  const [showMetadata, setShowMetadata] = useState(false);
+  const [showDangerZone, setShowDangerZone] = useState(false);
+  const [showReinitConfirm, setShowReinitConfirm] = useState(false);
+  const [pfxBrowseFeedback, setPfxBrowseFeedback] = useState<string | null>(null);
+  const [prefixRoot, setPrefixRoot] = useState<string | null>(null);
+  const [pfxBrowserPath, setPfxBrowserPath] = useState<string>("");
+  const [pfxBrowserDirs, setPfxBrowserDirs] = useState<string[]>([]);
+  const [pfxBrowserFiles, setPfxBrowserFiles] = useState<string[]>([]);
+  const [pfxBrowserLoading, setPfxBrowserLoading] = useState(false);
+
   // ── Artwork ───────────────────────────────────────────────────────────────
   const { applyArtById } = useArtwork();
+  const [headerArtUri, setHeaderArtUri] = useState<string | null>(null);
+  useEffect(() => {
+    getGameCardArt(game.name).then((r) => setHeaderArtUri(r.data_uri || null)).catch(() => setHeaderArtUri(null));
+  }, [game.name]);
 
   // ── Load capabilities when source changes ─────────────────────────────────
   useEffect(() => {
@@ -422,7 +595,9 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
     setExecutable(currentConfig.executable);
     setStartDir(currentConfig.start_dir || "");
     setSteamAppId(currentConfig.steam_app_id);
-    setSteamAppIdInput(currentConfig.steam_app_id !== undefined ? String(currentConfig.steam_app_id) : "");
+    setSteamAppIdInput(currentConfig.steam_app_id != null ? String(currentConfig.steam_app_id) : "");
+    setSgdbGameId(currentConfig.steamgriddb_game_id ?? null);
+    setSelectedSgdbGame(null);
     setProtonVersion(currentConfig.proton_version || "");
     setLaunchOptions(currentConfig.launch_options || "");
     const srcDeps = currentConfig.proton_dependencies || [];
@@ -448,66 +623,19 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
       steam_app_id: currentConfig.steam_app_id ?? null,
       proton_version: currentConfig.proton_version || null,
       proton_dependencies: currentConfig.proton_dependencies || [],
+      proton_sync_paths: currentConfig.proton_sync_paths || [],
       launch_options: currentConfig.launch_options || null,
       selected_launchers: currentConfig.selected_launchers || [],
       collections: currentConfig.collections || [],
+      steamgriddb_game_id: currentConfig.steamgriddb_game_id ?? null,
     });
     setNeedsRestartAfterAdd(currentConfig.needs_restart_after_add ?? false);
     setNeedsRestart(currentConfig.needs_restart ?? false);
   }, [selectedSourceIdx]);
 
-  // ── Init on mount ───────────────────────────────────────────────────────
   useEffect(() => {
-    listProtonVersions()
-      .then(setProtonVersions)
-      .catch(() => setProtonVersions([]));
-    // Fetch fresh game config — parent's games array may be stale after Apply Config
-    getGame(game.name, selectedSource.source_id).then((res) => {
-      if (res.success && res.game) {
-        const g = res.game;
-        // Refresh all form fields so they reflect the latest saved config
-        setName(g.name);
-        setStoredName(g.name);
-        setExecutable(g.executable);
-        setStartDir(g.start_dir || "");
-        setSteamAppId(g.steam_app_id);
-        setSteamAppIdInput(g.steam_app_id !== undefined ? String(g.steam_app_id) : "");
-        setProtonVersion(g.proton_version || "");
-        setLaunchOptions(g.launch_options || "");
-        const freshDeps = g.proton_dependencies || [];
-        const pd = popularDepsRef.current;
-        setCheckedDeps(freshDeps.filter((d) => pd.includes(d)));
-        setCustomDeps(freshDeps.filter((d) => !pd.includes(d)).join(", "));
-        const freshLaunchers = g.selected_launchers || [];
-        const pl = popularLaunchersRef.current;
-        setCheckedLaunchers(freshLaunchers.filter((lbl) => pl.some((l) => l.label === lbl)));
-        const freshColls = g.collections || [];
-        setCheckedCollections(freshColls.filter((c) => steamCollections.includes(c)));
-        setCustomCollections(freshColls.filter((c) => !steamCollections.includes(c)).join(", "));
-        setNeedsRestart(g.needs_restart ?? false);
-        setNeedsRestartAfterAdd(g.needs_restart_after_add ?? false);
-        // Sync configSnapshot with what's actually on disk
-        setConfigSnapshot({
-          name: g.name,
-          executable: g.executable,
-          start_dir: g.start_dir || null,
-          steam_app_id: g.steam_app_id ?? null,
-          proton_version: g.proton_version || null,
-          proton_dependencies: g.proton_dependencies || [],
-          launch_options: g.launch_options || null,
-          selected_launchers: g.selected_launchers || [],
-          collections: g.collections || [],
-        });
-        // Restore persisted snapshots so green state survives navigation
-        if (g.steam_snapshot) {
-          try { setLastSyncedSnapshot(JSON.parse(g.steam_snapshot)); } catch {}
-        } else {
-          setLastSyncedSnapshot(null);
-        }
-        setLastInstalledDeps(g.deps_snapshot ?? []);
-      }
-    }).catch(() => {});
-  }, [game.name, selectedSource?.source_id]);
+    listProtonVersions().then(setProtonVersions).catch(() => setProtonVersions([]));
+  }, []);
 
   useEffect(() => {
     // Mark all sources as loading (null), then fetch sizes one by one
@@ -631,7 +759,168 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
     return () => clearInterval(poll);
   }, [depInstall?.status, game.name, selectedSource?.source_id]);
 
-  // ── Auto-save (none — use "Apply Config" button) ─────────────────────
+  // ── Poll config copy status while running ─────────────────────────────
+  useEffect(() => {
+    if (!configCopy || configCopy.status !== "running") return;
+    const poll = setInterval(async () => {
+      try {
+        const statuses = await listConfigCopyStatuses();
+        const s = statuses?.[configCopy.copy_id];
+        if (!s || s.status !== "running") {
+          clearInterval(poll);
+          setConfigCopy(s ? { copy_id: s.copy_id, status: s.status, error: s.error } : null);
+        }
+      } catch {}
+    }, 1000);
+    return () => clearInterval(poll);
+  }, [configCopy?.status, configCopy?.copy_id]);
+
+  // ── Poll prefix init status while running ─────────────────────────────
+  useEffect(() => {
+    if (!prefixInit || prefixInit.status !== "running") return;
+    const poll = setInterval(async () => {
+      try {
+        const statuses = await listPrefixInitStatuses();
+        const s = statuses?.[prefixInit.prefix_id];
+        if (!s || s.status !== "running") {
+          clearInterval(poll);
+          setPrefixInit(s ? { prefix_id: s.prefix_id, status: s.status, error: s.error } : null);
+        }
+      } catch {}
+    }, 2000);
+    return () => clearInterval(poll);
+  }, [prefixInit?.status, prefixInit?.prefix_id]);
+
+  // ── Poll save sync status while running ───────────────────────────────────
+  useEffect(() => {
+    if (!saveSync || saveSync.status !== "running") return;
+    const poll = setInterval(async () => {
+      try {
+        const statuses = await listSaveSyncStatuses();
+        const s = statuses?.[saveSync.sync_id];
+        if (!s || s.status !== "running") {
+          clearInterval(poll);
+          setSaveSync(s ? { sync_id: s.sync_id, direction: s.direction, status: s.status, error: s.error, copied: s.copied, from_source_id: s.from_source_id, to_source_id: s.to_source_id, saves_dir: s.saves_dir } : null);
+        }
+      } catch {}
+    }, 2000);
+    return () => clearInterval(poll);
+  }, [saveSync?.status, saveSync?.sync_id]);
+
+  // ── Save sync handlers ────────────────────────────────────────────────────
+  type SaveSyncRes = { success: boolean; sync_id?: string; error?: string };
+
+  const handleBackupSaves = async () => {
+    if (!steamInfo) return;
+    const res: SaveSyncRes = await syncSaves(game.name, selectedSource.source_id, "backup", steamInfo.unsigned_appid).catch((e) => ({ success: false, error: String(e) }));
+    if (res.success && res.sync_id) {
+      setSaveSync({ sync_id: res.sync_id, direction: "backup", status: "running", error: null, copied: [] });
+    } else {
+      setSaveSync({ sync_id: "", direction: "backup", status: "failed", error: res.error ?? "Failed to start backup", copied: [] });
+    }
+  };
+
+  const handleRestoreSaves = async () => {
+    if (!steamInfo) return;
+    const res: SaveSyncRes = await syncSaves(game.name, selectedSource.source_id, "restore", steamInfo.unsigned_appid).catch((e) => ({ success: false, error: String(e) }));
+    if (res.success && res.sync_id) {
+      setSaveSync({ sync_id: res.sync_id, direction: "restore", status: "running", error: null, copied: [] });
+    } else {
+      setSaveSync({ sync_id: "", direction: "restore", status: "failed", error: res.error ?? "Failed to start restore", copied: [] });
+    }
+  };
+
+  const handleCopySaves = async () => {
+    if (!copySavesDest) return;
+    setCopySavesConfirming(false);
+    const dest = copySavesDest;
+    setCopySavesDest(null);
+    const res: SaveSyncRes = await copySavesBetweenSources(game.name, selectedSource.source_id, dest.source_id).catch((e) => ({ success: false, error: String(e) }));
+    if (res.success && res.sync_id) {
+      setSaveSync({ sync_id: res.sync_id, direction: "copy", status: "running", error: null, copied: [], to_source_id: dest.source_id });
+    } else {
+      setSaveSync({ sync_id: "", direction: "copy", status: "failed", error: res.error ?? "Failed to start copy", copied: [], to_source_id: dest.source_id });
+    }
+  };
+
+  // ── Track nav view so Back restores to this game ──────────────────────────
+  useEffect(() => {
+    saveUiState({ view: "game-detail", game_name: game.name, source_id: selectedSource?.source_id, draft: null }).catch(() => {});
+  }, [game.name, selectedSource?.source_id]);
+
+  // ── Refs for auto-save (avoid stale closures without extra deps) ───────────
+  const storedNameRef = useRef(storedName);
+  useEffect(() => { storedNameRef.current = storedName; }, [storedName]);
+  const selectedSourceIdRef = useRef(selectedSource?.source_id);
+  useEffect(() => { selectedSourceIdRef.current = selectedSource?.source_id; }, [selectedSource?.source_id]);
+  const canWriteRef = useRef(capabilities.can_write_config);
+  useEffect(() => { canWriteRef.current = capabilities.can_write_config; }, [capabilities.can_write_config]);
+
+  // ── Auto-save config on any field change (debounced 600ms) ────────────────
+  useEffect(() => {
+    const payload = {
+      name, executable, start_dir: startDir || null, steam_app_id: steamAppId ?? null,
+      proton_version: protonVersion || null, proton_dependencies: mergedDeps,
+      proton_sync_paths: syncPaths, launch_options: launchOptions || null,
+      selected_launchers: checkedLaunchers, collections: mergedCollections,
+      steamgriddb_game_id: sgdbGameId ?? null,
+    };
+    if (JSON.stringify(payload) === JSON.stringify(configSnapshot)) return;
+    const tid = setTimeout(async () => {
+      if (!canWriteRef.current) return;
+      try {
+        const res = await updateGameConfig(storedNameRef.current, payload, selectedSourceIdRef.current!);
+        if (res.success) {
+          setStoredName(payload.name);
+          setConfigSnapshot(payload);
+        }
+      } catch {}
+    }, 600);
+    return () => clearTimeout(tid);
+  }, [name, executable, startDir, steamAppId, protonVersion, launchOptions, checkedLaunchers, checkedDeps, customDeps, checkedCollections, customCollections, syncPaths, sgdbGameId, configSnapshot]);
+
+  // ── Prefix file browser ───────────────────────────────────────────────────
+  const pfxBrowseTo = async (path: string) => {
+    setPfxBrowserLoading(true);
+    try {
+      const res = await listDirContents(path);
+      setPfxBrowserPath(path);
+      setPfxBrowserDirs(res.dirs);
+      setPfxBrowserFiles(res.files);
+    } catch {}
+    setPfxBrowserLoading(false);
+  };
+
+  const handleTogglePrefixBrowser = async () => {
+    if (showPrefixBrowser) {
+      setShowPrefixBrowser(false);
+      setPfxBrowseFeedback(null);
+      return;
+    }
+    if (!steamInfo) {
+      setPfxBrowseFeedback("Add game to Steam first.");
+      return;
+    }
+    const root = await getGamePrefixPath(steamInfo.unsigned_appid).catch(() => null);
+    if (!root) {
+      setPfxBrowseFeedback("Prefix not initialized — run Init Prefix first.");
+      return;
+    }
+    setPfxBrowseFeedback(null);
+    setPrefixRoot(root);
+    await pfxBrowseTo(root);
+    setShowPrefixBrowser(true);
+  };
+
+  const handlePfxBrowserUp = () => {
+    if (!prefixRoot || pfxBrowserPath === prefixRoot) return;
+    const parent = pfxBrowserPath.substring(0, pfxBrowserPath.lastIndexOf("/")) || prefixRoot;
+    pfxBrowseTo(parent.startsWith(prefixRoot) ? parent : prefixRoot);
+  };
+
+  const handlePfxBrowserEnter = (dir: string) => {
+    pfxBrowseTo(`${pfxBrowserPath}/${dir}`);
+  };
 
   // ── SGDB game picker ───────────────────────────────────────────────────
   const handleOpenSgdbPicker = async () => {
@@ -654,23 +943,65 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
 
   const handleSelectSgdbGame = (game: { id: number; name: string }) => {
     setSelectedSgdbGame(game);
+    setSgdbGameId(game.id);
+    setSgdbGameIdInput(String(game.id));
     setShowSgdbPicker(false);
   };
 
+  const handleOpenSteamAppPicker = async () => {
+    if (showSteamAppPicker) { setShowSteamAppPicker(false); return; }
+    setLoading("steam_search");
+    try {
+      const res = await searchSteamApp(name);
+      setSteamAppResults(res.results || []);
+    } catch {
+      setSteamAppResults([]);
+    }
+    setShowSteamAppPicker(true);
+    setLoading(null);
+  };
+
   const handleApplySgdbArt = async () => {
-    if (!selectedSgdbGame || !steamInfo || needsRestartAfterAdd) return;
+    if (sgdbGameId == null || !steamInfo || needsRestartAfterAdd) return;
     setLoading("art");
     setSgdbFeedback(null);
     try {
-      const { applied, errors } = await applyArtById(
-        selectedSgdbGame.id,
-        steamInfo.unsigned_appid,
-        selectedSgdbGame.name
-      );
+      const artName = selectedSgdbGame?.id === sgdbGameId ? selectedSgdbGame.name : name;
+      const { applied, errors } = await applyArtById(sgdbGameId, steamInfo.unsigned_appid, artName);
       if (applied.length > 0) {
-        setSgdbFeedback({ ok: true, msg: `Applied ${applied.join(", ")} art from "${selectedSgdbGame.name}"` });
+        setSgdbFeedback({ ok: true, msg: `Applied ${applied.join(", ")} art` });
       } else {
         setSgdbFeedback({ ok: false, msg: errors.join("; ") || "No art found" });
+      }
+    } catch (err: any) {
+      setSgdbFeedback({ ok: false, msg: err?.message || "Error" });
+    }
+    setLoading(null);
+  };
+
+  const handleApplyDeckyfin = async () => {
+    setLoading("deckyfin-art");
+    setSgdbFeedback(null);
+    try {
+      let appId: number;
+      if (steamInfo) {
+        appId = steamInfo.unsigned_appid;
+      } else {
+        const calc = await calcShortcutAppId(name, executable);
+        if (!calc.success || calc.unsigned_appid == null) {
+          setSgdbFeedback({ ok: false, msg: "Could not calculate app ID" });
+          setLoading(null);
+          return;
+        }
+        appId = calc.unsigned_appid;
+      }
+      const res = await applySteamGridLegacy(name, appId);
+      if (res.applied && res.applied.length > 0) {
+        setSgdbFeedback({ ok: true, msg: `Art saved (${res.applied.length} file${res.applied.length > 1 ? "s" : ""}) — will appear in Steam after restart` });
+        // Pass the computed appId so art shows even if game isn't in Steam yet
+        getGameCardArt(game.name, appId).then((r) => setHeaderArtUri(r.data_uri || null)).catch(() => {});
+      } else {
+        setSgdbFeedback({ ok: false, msg: (res.errors || []).join("; ") || "No art found" });
       }
     } catch (err: any) {
       setSgdbFeedback({ ok: false, msg: err?.message || "Error" });
@@ -687,9 +1018,11 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         steam_app_id: steamAppId ?? null,
         proton_version: protonVersion || null,
         proton_dependencies: mergedDeps,
+        proton_sync_paths: syncPaths,
         launch_options: launchOptions || null,
         selected_launchers: checkedLaunchers,
         collections: mergedCollections,
+        steamgriddb_game_id: sgdbGameId ?? null,
       };
       const res = await updateGameConfig(storedName, payload, selectedSource.source_id);
       if (!res.success) {
@@ -698,6 +1031,9 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         setStoredName(name);
         setConfigFeedback({ ok: true, msg: "Config saved" });
         setConfigSnapshot(payload);
+        // Immediately clear the draft so a sidebar close right after Apply Config
+        // doesn't restore stale unsaved state
+        saveUiState({ view: "game-detail", game_name: game.name, source_id: selectedSource.source_id, draft: null }).catch(() => {});
       }
     } catch (err: any) {
       setConfigFeedback({ ok: false, msg: err?.message || "Failed to save config" });
@@ -833,25 +1169,42 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
     setLoading(null);
   };
 
-  const handleInitPrefix = async () => {
+  const handleInitPrefix = async (reinit: boolean = false) => {
     if (needsRestartAfterAdd || !steamInfo) return;
-    setLoading("init");
+    if (prefixInit?.status === "running") return;
+    setShowReinitConfirm(false);
     setFeedback(null);
     try {
       const res = await initPrefix(
         steamInfo.app_id,
         protonVersion || undefined,
-        forceReinit
+        reinit,
+        game.name,
       );
-      if (res.success) {
-        setFeedback({ ok: true, msg: "Prefix initialized" });
+      if (res.success && res.prefix_id) {
+        setPrefixInit({ prefix_id: res.prefix_id, status: "running", error: null });
       } else {
-        setFeedback({ ok: false, msg: res.error || "Failed to init prefix" });
+        setFeedback({ ok: false, msg: res.error || "Failed to start prefix init" });
       }
     } catch (err: any) {
       setFeedback({ ok: false, msg: err?.message || "Error" });
     }
-    setLoading(null);
+  };
+
+  const handleInitPrefixClick = async () => {
+    if (needsRestartAfterAdd || !steamInfo) return;
+    if (prefixInit?.status === "running") return;
+    const checkPath = prefixRoot ?? await getGamePrefixPath(steamInfo.unsigned_appid).catch(() => null);
+    if (checkPath) {
+      try {
+        const contents = await listDirContents(checkPath);
+        if (contents.dirs.length > 0 || contents.files.length > 0) {
+          setShowReinitConfirm(true);
+          return;
+        }
+      } catch {}
+    }
+    handleInitPrefix(false);
   };
 
   const handleInstallDeps = async () => {
@@ -907,6 +1260,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
       steam_app_id: steamAppId ?? null,
       proton_version: protonVersion || null,
       proton_dependencies: mergedDeps,
+      proton_sync_paths: syncPaths,
       launch_options: launchOptions || null,
       selected_launchers: checkedLaunchers,
       collections: mergedCollections,
@@ -934,26 +1288,28 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
     return JSON.stringify(a) !== JSON.stringify(b);
   })();
 
-  const depsNeedsInstall = (() => {
-    const saved = configSnapshot.proton_dependencies || [];
-    return saved.length > 0 && JSON.stringify(saved) !== JSON.stringify(lastInstalledDeps);
-  })();
+  const depsNeedsInstall = mergedDeps.length > 0 && JSON.stringify(mergedDeps) !== JSON.stringify(lastInstalledDeps);
 
   const handleCopyConfig = async () => {
     if (!copyConfigDest) return;
     setCopyConfigConfirming(false);
     setCopyConfigFeedback(null);
+    const dest = copyConfigDest;
+    setCopyConfigDest(null);
     try {
       const res = await copyGameConfig(
         game.name,
         selectedSource.source_id,
-        copyConfigDest.source_id,
+        dest.source_id,
       );
-      setCopyConfigFeedback(res.success ? "✓ Config copied" : `✗ ${res.error ?? "Failed"}`);
+      if (res.success && res.copy_id) {
+        setConfigCopy({ copy_id: res.copy_id, status: "running", error: null });
+      } else {
+        setCopyConfigFeedback(`✗ ${res.error ?? "Failed"}`);
+      }
     } catch (e) {
       setCopyConfigFeedback(`✗ ${String(e)}`);
     }
-    setCopyConfigDest(null);
   };
 
   const handleStartTransfer = async () => {
@@ -1095,77 +1451,690 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
         </Focusable>
       )}
 
-      {/* ── Transfer Actions ─────────────────────────────────────────────── */}
+      {/* ── Art header ──────────────────────────────────────────────────────── */}
+      <div style={{ position: "relative", width: "100%", height: "110px", borderRadius: "6px", marginBottom: "8px", overflow: "hidden",
+        background: headerArtUri ? `center / cover no-repeat url("${headerArtUri}")` : "linear-gradient(135deg, #667eea, #764ba2)" }}>
+        {!headerArtUri && (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: "100%", fontSize: "40px" }}>🎮</div>
+        )}
+        {steamInfo && (
+          <div style={{ position: "absolute", bottom: "6px", right: "8px", display: "flex", alignItems: "center", gap: "4px",
+            background: "rgba(0,0,0,0.55)", borderRadius: "6px", padding: "3px 7px" }}>
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="#c7d5e0">
+              <path d="M11.979 0C5.678 0 .511 4.86.022 11.037l6.432 2.658c.545-.371 1.203-.59 1.912-.59.063 0 .125.004.188.006l2.861-4.142V8.91c0-2.495 2.028-4.524 4.524-4.524 2.494 0 4.524 2.031 4.524 4.527s-2.03 4.525-4.524 4.525h-.105l-4.076 2.911c0 .052.004.105.004.159 0 1.875-1.515 3.396-3.39 3.396-1.635 0-3.016-1.173-3.331-2.727L.436 15.27C1.862 20.307 6.486 24 11.979 24c6.627 0 11.999-5.373 11.999-12S18.605 0 11.979 0zM7.54 18.21l-1.473-.61c.262.543.714.999 1.314 1.25 1.297.539 2.793-.076 3.332-1.375.263-.63.264-1.319.005-1.949s-.75-1.121-1.377-1.383c-.624-.26-1.29-.249-1.878-.03l1.523.63c.956.4 1.409 1.5 1.009 2.455-.397.957-1.497 1.41-2.455 1.012H7.54zm11.415-9.303c0-1.662-1.353-3.015-3.015-3.015-1.665 0-3.015 1.353-3.015 3.015 0 1.665 1.35 3.015 3.015 3.015 1.663 0 3.015-1.35 3.015-3.015zm-5.273-.005c0-1.252 1.013-2.266 2.265-2.266 1.249 0 2.266 1.014 2.266 2.266 0 1.251-1.017 2.265-2.266 2.265-1.252 0-2.265-1.014-2.265-2.265z"/>
+            </svg>
+            <span style={{ fontSize: "10px", color: "#c7d5e0" }}>Steam</span>
+          </div>
+        )}
+      </div>
+
+      {/* ── Metadata ──────────────────────────────────────────────────────────── */}
+      <div style={{ border: "1px solid #3a3a3a", borderRadius: "6px", marginBottom: "8px" }}>
+        <Focusable onActivate={() => setShowMetadata((v) => !v)} onClick={() => setShowMetadata((v) => !v)} focusClassName="is-focused"
+          style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", cursor: "pointer", background: "#1e1e1e", borderRadius: showMetadata ? "6px 6px 0 0" : "6px" }}>
+          <span style={{ fontWeight: 600, fontSize: "0.9em", color: "#e0e0e0" }}>Metadata</span>
+          <span style={{ fontSize: "0.78em", color: "#666" }}>{showMetadata ? "▲" : "▼"}</span>
+        </Focusable>
+        {showMetadata && (
+          <div style={{ padding: "8px 12px", borderTop: "1px solid #2a2a2a" }}>
+            {([
+              ["Name", name],
+              ["Executable", executable],
+              ["Start Dir", startDir || "—"],
+              ["Proton Version", protonVersion || "— (Steam default)"],
+              ["Dependencies", mergedDeps.length > 0 ? mergedDeps.join(", ") : "—"],
+              ["Collections", mergedCollections.length > 0 ? mergedCollections.join(", ") : "—"],
+              ["Save Paths", syncPaths.length > 0 ? syncPaths.join(", ") : "—"],
+              ["Steam App ID", steamAppId != null ? String(steamAppId) : "—"],
+              ["SteamGridDB ID", sgdbGameId != null ? String(sgdbGameId) : "—"],
+              ["Shortcut App ID", steamInfo ? String(steamInfo.unsigned_appid) : "—"],
+              ["On Steam", steamInfo ? "Yes" : "No"],
+              ["Source", `${selectedSource.source_name} (${selectedSource.source_type})`],
+            ] as [string, string][]).map(([label, value]) => (
+              <div key={label} style={{ display: "flex", gap: "8px", marginBottom: "5px", fontSize: "0.82em" }}>
+                <span style={{ color: "#666", minWidth: "110px", flexShrink: 0 }}>{label}</span>
+                <span style={{ color: "#c0c0c0", wordBreak: "break-all", flex: 1 }}>{value}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Game Settings ────────────────────────────────────────────────────── */}
+      <div style={{ border: "1px solid #3a3a3a", borderRadius: "6px", marginBottom: "8px" }}>
+        <Focusable onActivate={() => setShowGameSettings((v) => !v)} onClick={() => setShowGameSettings((v) => !v)} focusClassName="is-focused"
+          style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", cursor: "pointer", background: "#1e1e1e", borderRadius: showGameSettings ? "6px 6px 0 0" : "6px" }}>
+          <span style={{ fontWeight: 600, fontSize: "0.9em", color: "#e0e0e0" }}>Game Settings</span>
+          <span style={{ fontSize: "0.78em", color: "#666" }}>{showGameSettings ? "▲" : "▼"}</span>
+        </Focusable>
+        {showGameSettings && (
+          <div style={{ padding: "8px 12px", borderTop: "1px solid #2a2a2a" }}>
+            {/* Name */}
+            <label style={{ fontSize: "0.78em", color: "#888", display: "block", marginBottom: "2px" }}>Name</label>
+            <CompactTextField value={name} onChange={(e) => setName(e.target.value)} style={{ width: "100%", marginBottom: "8px" }} />
+            {/* Executable */}
+            <label style={{ fontSize: "0.78em", color: "#888", display: "block", marginBottom: "2px" }}>Executable</label>
+            <Focusable focusClassName="" style={{ display: "flex", gap: "6px", alignItems: "center", marginBottom: showExePicker ? "6px" : "8px" }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <CompactTextField value={executable} onChange={(e) => setExecutable(e.target.value)} style={{ width: "100%" }} />
+              </div>
+              <Focusable onActivate={handleOpenExePicker} onClick={handleOpenExePicker} focusClassName="is-focused" style={{ ...BTN_STYLE, alignSelf: "center", padding: "4px 12px" }}>
+                {showExePicker ? "✕" : "Browse"}
+              </Focusable>
+            </Focusable>
+            {showExePicker && (
+              <Focusable style={{ border: "1px solid #555", borderRadius: "4px", maxHeight: "180px", overflowY: "auto", padding: "2px 0", marginBottom: "8px" }}>
+                {exeOptions.length === 0 && <p style={{ padding: "8px", margin: 0, fontSize: "0.85em", color: "#888" }}>No executables found in {startDir}</p>}
+                {exeOptions.map((exe) => (
+                  <Focusable key={exe} onActivate={() => handleSelectExe(exe)} onClick={() => handleSelectExe(exe)} focusClassName="is-focused"
+                    style={{ margin: "0 2px", padding: "4px 10px", cursor: "pointer", fontSize: "0.85em", borderBottom: "1px solid #333" }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+                    {exe}
+                  </Focusable>
+                ))}
+              </Focusable>
+            )}
+            {/* Start Dir */}
+            <label style={{ fontSize: "0.78em", color: "#888", display: "block", marginBottom: "2px" }}>Start Dir</label>
+            <CompactTextField value={startDir} onChange={(e) => setStartDir(e.target.value)} style={{ width: "100%", marginBottom: "8px" }} />
+            {/* Steam App ID */}
+            <Focusable focusClassName="" style={{ display: "flex", alignItems: "center", gap: "5px", marginBottom: "2px" }}>
+              <span style={{ fontSize: "0.78em", color: "#888" }}>Steam App ID</span>
+              <Focusable focusClassName="is-focused"
+                onActivate={() => Navigation.NavigateToExternalWeb(steamAppId ? `https://www.steamdb.info/app/${steamAppId}/` : `https://www.steamdb.info/search/?a=all&q=${encodeURIComponent(name)}`)}
+                onClick={() => Navigation.NavigateToExternalWeb(steamAppId ? `https://www.steamdb.info/app/${steamAppId}/` : `https://www.steamdb.info/search/?a=all&q=${encodeURIComponent(name)}`)}
+                style={{ padding: "1px 4px", fontSize: "0.65em", borderRadius: "12px", border: "1px solid #555", color: "#888", cursor: "pointer", lineHeight: 1 }}>
+                ℹ
+              </Focusable>
+            </Focusable>
+            <Focusable focusClassName="" style={{ display: "flex", gap: "6px", alignItems: "center", marginBottom: showSteamAppPicker ? "4px" : "8px" }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <CompactTextField
+                  value={steamAppIdInput}
+                  onChange={(e) => { setSteamAppIdInput(e.target.value); const p = parseInt(e.target.value, 10); setSteamAppId(isNaN(p) ? undefined : p); }}
+                  style={{ width: "100%" }}
+                />
+              </div>
+              <Focusable onActivate={handleOpenSteamAppPicker} onClick={handleOpenSteamAppPicker} focusClassName="is-focused"
+                style={{ ...BTN_STYLE, alignSelf: "center", padding: "4px 12px", opacity: loading === "steam_search" ? 0.5 : 1 }}>
+                {loading === "steam_search" ? "…" : showSteamAppPicker ? "✕" : "Search"}
+              </Focusable>
+            </Focusable>
+            {showSteamAppPicker && (
+              <Focusable style={{ border: "1px solid #555", borderRadius: "4px", maxHeight: "160px", overflowY: "auto", padding: "2px 0", marginBottom: "8px" }}>
+                {steamAppResults.length === 0 && (
+                  <p style={{ padding: "8px", margin: 0, fontSize: "0.85em", color: "#888" }}>No results found for "{name}"</p>
+                )}
+                {steamAppResults.map((r) => (
+                  <Focusable key={r.id} onActivate={() => { setSteamAppId(r.id); setSteamAppIdInput(String(r.id)); setShowSteamAppPicker(false); }}
+                    onClick={() => { setSteamAppId(r.id); setSteamAppIdInput(String(r.id)); setShowSteamAppPicker(false); }}
+                    focusClassName="is-focused"
+                    style={{ margin: "0 2px", padding: "4px 10px", cursor: "pointer", fontSize: "0.85em", borderBottom: "1px solid #333", color: steamAppId === r.id ? "#0078d4" : "#ccc" }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+                    {r.name}
+                    <span style={{ marginLeft: "6px", fontSize: "0.78em", color: "#666" }}>({r.id})</span>
+                  </Focusable>
+                ))}
+              </Focusable>
+            )}
+            {/* SteamGridDB */}
+            <Focusable focusClassName="" style={{ display: "flex", alignItems: "center", gap: "5px", marginBottom: "2px" }}>
+              <span style={{ fontSize: "0.78em", color: "#888" }}>SteamGridDB Game ID</span>
+              <Focusable focusClassName="is-focused"
+                onActivate={() => Navigation.NavigateToExternalWeb(sgdbGameId != null ? `https://www.steamgriddb.com/game/${sgdbGameId}` : `https://www.steamgriddb.com/search/grids?term=${encodeURIComponent(name)}`)}
+                onClick={() => Navigation.NavigateToExternalWeb(sgdbGameId != null ? `https://www.steamgriddb.com/game/${sgdbGameId}` : `https://www.steamgriddb.com/search/grids?term=${encodeURIComponent(name)}`)}
+                style={{ padding: "1px 4px", fontSize: "0.65em", borderRadius: "12px", border: "1px solid #555", color: "#888", cursor: "pointer", lineHeight: 1 }}>
+                ℹ
+              </Focusable>
+            </Focusable>
+            <Focusable focusClassName="" style={{ display: "flex", gap: "6px", alignItems: "center", marginBottom: showSgdbPicker ? "4px" : "8px" }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <CompactTextField
+                  value={sgdbGameIdInput}
+                  onChange={(e) => { setSgdbGameIdInput(e.target.value); const p = parseInt(e.target.value, 10); setSgdbGameId(isNaN(p) ? null : p); setSelectedSgdbGame(null); }}
+                  style={{ width: "100%" }}
+                />
+              </div>
+              <Focusable onActivate={handleOpenSgdbPicker} onClick={handleOpenSgdbPicker} focusClassName="is-focused"
+                style={{ ...BTN_STYLE, alignSelf: "center", padding: "4px 12px", opacity: loading === "sgdb_search" ? 0.5 : 1 }}>
+                {loading === "sgdb_search" ? "…" : showSgdbPicker ? "✕" : "Search"}
+              </Focusable>
+            </Focusable>
+            {showSgdbPicker && (
+              <Focusable style={{ border: "1px solid #555", borderRadius: "4px", maxHeight: "160px", overflowY: "auto", padding: "2px 0" }}>
+                {sgdbGames.length === 0 && (
+                  <p style={{ padding: "8px", margin: 0, fontSize: "0.85em", color: "#888" }}>No results for "{name}"</p>
+                )}
+                {sgdbGames.map((g) => (
+                  <Focusable key={g.id} onActivate={() => handleSelectSgdbGame(g)} onClick={() => handleSelectSgdbGame(g)} focusClassName="is-focused"
+                    style={{ margin: "0 2px", padding: "4px 10px", cursor: "pointer", fontSize: "0.85em", borderBottom: "1px solid #333",
+                      color: selectedSgdbGame?.id === g.id ? "#0078d4" : "#ccc" }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+                    {g.name} <span style={{ fontSize: "0.78em", color: "#666" }}>({g.id})</span>
+                  </Focusable>
+                ))}
+              </Focusable>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Launch Options */}
+      <div style={{ border: "1px solid #3a3a3a", borderRadius: "6px", marginBottom: "8px" }}>
+        <Focusable onActivate={() => setShowLaunchOptions((v) => !v)} onClick={() => setShowLaunchOptions((v) => !v)} focusClassName="is-focused"
+          style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", cursor: "pointer", background: "#1e1e1e", borderRadius: showLaunchOptions ? "6px 6px 0 0" : "6px" }}>
+          <span style={{ fontWeight: 600, fontSize: "0.9em", color: "#e0e0e0" }}>Launch Options</span>
+          <span style={{ fontSize: "0.78em", color: "#666" }}>{showLaunchOptions ? "▲" : "▼"}</span>
+        </Focusable>
+        {showLaunchOptions && (
+          <div style={{ padding: "8px" }}>
+            <p style={{ fontSize: "0.78em", color: "#888", margin: "0 0 8px 0", lineHeight: 1.5 }}>
+              Wrapper scripts and extra flags passed to the launch command. Toggle common wrappers like GameMode or MangoHUD, or type raw arguments directly. Check{" "}
+              <Focusable
+                onActivate={() => Navigation.NavigateToExternalWeb(steamAppId ? `https://www.protondb.com/app/${steamAppId}` : `https://www.protondb.com/search?q=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`)}
+                onClick={() => Navigation.NavigateToExternalWeb(steamAppId ? `https://www.protondb.com/app/${steamAppId}` : `https://www.protondb.com/search?q=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`)}
+                focusClassName="is-focused" style={{ display: "inline", color: "#5dade2", cursor: "pointer", background: "transparent", border: "none", padding: 0, fontSize: "inherit" }}>
+                ProtonDB
+              </Focusable>{" "}for community launch flag recommendations.
+              {onNavigateToSettings && <>{" "}To add more popular options, go to{" "}<Focusable onActivate={onNavigateToSettings} onClick={onNavigateToSettings} focusClassName="is-focused" style={{ display: "inline", color: "#5dade2", cursor: "pointer", background: "transparent", border: "none", padding: 0, fontSize: "inherit" }}>Settings → Popular Launcher Options</Focusable>.</>}
+            </p>
+            {popularLaunchers.length > 0 && (
+              <Focusable focusClassName="" style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "8px" }}>
+                {popularLaunchers.map((pl) => {
+                  const active = checkedLaunchers.includes(pl.label);
+                  return (
+                    <Focusable key={pl.label} onActivate={() => toggleCheckedLauncher(pl.label)} onClick={() => toggleCheckedLauncher(pl.label)} focusClassName="is-focused"
+                      style={{ margin: "0 2px", padding: "4px 10px", borderRadius: "12px", fontSize: "0.82em", cursor: "pointer",
+                        border: active ? "1px solid #0078d4" : "1px solid #555", background: active ? "#0078d4" : "transparent", color: active ? "white" : "#ccc" }}>
+                      {pl.label}
+                    </Focusable>
+                  );
+                })}
+              </Focusable>
+            )}
+            <CompactTextField value={launchOptions} onChange={(e) => setLaunchOptions(e.target.value)} placeholder="Extra launch options…"
+              style={{ width: "100%", marginBottom: finalLaunchOptions ? "6px" : "0" }} />
+            {finalLaunchOptions && <div style={{ fontSize: "0.75em", color: "#555", wordBreak: "break-all" as const, marginTop: "4px" }}>→ {finalLaunchOptions}</div>}
+          </div>
+        )}
+      </div>
+
+      {/* Collections */}
+      <div style={{ border: "1px solid #3a3a3a", borderRadius: "6px", marginBottom: "8px" }}>
+        <Focusable onActivate={() => setShowCollections((v) => !v)} onClick={() => setShowCollections((v) => !v)} focusClassName="is-focused"
+          style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", cursor: "pointer", background: "#1e1e1e", borderRadius: showCollections ? "6px 6px 0 0" : "6px" }}>
+          <span style={{ fontWeight: 600, fontSize: "0.9em", color: "#e0e0e0" }}>Collections</span>
+          <span style={{ fontSize: "0.78em", color: "#666" }}>{showCollections ? "▲" : "▼"}</span>
+        </Focusable>
+        {showCollections && (
+          <div style={{ padding: "8px" }}>
+            <p style={{ fontSize: "0.78em", color: "#888", margin: "0 0 8px 0", lineHeight: 1.5 }}>
+              Assign this game to Steam collections for library organisation. Select from your existing collections or add custom ones below.
+              {onNavigateToSettings && <>{" "}To create or delete collections, go to{" "}<Focusable onActivate={onNavigateToSettings} onClick={onNavigateToSettings} focusClassName="is-focused" style={{ display: "inline", color: "#5dade2", cursor: "pointer", textDecoration: "underline" }}>Settings → Steam Collections</Focusable>.</>}
+            </p>
+            {steamCollections.length > 0 && (
+              <Focusable focusClassName="" style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "10px" }}>
+                {steamCollections.map((col) => {
+                  const selected = checkedCollections.includes(col);
+                  return (
+                    <Focusable key={col} onActivate={() => toggleCheckedCollection(col)} onClick={() => toggleCheckedCollection(col)} focusClassName="is-focused"
+                      style={{ padding: "4px 12px", fontSize: "0.82em", borderRadius: "14px", cursor: "pointer",
+                        border: selected ? "1px solid #0078d4" : "1px solid #555", background: selected ? "#0078d4" : "transparent", color: selected ? "white" : "#ccc" }}>
+                      {col}
+                    </Focusable>
+                  );
+                })}
+              </Focusable>
+            )}
+            <label style={{ fontSize: "0.82em", color: "#888", display: "block", marginBottom: "2px" }}>Custom (comma-separated)</label>
+            <CompactTextField value={customCollections} onChange={(e) => setCustomCollections(e.target.value)}
+              placeholder={steamCollections.length > 0 ? "e.g. RPG, FPS" : "e.g. RPG, FPS, Favorites"} style={{ width: "100%" }} />
+          </div>
+        )}
+      </div>
+
+      {/* Proton Version */}
+      <div style={{ border: "1px solid #3a3a3a", borderRadius: "6px", marginBottom: "8px" }}>
+        <Focusable onActivate={() => setShowProtonVersion((v) => !v)} onClick={() => setShowProtonVersion((v) => !v)} focusClassName="is-focused"
+          style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", cursor: "pointer", background: "#1e1e1e", borderRadius: showProtonVersion ? "6px 6px 0 0" : "6px" }}>
+          <span style={{ fontWeight: 600, fontSize: "0.9em", color: "#e0e0e0" }}>Proton Version</span>
+          <span style={{ fontSize: "0.78em", color: "#666" }}>{showProtonVersion ? "▲" : "▼"}</span>
+        </Focusable>
+        {showProtonVersion && (
+          <>
+            <div style={{ padding: "8px 12px 4px", borderBottom: "1px solid #2a2a2a" }}>
+              <p style={{ fontSize: "0.78em", color: "#888", margin: 0, lineHeight: 1.5 }}>
+                The Proton/Wine build used to run this game. Leave blank to use Steam's default. Check{" "}
+                <Focusable
+                  onActivate={() => Navigation.NavigateToExternalWeb(steamAppId ? `https://www.protondb.com/app/${steamAppId}` : `https://www.protondb.com/search?q=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`)}
+                  onClick={() => Navigation.NavigateToExternalWeb(steamAppId ? `https://www.protondb.com/app/${steamAppId}` : `https://www.protondb.com/search?q=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`)}
+                  focusClassName="is-focused" style={{ display: "inline", color: "#5dade2", cursor: "pointer", background: "transparent", border: "none", padding: 0, fontSize: "inherit" }}>
+                  ProtonDB
+                </Focusable>{" "}for community-tested recommendations.
+                {onNavigateToSettings && <>{" "}To download additional Proton builds, go to{" "}<Focusable onActivate={onNavigateToSettings} onClick={onNavigateToSettings} focusClassName="is-focused" style={{ display: "inline", color: "#5dade2", cursor: "pointer", background: "transparent", border: "none", padding: 0, fontSize: "inherit" }}>Settings → Proton Versions</Focusable>.</>}
+              </p>
+            </div>
+            <div style={{ padding: "2px 0", maxHeight: "200px", overflowY: "auto" }}>
+              <Focusable onActivate={() => { setProtonVersion(""); setShowProtonVersion(false); }} onClick={() => { setProtonVersion(""); setShowProtonVersion(false); }} focusClassName="is-focused"
+                style={{ margin: "0 2px", padding: "4px 10px", cursor: "pointer", fontSize: "0.85em", borderBottom: "1px solid #2a2a2a", color: !protonVersion ? "#0078d4" : "#ccc" }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.06)")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+                — None —
+              </Focusable>
+              {protonVersions.map((v) => (
+                <Focusable key={v} onActivate={() => { setProtonVersion(v); setShowProtonVersion(false); }} onClick={() => { setProtonVersion(v); setShowProtonVersion(false); }} focusClassName="is-focused"
+                  style={{ margin: "0 2px", padding: "4px 10px", cursor: "pointer", fontSize: "0.85em", borderBottom: "1px solid #2a2a2a", color: protonVersion === v ? "#0078d4" : "#ccc" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.06)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+                  {v}
+                </Focusable>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Dependencies */}
+      <div style={{ border: "1px solid #3a3a3a", borderRadius: "6px", marginBottom: "8px" }}>
+        <Focusable onActivate={() => setShowDependencies((v) => !v)} onClick={() => setShowDependencies((v) => !v)} focusClassName="is-focused"
+          style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", cursor: "pointer", background: "#1e1e1e", borderRadius: showDependencies ? "6px 6px 0 0" : "6px" }}>
+          <span style={{ fontWeight: 600, fontSize: "0.9em", color: "#e0e0e0" }}>Dependencies</span>
+          <span style={{ fontSize: "0.78em", color: "#666" }}>{showDependencies ? "▲" : "▼"}</span>
+        </Focusable>
+        {showDependencies && (
+          <div style={{ padding: "8px" }}>
+            <p style={{ fontSize: "0.78em", color: "#888", margin: "0 0 8px 0", lineHeight: 1.5 }}>
+              Winetricks packages installed into this game's Proton prefix — DirectX, Visual C++ runtimes, and other Windows libraries. Look up requirements on{" "}
+              <Focusable
+                onActivate={() => Navigation.NavigateToExternalWeb(steamAppId ? `https://steamdb.info/app/${steamAppId}/` : `https://steamdb.info/search/?a=all&q=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`)}
+                onClick={() => Navigation.NavigateToExternalWeb(steamAppId ? `https://steamdb.info/app/${steamAppId}/` : `https://steamdb.info/search/?a=all&q=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`)}
+                focusClassName="is-focused" style={{ display: "inline", color: "#5dade2", cursor: "pointer", background: "transparent", border: "none", padding: 0, fontSize: "inherit" }}>
+                SteamDB
+              </Focusable>.
+              {onNavigateToSettings && <>{" "}To add more popular dependency chips, go to{" "}<Focusable onActivate={onNavigateToSettings} onClick={onNavigateToSettings} focusClassName="is-focused" style={{ display: "inline", color: "#5dade2", cursor: "pointer", background: "transparent", border: "none", padding: 0, fontSize: "inherit" }}>Settings → Popular Dependencies</Focusable>.</>}
+            </p>
+            <Focusable focusClassName="" style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "10px" }}>
+              {popularDeps.map((dep) => {
+                const selected = checkedDeps.includes(dep);
+                return (
+                  <Focusable key={dep} onActivate={() => toggleCheckedDep(dep)} onClick={() => toggleCheckedDep(dep)} focusClassName="is-focused"
+                    style={{ padding: "4px 12px", fontSize: "0.82em", borderRadius: "14px", cursor: "pointer",
+                      border: selected ? "1px solid #0078d4" : "1px solid #555", background: selected ? "#0078d4" : "transparent", color: selected ? "white" : "#ccc" }}>
+                    {dep}
+                  </Focusable>
+                );
+              })}
+            </Focusable>
+            <label style={{ fontSize: "0.82em", color: "#888", display: "block", marginBottom: "2px" }}>Custom (comma-separated)</label>
+            <CompactTextField value={customDeps} onChange={(e) => setCustomDeps(e.target.value)} style={{ width: "100%" }} />
+          </div>
+        )}
+      </div>
+
+      {/* Save Paths */}
+      <div style={{ border: "1px solid #3a3a3a", borderRadius: "6px", marginBottom: "8px" }}>
+        <Focusable onActivate={() => setShowSavePaths((v) => !v)} onClick={() => setShowSavePaths((v) => !v)} focusClassName="is-focused"
+          style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", cursor: "pointer", background: "#1e1e1e", borderRadius: showSavePaths ? "6px 6px 0 0" : "6px" }}>
+          <span style={{ fontWeight: 600, fontSize: "0.9em", color: "#e0e0e0" }}>Save Paths</span>
+          <span style={{ fontSize: "0.78em", color: "#666" }}>{showSavePaths ? "▲" : "▼"}</span>
+        </Focusable>
+        {showSavePaths && <div style={{ padding: "8px" }}>
+          <p style={{ fontSize: "0.78em", color: "#888", margin: "0 0 8px 0", lineHeight: 1.5 }}>
+            Paths inside the Proton prefix to back up and restore saves. Select a prefix location and type the game-specific subfolder. Look up the correct path on{" "}
+            <Focusable onActivate={() => Navigation.NavigateToExternalWeb(`https://www.pcgamingwiki.com/wiki/Special:Search?search=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`)}
+              onClick={() => Navigation.NavigateToExternalWeb(`https://www.pcgamingwiki.com/wiki/Special:Search?search=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`)}
+              focusClassName="is-focused" style={{ display: "inline", color: "#5dade2", cursor: "pointer", background: "transparent", border: "none", padding: 0, fontSize: "inherit" }}>
+              PCGamingWiki
+            </Focusable>{" "}or{" "}
+            <Focusable onActivate={() => Navigation.NavigateToExternalWeb(steamAppId ? `https://steamdb.info/app/${steamAppId}/` : `https://steamdb.info/search/?a=all&q=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`)}
+              onClick={() => Navigation.NavigateToExternalWeb(steamAppId ? `https://steamdb.info/app/${steamAppId}/` : `https://steamdb.info/search/?a=all&q=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`)}
+              focusClassName="is-focused" style={{ display: "inline", color: "#5dade2", cursor: "pointer", background: "transparent", border: "none", padding: 0, fontSize: "inherit" }}>
+              SteamDB
+            </Focusable>.
+            {onNavigateToSettings && <>{" "}To add custom prefix shortcuts, go to{" "}<Focusable onActivate={onNavigateToSettings} onClick={onNavigateToSettings} focusClassName="is-focused" style={{ display: "inline", color: "#5dade2", cursor: "pointer", background: "transparent", border: "none", padding: 0, fontSize: "inherit" }}>Settings → Popular Save Prefixes</Focusable>.</>}
+          </p>
+          {syncPaths.length > 0 && (
+            <div style={{ marginBottom: "8px", display: "flex", flexDirection: "column", gap: "4px" }}>
+              {syncPaths.map((p, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: "6px", background: "rgba(255,255,255,0.06)", border: "1px solid #3a3a3a", borderRadius: "4px", padding: "4px 8px" }}>
+                  <span style={{ flex: 1, fontSize: "0.78em", color: "#c0c0c0", fontFamily: "monospace", wordBreak: "break-all" }}>{p}</span>
+                  <Focusable onActivate={() => setSyncPaths((prev) => prev.filter((_, j) => j !== i))} onClick={() => setSyncPaths((prev) => prev.filter((_, j) => j !== i))} focusClassName="is-focused"
+                    style={{ cursor: "pointer", color: "#666", padding: "0 4px", flexShrink: 0, fontSize: "0.85em" }}>✕</Focusable>
+                </div>
+              ))}
+            </div>
+          )}
+          {(() => {
+            const PREFIXES = [
+              { label: "Roaming", path: "drive_c/users/steamuser/AppData/Roaming" },
+              { label: "LocalLow", path: "drive_c/users/steamuser/AppData/LocalLow" },
+              { label: "Local", path: "drive_c/users/steamuser/AppData/Local" },
+              { label: "My Documents", path: "drive_c/users/steamuser/My Documents" },
+              { label: "My Games", path: "drive_c/users/steamuser/My Documents/My Games" },
+              { label: "Saved Games", path: "drive_c/users/steamuser/Saved Games" },
+              { label: "Game Folder", path: "game://" },
+              { label: "Userdata", path: "userdata://" },
+              ...customSavePrefixes.filter((cp) => !["Roaming","LocalLow","Local","My Documents","My Games","Saved Games","Game Folder","Userdata","Custom"].includes(cp.label)),
+              { label: "Custom", path: "" },
+            ];
+            const activePfx = PREFIXES.find((p) => p.label === selectedPfx) ?? PREFIXES[0];
+            const isScheme = activePfx.path === "game://" || activePfx.path === "userdata://";
+            const fullPath = isScheme ? `${activePfx.path}${syncSuffix.trim()}` : activePfx.path ? `${activePfx.path}/${syncSuffix.trim()}`.replace(/\/$/, "") : syncSuffix.trim();
+            const canAdd = syncSuffix.trim().length > 0;
+            const handleAdd = () => { if (canAdd) { setSyncPaths((prev) => [...prev, fullPath]); setSyncSuffix(""); } };
+            return (
+              <>
+                <Focusable focusClassName="" style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "6px" }}>
+                  {PREFIXES.map((pfx) => {
+                    const active = selectedPfx === pfx.label;
+                    return (
+                      <Focusable key={pfx.label} onActivate={() => setSelectedPfx(pfx.label)} onClick={() => setSelectedPfx(pfx.label)} focusClassName="is-focused"
+                        style={{ padding: "3px 9px", fontSize: "0.75em", borderRadius: "10px", cursor: "pointer",
+                          border: active ? "1px solid #0078d4" : "1px solid #555", background: active ? "rgba(0,120,212,0.2)" : "transparent", color: active ? "#5dade2" : "#aaa" }}>
+                        {pfx.label}
+                      </Focusable>
+                    );
+                  })}
+                </Focusable>
+                {activePfx.path && (
+                  <div style={{ fontSize: "0.72em", color: "#555", marginBottom: "4px", fontFamily: "monospace", wordBreak: "break-all" }}>
+                    {activePfx.path === "game://" ? "[game folder]/" : activePfx.path === "userdata://" ? "[steam userdata]/" : `${activePfx.path}/`}
+                  </div>
+                )}
+                <Focusable focusClassName="" style={{ display: "flex", gap: "6px" }}>
+                  <div style={{ flex: 1 }}>
+                    <CompactTextField value={syncSuffix} onChange={(e) => setSyncSuffix(e.target.value)}
+                      placeholder={activePfx.path === "game://" ? "CULTIC_Data/Saves" : activePfx.path === "userdata://" ? "<app_id>/remote" : activePfx.path ? "GameName/saves" : "drive_c/users/steamuser/..."}
+                      style={{ width: "100%" }} />
+                  </div>
+                  <Focusable onActivate={handleAdd} onClick={handleAdd} focusClassName="is-focused"
+                    style={{ ...BTN_STYLE, padding: "4px 10px", fontSize: "0.82em", opacity: canAdd ? 1 : 0.4 }}>
+                    Add
+                  </Focusable>
+                </Focusable>
+              </>
+            );
+          })()}
+        </div>}
+      </div>
+
+      {/* ── Steam Actions ──────────────────────────────────────────────────── */}
+      <div style={{ border: "1px solid #3a3a3a", borderRadius: "6px", marginBottom: "8px" }}>
+        <Focusable onActivate={() => setShowSteamActions((v) => !v)} onClick={() => setShowSteamActions((v) => !v)} focusClassName="is-focused"
+          style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", cursor: "pointer", background: "#1e1e1e", borderRadius: showSteamActions ? "6px 6px 0 0" : "6px" }}>
+          <span style={{ fontWeight: 600, fontSize: "0.9em", color: "#e0e0e0" }}>Steam Actions</span>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            {((capabilities.can_play && steamNeedsSync) || needsRestart) && (
+              <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#2ecc71", display: "inline-block", flexShrink: 0 }} />
+            )}
+            <span style={{ fontSize: "0.78em", color: "#666" }}>{showSteamActions ? "▲" : "▼"}</span>
+          </div>
+        </Focusable>
+        {showSteamActions && (
+          <div style={{ padding: "8px" }}>
+            <p style={{ fontSize: "0.78em", color: "#888", margin: "0 0 8px 0", lineHeight: 1.5 }}>
+              Sync this game's settings to Steam and restart Steam to apply changes. Add the game as a non-Steam shortcut so it appears in your library, or update an existing shortcut after editing its settings.
+            </p>
+            {needsRestartAfterAdd && (
+              <div style={{ padding: "8px 12px", marginBottom: "8px", borderRadius: "4px", background: "rgba(230,126,34,0.15)", border: "1px solid rgba(230,126,34,0.3)", fontSize: "0.82em", color: "#e67e22" }}>
+                ⚠ Restart Steam to unlock prefix and art actions
+              </div>
+            )}
+            {!capabilities.can_play && (
+              <div style={{ padding: "8px 10px", borderRadius: "4px", background: "rgba(52,73,94,0.3)", border: "1px solid #2c3e50", fontSize: "0.78em", color: "#7f8c8d", marginBottom: "8px" }}>
+                🔒 Steam actions unavailable — games on {selectedSource.source_type} sources can't be launched by Steam
+              </div>
+            )}
+            <Focusable
+              onActivate={capabilities.can_play ? (steamInfo ? handleUpdateSteam : handleAddToSteam) : undefined}
+              onClick={capabilities.can_play ? (steamInfo ? handleUpdateSteam : handleAddToSteam) : undefined}
+              focusClassName="is-focused"
+              style={{ ...BTN_STYLE, display: "block", width: "100%", boxSizing: "border-box" as const, textAlign: "center" as const, marginBottom: "6px",
+                opacity: !capabilities.can_play || loading === "add" || loading === "update" ? 0.4 : 1,
+                border: capabilities.can_play && steamNeedsSync ? "1px solid #27ae60" : "1px solid #555",
+                color: capabilities.can_play && steamNeedsSync ? "#2ecc71" : "#e0e0e0" }}>
+              {loading === "add" ? "Adding…" : loading === "update" ? "Updating…" : steamInfo ? "Update Steam Game" : "Add to Steam"}
+            </Focusable>
+            <Focusable
+              onActivate={runningTaskCount > 0 ? undefined : handleRestartSteam}
+              onClick={runningTaskCount > 0 ? undefined : handleRestartSteam}
+              focusClassName="is-focused"
+              style={{ ...BTN_STYLE, display: "block", width: "100%", boxSizing: "border-box" as const, textAlign: "center" as const,
+                border: runningTaskCount > 0 ? "1px solid #444" : needsRestart ? "1px solid #27ae60" : "1px solid #555",
+                color: runningTaskCount > 0 ? "#555" : needsRestart ? "#2ecc71" : "#e0e0e0",
+                opacity: runningTaskCount > 0 ? 0.5 : 1,
+                cursor: runningTaskCount > 0 ? "default" : "pointer" }}>
+              {restarting ? "…" : runningTaskCount > 0 ? `↺ Restart Steam (${runningTaskCount} task${runningTaskCount > 1 ? "s" : ""} running)` : "↺ Restart Steam"}
+            </Focusable>
+            {feedback && <p style={{ marginTop: "8px", color: feedback.ok ? "lightgreen" : "tomato", fontSize: "0.9em" }}>{feedback.msg}</p>}
+          </div>
+        )}
+      </div>
+
+      {/* ── Art Actions ────────────────────────────────────────────────────── */}
+      {capabilities.can_play && (
+        <div style={{ border: "1px solid #3a3a3a", borderRadius: "6px", marginBottom: "8px" }}>
+          <Focusable onActivate={() => setShowArtActions((v) => !v)} onClick={() => setShowArtActions((v) => !v)} focusClassName="is-focused"
+            style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", cursor: "pointer", background: "#1e1e1e", borderRadius: showArtActions ? "6px 6px 0 0" : "6px" }}>
+            <span style={{ fontWeight: 600, fontSize: "0.9em", color: "#e0e0e0" }}>Art Actions</span>
+            <span style={{ fontSize: "0.78em", color: "#666" }}>{showArtActions ? "▲" : "▼"}</span>
+          </Focusable>
+          {showArtActions && (
+            <div style={{ padding: "8px" }}>
+              <p style={{ fontSize: "0.78em", color: "#888", margin: "0 0 8px 0", lineHeight: 1.5 }}>
+                Apply artwork to this game's Steam shortcut. Apply Steam Art uses Steam's native API and requires a configured SteamGridDB Game ID. Apply Deckyfin Art writes art files directly to disk (works before adding to Steam, but Steam restart is needed for them to appear in Steam's UI).
+              </p>
+              {!steamInfo && !needsRestartAfterAdd && (
+                <div style={{ padding: "8px 10px", borderRadius: "4px", background: "rgba(52,73,94,0.3)", border: "1px solid #2c3e50", fontSize: "0.78em", color: "#7f8c8d", marginBottom: "8px" }}>
+                  🔒 Apply Steam Art requires the game to be added to Steam first
+                </div>
+              )}
+              {needsRestartAfterAdd && (
+                <div style={{ padding: "8px 12px", marginBottom: "8px", borderRadius: "4px", background: "rgba(230,126,34,0.15)", border: "1px solid rgba(230,126,34,0.3)", fontSize: "0.82em", color: "#e67e22" }}>
+                  ⚠ Restart Steam to unlock Steam art actions
+                </div>
+              )}
+              <Focusable
+                onActivate={capabilities.can_play ? handleApplySgdbArt : undefined}
+                onClick={capabilities.can_play ? handleApplySgdbArt : undefined}
+                focusClassName="is-focused"
+                style={{ ...BTN_STYLE, display: "block", width: "100%", boxSizing: "border-box" as const, textAlign: "center" as const, marginBottom: "6px",
+                  opacity: !steamInfo || needsRestartAfterAdd || sgdbGameId == null || loading === "art" ? 0.4 : 1 }}>
+                {loading === "art" ? "Applying…" : "Apply Steam Art"}
+              </Focusable>
+              <Focusable
+                onActivate={capabilities.can_play ? handleApplyDeckyfin : undefined}
+                onClick={capabilities.can_play ? handleApplyDeckyfin : undefined}
+                focusClassName="is-focused"
+                style={{ ...BTN_STYLE, display: "block", width: "100%", boxSizing: "border-box" as const, textAlign: "center" as const,
+                  opacity: loading === "deckyfin-art" ? 0.4 : 1 }}>
+                {loading === "deckyfin-art" ? "Applying…" : "Apply Deckyfin Art"}
+              </Focusable>
+              {sgdbFeedback && (
+                <div style={{ fontSize: "0.82em", marginTop: "6px", color: sgdbFeedback.ok ? "#2ecc71" : "tomato" }}>
+                  {sgdbFeedback.msg}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Prefix Actions ─────────────────────────────────────────────────── */}
+      <div style={{ border: "1px solid #3a3a3a", borderRadius: "6px", marginBottom: "8px" }}>
+        <Focusable onActivate={() => setShowPrefixActions((v) => !v)} onClick={() => setShowPrefixActions((v) => !v)} focusClassName="is-focused"
+          style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", cursor: "pointer", background: "#1e1e1e", borderRadius: showPrefixActions ? "6px 6px 0 0" : "6px" }}>
+          <span style={{ fontWeight: 600, fontSize: "0.9em", color: "#e0e0e0" }}>Prefix Actions</span>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            {capabilities.can_play && depsNeedsInstall && (
+              <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#2ecc71", display: "inline-block", flexShrink: 0 }} />
+            )}
+            <span style={{ fontSize: "0.78em", color: "#666" }}>{showPrefixActions ? "▲" : "▼"}</span>
+          </div>
+        </Focusable>
+        {showPrefixActions && (
+          <div style={{ padding: "8px" }}>
+            <p style={{ fontSize: "0.78em", color: "#888", margin: "0 0 8px 0", lineHeight: 1.5 }}>
+              Manage the Wine/Proton prefix for this game. Initialize it to create a fresh Windows environment, install required dependencies, or browse the prefix filesystem to inspect or locate files.
+            </p>
+            {!steamInfo && !needsRestartAfterAdd && capabilities.can_play && (
+              <div style={{ padding: "8px 10px", borderRadius: "4px", background: "rgba(52,73,94,0.3)", border: "1px solid #2c3e50", fontSize: "0.78em", color: "#7f8c8d", marginBottom: "8px" }}>
+                🔒 Add game to Steam first
+              </div>
+            )}
+            {needsRestartAfterAdd && (
+              <div style={{ padding: "8px 12px", marginBottom: "8px", borderRadius: "4px", background: "rgba(230,126,34,0.15)", border: "1px solid rgba(230,126,34,0.3)", fontSize: "0.82em", color: "#e67e22" }}>
+                ⚠ Restart Steam to unlock prefix actions
+              </div>
+            )}
+            {!capabilities.can_play && (
+              <div style={{ padding: "8px 10px", borderRadius: "4px", background: "rgba(52,73,94,0.3)", border: "1px solid #2c3e50", fontSize: "0.78em", color: "#7f8c8d", marginBottom: "8px" }}>
+                🔒 Prefix actions unavailable — games on {selectedSource.source_type} sources can't be launched by Steam
+              </div>
+            )}
+            {/* Init Prefix */}
+            <Focusable
+              onActivate={capabilities.can_play ? handleInitPrefixClick : undefined}
+              onClick={capabilities.can_play ? handleInitPrefixClick : undefined}
+              focusClassName="is-focused"
+              style={{ ...BTN_STYLE, display: "block", width: "100%", boxSizing: "border-box" as const, textAlign: "center" as const, marginBottom: showReinitConfirm ? "4px" : "6px",
+                opacity: !capabilities.can_play || !steamInfo || needsRestartAfterAdd || prefixInit?.status === "running" ? 0.4 : 1 }}>
+              {prefixInit?.status === "running" ? "Initing…" : "Init Prefix"}
+            </Focusable>
+            {showReinitConfirm && (
+              <div style={{ fontSize: "0.82em", color: "#ccc", marginBottom: "6px", padding: "6px 8px", background: "#1a1a1a", borderRadius: "4px", border: "1px solid #444" }}>
+                <div style={{ marginBottom: "6px" }}>Prefix already exists. Re-initialize? This will wipe the current prefix.</div>
+                <Focusable focusClassName="" style={{ display: "flex", gap: "6px" }}>
+                  <Focusable onActivate={() => setShowReinitConfirm(false)} onClick={() => setShowReinitConfirm(false)} focusClassName="is-focused" style={{ ...BTN_STYLE, padding: "2px 8px", fontSize: "0.82em" }}>Cancel</Focusable>
+                  <Focusable onActivate={() => handleInitPrefix(true)} onClick={() => handleInitPrefix(true)} focusClassName="is-focused" style={{ ...BTN_STYLE, padding: "2px 8px", fontSize: "0.82em", border: "1px solid #e74c3c", color: "#e74c3c" }}>Yes, Re-initialize</Focusable>
+                </Focusable>
+              </div>
+            )}
+            {/* Install Dependencies */}
+            <Focusable
+              onActivate={capabilities.can_play ? handleInstallDeps : undefined}
+              onClick={capabilities.can_play ? handleInstallDeps : undefined}
+              focusClassName="is-focused"
+              style={{ ...BTN_STYLE, display: "block", width: "100%", boxSizing: "border-box" as const, textAlign: "center" as const, marginBottom: "6px",
+                opacity: !capabilities.can_play || !steamInfo || needsRestartAfterAdd || mergedDeps.length === 0 || depInstall?.status === "installing" ? 0.4 : 1,
+                border: capabilities.can_play && depsNeedsInstall ? "1px solid #27ae60" : "1px solid #555",
+                color: capabilities.can_play && depsNeedsInstall ? "#2ecc71" : "#e0e0e0" }}>
+              {depInstall?.status === "installing" ? "Installing…" : "Install Dependencies"}
+            </Focusable>
+            {/* Browse Prefix Files */}
+            <Focusable
+              onActivate={handleTogglePrefixBrowser}
+              onClick={handleTogglePrefixBrowser}
+              focusClassName="is-focused"
+              style={{ ...BTN_STYLE, display: "block", width: "100%", boxSizing: "border-box" as const, textAlign: "center" as const, marginBottom: "6px",
+                opacity: !steamInfo ? 0.4 : 1 }}>
+              {showPrefixBrowser ? "✕ Close Browser" : "Browse Prefix Files"}
+            </Focusable>
+            {pfxBrowseFeedback && (
+              <div style={{ fontSize: "0.82em", color: "#e67e22", marginBottom: "6px" }}>{pfxBrowseFeedback}</div>
+            )}
+            {showPrefixBrowser && (
+              <>
+                <div style={{ fontSize: "0.78em", color: "#555", marginBottom: "4px", borderRadius: "4px", padding: "3px 8px", background: "#1a1a1a" }}>
+                  {steamInfo ? `App ID: ${steamInfo.unsigned_appid}` : ""}
+                </div>
+                <Focusable focusClassName="" style={{ display: "flex", gap: "6px", alignItems: "center", padding: "5px 8px", border: "1px solid #2a2a2a", borderRadius: "4px 4px 0 0", background: "#1a1a1a" }}>
+                  <Focusable onActivate={handlePfxBrowserUp} onClick={handlePfxBrowserUp} focusClassName="is-focused"
+                    style={{ ...BTN_STYLE, padding: "2px 8px", fontSize: "0.78em", opacity: pfxBrowserPath === prefixRoot ? 0.3 : 1 }}>
+                    ← Up
+                  </Focusable>
+                  <span style={{ flex: 1, fontSize: "0.72em", color: "#666", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", direction: "rtl", textAlign: "left" }}>
+                    {pfxBrowserPath}
+                  </span>
+                </Focusable>
+                <Focusable focusClassName="" style={{ maxHeight: "200px", overflowY: "auto", padding: "2px 0", border: "1px solid #2a2a2a", borderTop: "none", borderRadius: "0 0 4px 4px", marginBottom: "6px" }}>
+                  {pfxBrowserLoading && <p style={{ padding: "8px", margin: 0, fontSize: "0.82em", color: "#888" }}>Loading…</p>}
+                  {!pfxBrowserLoading && pfxBrowserDirs.length === 0 && pfxBrowserFiles.length === 0 && (
+                    <p style={{ padding: "8px", margin: 0, fontSize: "0.82em", color: "#555" }}>Empty</p>
+                  )}
+                  {!pfxBrowserLoading && pfxBrowserDirs.map((dir) => (
+                    <Focusable key={`d:${dir}`} onActivate={() => handlePfxBrowserEnter(dir)} onClick={() => handlePfxBrowserEnter(dir)} focusClassName="is-focused"
+                      style={{ margin: "0 2px", padding: "4px 10px", fontSize: "0.82em", cursor: "pointer", borderBottom: "1px solid #2a2a2a" }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.06)")}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+                      📁 {dir}
+                    </Focusable>
+                  ))}
+                  {!pfxBrowserLoading && pfxBrowserFiles.map((file) => (
+                    <Focusable key={`f:${file}`} onActivate={() => {}} focusClassName="is-focused"
+                      style={{ margin: "0 2px", padding: "4px 10px", fontSize: "0.82em", color: "#666", borderBottom: "1px solid #2a2a2a" }}>
+                      📄 {file}
+                    </Focusable>
+                  ))}
+                </Focusable>
+              </>
+            )}
+            {/* Dep install status */}
+            {depInstall && (
+              <div style={{ border: "1px solid #444", borderRadius: "4px", padding: "8px 10px", marginTop: "4px", background: "#1a1a1a", fontSize: "0.82em" }}>
+                {depInstall.status === "installing" && <span style={{ color: "#aaa" }}>⟳ Installing dependencies — you can navigate away and come back</span>}
+                {depInstall.status === "done" && (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ color: "#2ecc71" }}>✓ Installed: {(depInstall.installed || []).join(", ") || "done"}</span>
+                    <Focusable onActivate={() => setDepInstall(null)} onClick={() => setDepInstall(null)} focusClassName="is-focused" style={{ cursor: "pointer", color: "#666", padding: "0 4px", marginLeft: "8px" }}>✕</Focusable>
+                  </div>
+                )}
+                {depInstall.status === "failed" && (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ color: "tomato" }}>✗ {depInstall.error || (depInstall.failed_deps?.length ? `Failed: ${depInstall.failed_deps.join(", ")}` : "Installation failed")}</span>
+                    <Focusable onActivate={() => setDepInstall(null)} onClick={() => setDepInstall(null)} focusClassName="is-focused" style={{ cursor: "pointer", color: "#666", padding: "0 4px", marginLeft: "8px" }}>✕</Focusable>
+                  </div>
+                )}
+              </div>
+            )}
+            {/* Prefix init status */}
+            {prefixInit && (
+              <div style={{ border: "1px solid #444", borderRadius: "4px", padding: "8px 10px", marginTop: "4px", background: "#1a1a1a", fontSize: "0.82em" }}>
+                {prefixInit.status === "running" && <span style={{ color: "#aaa" }}>⟳ Initializing prefix — you can navigate away and come back</span>}
+                {prefixInit.status === "done" && (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ color: "#2ecc71" }}>✓ Prefix initialized</span>
+                    <Focusable onActivate={() => { setPrefixInit(null); clearPrefixInitStatus(prefixInit.prefix_id).catch(() => {}); }} onClick={() => { setPrefixInit(null); clearPrefixInitStatus(prefixInit.prefix_id).catch(() => {}); }} focusClassName="is-focused" style={{ cursor: "pointer", color: "#666", padding: "0 4px", marginLeft: "8px" }}>✕</Focusable>
+                  </div>
+                )}
+                {prefixInit.status === "failed" && (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <span style={{ color: "tomato", wordBreak: "break-all", minWidth: 0, flex: 1 }}>✗ {prefixInit.error || "Prefix init failed"}</span>
+                    <Focusable onActivate={() => { setPrefixInit(null); clearPrefixInitStatus(prefixInit.prefix_id).catch(() => {}); }} onClick={() => { setPrefixInit(null); clearPrefixInitStatus(prefixInit.prefix_id).catch(() => {}); }} focusClassName="is-focused" style={{ cursor: "pointer", color: "#666", padding: "0 4px", marginLeft: "8px", flexShrink: 0 }}>✕</Focusable>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── Transfer Actions ──────────────────────────────────────────────── */}
       {(game.sources.length >= 2 ||
         allSources.some(
           (s) =>
             s.type !== "agent" &&
             !game.sources.some((gs) => gs.source_id === s.id),
-        )) && (
-        <div style={{ marginBottom: "10px" }}>
-          <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.08)", margin: "14px 0 10px" }} />
-          <h4 style={{ margin: "0 0 10px 0" }}>Transfer Actions</h4>
-          {/* Copy config block */}
-          {game.sources.length >= 2 && (
-            <div style={{ marginBottom: "6px" }}>
-              <Focusable
-                onActivate={() => {
-                  setShowCopyConfigPicker((v) => !v);
-                  setShowCopyGamePicker(false);
-                  setCopyConfigDest(null);
-                  setCopyConfigConfirming(false);
-                }}
-                onClick={() => {
-                  setShowCopyConfigPicker((v) => !v);
-                  setShowCopyGamePicker(false);
-                  setCopyConfigDest(null);
-                  setCopyConfigConfirming(false);
-                }}
-                focusClassName="is-focused"
-                style={{ ...BTN_STYLE, padding: "4px 10px", fontSize: "0.82em" }}
-              >
-                {copyConfigDest ? `Copy config → ${copyConfigDest.source_name}` : "Copy config →"}
-              </Focusable>
-
-              {showCopyConfigPicker && !copyConfigConfirming && (
-                <div style={{ border: "1px solid #555", borderRadius: "4px", padding: "2px 0", marginTop: "4px" }}>
-                  {game.sources
-                    .filter((s) => s.source_id !== selectedSource.source_id)
-                    .map((src) => (
-                      <Focusable
-                        key={src.source_id}
-                        onActivate={() => { setCopyConfigDest(src); setShowCopyConfigPicker(false); setCopyConfigConfirming(true); }}
-                        onClick={() => { setCopyConfigDest(src); setShowCopyConfigPicker(false); setCopyConfigConfirming(true); }}
-                        focusClassName="is-focused"
-                        style={{ margin: "0 2px", padding: "4px 10px", cursor: "pointer", fontSize: "0.85em", borderBottom: "1px solid #333", color: "#ccc" }}
-                        onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
-                        onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                      >
-                        {src.source_name}
-                        <span style={{ marginLeft: "6px", fontSize: "0.78em", color: "#666" }}>({src.source_type})</span>
-                      </Focusable>
-                    ))}
-                </div>
-              )}
-
-              {copyConfigConfirming && copyConfigDest && (
-                <div style={{ fontSize: "0.82em", color: "#ccc", marginTop: "4px" }}>
-                  <span>Replace <b>{copyConfigDest.source_name}</b>'s config with <b>{selectedSource.source_name}</b>'s?</span>
-                  <Focusable focusClassName="" style={{ display: "flex", gap: "6px", marginTop: "4px" }}>
-                    <Focusable onActivate={() => setCopyConfigConfirming(false)} onClick={() => setCopyConfigConfirming(false)} focusClassName="is-focused" style={{ ...BTN_STYLE, padding: "2px 8px", fontSize: "0.82em" }}>Cancel</Focusable>
-                    <Focusable onActivate={handleCopyConfig} onClick={handleCopyConfig} focusClassName="is-focused" style={{ ...BTN_STYLE, padding: "2px 8px", fontSize: "0.82em", border: "1px solid #27ae60", color: "#2ecc71" }}>Copy</Focusable>
-                  </Focusable>
-                </div>
-              )}
-
-              {copyConfigFeedback && (
-                <p style={{ margin: "4px 0 0", fontSize: "0.82em", color: copyConfigFeedback.startsWith("✓") ? "#2ecc71" : "tomato" }}>
-                  {copyConfigFeedback}
-                </p>
-              )}
-            </div>
-          )}
-
+        ) ||
+        (game.sources.length >= 2 && syncPaths.length > 0)) && (
+        <div style={{ border: "1px solid #3a3a3a", borderRadius: "6px", marginBottom: "8px" }}>
+          <Focusable
+            onActivate={() => setShowTransferActions((v) => !v)}
+            onClick={() => setShowTransferActions((v) => !v)}
+            focusClassName="is-focused"
+            style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", cursor: "pointer", background: "#1e1e1e", borderRadius: showTransferActions ? "6px 6px 0 0" : "6px" }}
+          >
+            <span style={{ fontWeight: 600, fontSize: "0.9em", color: "#e0e0e0" }}>Transfer Actions</span>
+            <span style={{ fontSize: "0.78em", color: "#666" }}>{showTransferActions ? "▲" : "▼"}</span>
+          </Focusable>
+          {showTransferActions && (
+            <div style={{ padding: "8px 12px", borderTop: "1px solid #2a2a2a" }}>
+          <p style={{ fontSize: "0.78em", color: "#888", margin: "0 0 8px 0", lineHeight: 1.5 }}>
+            Copy this game or its settings between sources. Copy Game transfers the game files to another location, Copy Config replicates its Deckyfin configuration to another source, and Copy Saves moves save data between sources.
+          </p>
           {/* Copy game block */}
           {allSources.some((s) => s.type !== "agent" && !game.sources.some((gs) => gs.source_id === s.id)) && (
             <div style={{ marginBottom: "6px" }}>
@@ -1183,9 +2152,9 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
                   setCopyGameConfirming(false);
                 }}
                 focusClassName="is-focused"
-                style={{ ...BTN_STYLE, padding: "4px 10px", fontSize: "0.82em" }}
+                style={{ ...BTN_STYLE, display: "block", width: "100%", boxSizing: "border-box" as const, textAlign: "center" as const, marginBottom: "6px" }}
               >
-                {copyGameDest ? `Copy game → ${copyGameDest.name}` : "Copy game →"}
+                {copyGameDest ? `Copy Game → ${copyGameDest.name}` : "Copy Game"}
               </Focusable>
 
               {showCopyGamePicker && !copyGameConfirming && (
@@ -1213,7 +2182,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
                 <div style={{ fontSize: "0.82em", color: "#ccc", marginTop: "4px" }}>
                   <span>Copy <b>{game.name}</b> to <b>{copyGameDest.name}</b>?</span>
                   <Focusable focusClassName="" style={{ display: "flex", gap: "6px", marginTop: "4px" }}>
-                    <Focusable onActivate={() => setCopyGameConfirming(false)} onClick={() => setCopyGameConfirming(false)} focusClassName="is-focused" style={{ ...BTN_STYLE, padding: "2px 8px", fontSize: "0.82em" }}>Cancel</Focusable>
+                    <Focusable onActivate={() => { setCopyGameConfirming(false); setCopyGameDest(null); }} onClick={() => { setCopyGameConfirming(false); setCopyGameDest(null); }} focusClassName="is-focused" style={{ ...BTN_STYLE, padding: "2px 8px", fontSize: "0.82em" }}>Cancel</Focusable>
                     <Focusable onActivate={handleStartTransfer} onClick={handleStartTransfer} focusClassName="is-focused" style={{ ...BTN_STYLE, padding: "2px 8px", fontSize: "0.82em", border: "1px solid #27ae60", color: "#2ecc71" }}>Copy</Focusable>
                   </Focusable>
                 </div>
@@ -1226,6 +2195,106 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
               )}
             </div>
           )}
+
+          {/* Copy config block */}
+          {game.sources.length >= 2 && (
+            <div style={{ marginBottom: "6px" }}>
+              <Focusable
+                onActivate={() => {
+                  setShowCopyConfigPicker((v) => !v);
+                  setShowCopyGamePicker(false);
+                  setCopyConfigDest(null);
+                  setCopyConfigConfirming(false);
+                }}
+                onClick={() => {
+                  setShowCopyConfigPicker((v) => !v);
+                  setShowCopyGamePicker(false);
+                  setCopyConfigDest(null);
+                  setCopyConfigConfirming(false);
+                }}
+                focusClassName="is-focused"
+                style={{ ...BTN_STYLE, display: "block", width: "100%", boxSizing: "border-box" as const, textAlign: "center" as const, marginBottom: "6px" }}
+              >
+                {copyConfigDest ? `Copy Config → ${copyConfigDest.source_name}` : "Copy Config"}
+              </Focusable>
+
+              {showCopyConfigPicker && !copyConfigConfirming && (
+                <div style={{ border: "1px solid #555", borderRadius: "4px", padding: "2px 0", marginTop: "4px" }}>
+                  {game.sources
+                    .filter((s) => s.source_id !== selectedSource.source_id)
+                    .map((src) => (
+                      <Focusable
+                        key={src.source_id}
+                        onActivate={() => { setCopyConfigDest(src); setShowCopyConfigPicker(false); setCopyConfigConfirming(true); }}
+                        onClick={() => { setCopyConfigDest(src); setShowCopyConfigPicker(false); setCopyConfigConfirming(true); }}
+                        focusClassName="is-focused"
+                        style={{ margin: "0 2px", padding: "4px 10px", cursor: "pointer", fontSize: "0.85em", borderBottom: "1px solid #333", color: "#ccc" }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                      >
+                        {src.source_name}
+                        <span style={{ marginLeft: "6px", fontSize: "0.78em", color: "#666" }}>({src.source_type})</span>
+                      </Focusable>
+                    ))}
+                </div>
+              )}
+
+              {copyConfigConfirming && copyConfigDest && (
+                <div style={{ fontSize: "0.82em", color: "#ccc", marginTop: "4px" }}>
+                  <span>Replace <b>{copyConfigDest.source_name}</b>'s config with <b>{selectedSource.source_name}</b>'s?</span>
+                  <Focusable focusClassName="" style={{ display: "flex", gap: "6px", marginTop: "4px" }}>
+                    <Focusable onActivate={() => { setCopyConfigConfirming(false); setCopyConfigDest(null); }} onClick={() => { setCopyConfigConfirming(false); setCopyConfigDest(null); }} focusClassName="is-focused" style={{ ...BTN_STYLE, padding: "2px 8px", fontSize: "0.82em" }}>Cancel</Focusable>
+                    <Focusable onActivate={handleCopyConfig} onClick={handleCopyConfig} focusClassName="is-focused" style={{ ...BTN_STYLE, padding: "2px 8px", fontSize: "0.82em", border: "1px solid #27ae60", color: "#2ecc71" }}>Copy</Focusable>
+                  </Focusable>
+                </div>
+              )}
+
+              {copyConfigFeedback && (
+                <p style={{ margin: "4px 0 0", fontSize: "0.82em", color: copyConfigFeedback.startsWith("✓") ? "#2ecc71" : "tomato" }}>
+                  {copyConfigFeedback}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Copy saves block */}
+          {game.sources.length >= 2 && syncPaths.length > 0 && (
+            <div style={{ marginBottom: "6px" }}>
+              <Focusable
+                onActivate={() => { setShowCopySavesPicker((v) => !v); setCopySavesDest(null); setCopySavesConfirming(false); }}
+                onClick={() => { setShowCopySavesPicker((v) => !v); setCopySavesDest(null); setCopySavesConfirming(false); }}
+                focusClassName="is-focused"
+                style={{ ...BTN_STYLE, display: "block", width: "100%", boxSizing: "border-box" as const, textAlign: "center" as const, marginBottom: "6px" }}>
+                {copySavesDest ? `Copy Saves → ${copySavesDest.source_name}` : "Copy Saves"}
+              </Focusable>
+              {showCopySavesPicker && !copySavesConfirming && (
+                <div style={{ border: "1px solid #555", borderRadius: "4px", padding: "2px 0", marginTop: "4px" }}>
+                  {game.sources.filter((s) => s.source_id !== selectedSource.source_id).map((src) => (
+                    <Focusable key={src.source_id}
+                      onActivate={() => { setCopySavesDest(src); setShowCopySavesPicker(false); setCopySavesConfirming(true); }}
+                      onClick={() => { setCopySavesDest(src); setShowCopySavesPicker(false); setCopySavesConfirming(true); }}
+                      focusClassName="is-focused"
+                      style={{ margin: "0 2px", padding: "4px 10px", cursor: "pointer", fontSize: "0.85em", borderBottom: "1px solid #333", color: "#ccc" }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+                      {src.source_name}
+                      <span style={{ marginLeft: "6px", fontSize: "0.78em", color: "#666" }}>({src.source_type})</span>
+                    </Focusable>
+                  ))}
+                </div>
+              )}
+              {copySavesConfirming && copySavesDest && (
+                <div style={{ fontSize: "0.82em", color: "#ccc", marginTop: "4px" }}>
+                  <span>Copy saves from <b>{selectedSource.source_name}</b> → <b>{copySavesDest.source_name}</b>?</span>
+                  <Focusable focusClassName="" style={{ display: "flex", gap: "6px", marginTop: "4px" }}>
+                    <Focusable onActivate={() => { setCopySavesConfirming(false); setCopySavesDest(null); }} onClick={() => { setCopySavesConfirming(false); setCopySavesDest(null); }} focusClassName="is-focused" style={{ ...BTN_STYLE, padding: "2px 8px", fontSize: "0.82em" }}>Cancel</Focusable>
+                    <Focusable onActivate={handleCopySaves} onClick={handleCopySaves} focusClassName="is-focused" style={{ ...BTN_STYLE, padding: "2px 8px", fontSize: "0.82em", border: "1px solid #27ae60", color: "#2ecc71" }}>Copy</Focusable>
+                  </Focusable>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* ── Transfer Progress Banner ───────────────────────────────────────── */}
           {transferStatus && (() => {
             const pct =
@@ -1356,671 +2425,96 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
               </div>
             );
           })()}
-        </div>
-      )}
-
-      {/* ── Config Fields ──────────────────────────────────────────────── */}
-      <h4 style={{ margin: "0 0 10px 0" }}>Game Settings</h4>
-
-      {/* Name */}
-      <label style={LABEL_STYLE}>Name</label>
-      <CompactTextField
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        style={{ width: "100%", marginBottom: "10px" }}
-      />
-
-      {/* Executable */}
-      <label style={LABEL_STYLE}>Executable</label>
-      <Focusable
-        focusClassName=""
-        style={{
-          display: "flex",
-          gap: "6px",
-          marginBottom: showExePicker ? "4px" : "10px",
-          alignItems: "center",
-        }}
-      >
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <CompactTextField
-            value={executable}
-            onChange={(e) => setExecutable(e.target.value)}
-            style={{ width: "100%" }}
-          />
-        </div>
-        <Focusable
-          onActivate={handleOpenExePicker}
-          onClick={handleOpenExePicker}
-          focusClassName="is-focused"
-          style={{ ...BTN_STYLE, alignSelf: "center", padding: "4px 12px" }}
-        >
-          {showExePicker ? "✕" : "Browse"}
-        </Focusable>
-      </Focusable>
-
-      {/* Executable picker dropdown */}
-      {showExePicker && (
-        <Focusable
-          style={{
-            marginBottom: "10px",
-            border: "1px solid #555",
-            borderRadius: "4px",
-            maxHeight: "180px",
-            overflowY: "auto",
-            padding: "2px 0",
-          }}
-        >
-          {exeOptions.length === 0 && (
-            <p style={{ padding: "8px", margin: 0, fontSize: "0.85em", color: "#888" }}>
-              No executables found in {startDir}
-            </p>
-          )}
-          {exeOptions.map((exe) => (
-            <Focusable
-              key={exe}
-              onActivate={() => handleSelectExe(exe)}
-              onClick={() => handleSelectExe(exe)}
-              focusClassName="is-focused"
-              style={{
-                margin: "0 2px",
-                padding: "4px 10px",
-                cursor: "pointer",
-                fontSize: "0.85em",
-                borderBottom: "1px solid #333",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-            >
-              {exe}
-            </Focusable>
-          ))}
-        </Focusable>
-      )}
-
-      {/* Start Dir */}
-      <label style={LABEL_STYLE}>Start Dir</label>
-      <CompactTextField
-        value={startDir}
-        onChange={(e) => setStartDir(e.target.value)}
-        style={{ width: "100%", marginBottom: "10px" }}
-      />
-
-      {/* Steam App ID */}
-      <label style={LABEL_STYLE}>Steam App ID</label>
-      <CompactTextField
-        value={steamAppIdInput}
-        onChange={(e) => {
-          setSteamAppIdInput(e.target.value);
-          const parsed = parseInt(e.target.value, 10);
-          setSteamAppId(isNaN(parsed) ? undefined : parsed);
-        }}
-        style={{ width: "100%", marginBottom: "10px" }}
-      />
-
-      {/* Launch Options */}
-      <label style={LABEL_STYLE}>
-        Launch Options
-        <span style={{ color: "#666", fontWeight: "normal" }}> (click to toggle)</span>
-      </label>
-      <div style={{ marginBottom: "8px", border: "1px solid #444", borderRadius: "4px", padding: "8px" }}>
-        {popularLaunchers.length > 0 && (
-          <Focusable focusClassName="" style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "8px" }}>
-            {popularLaunchers.map((pl) => {
-              const active = checkedLaunchers.includes(pl.label);
-              return (
-                <Focusable
-                  key={pl.label}
-                  onActivate={() => toggleCheckedLauncher(pl.label)}
-                  onClick={() => toggleCheckedLauncher(pl.label)}
-                  focusClassName="is-focused"
-                  style={{
-                    margin: "0 2px", padding: "4px 10px", borderRadius: "12px",
-                    fontSize: "0.82em", cursor: "pointer",
-                    border: active ? "1px solid #0078d4" : "1px solid #555",
-                    background: active ? "#0078d4" : "transparent",
-                    color: active ? "white" : "#ccc",
-                  }}
-                >
-                  {pl.label}
-                </Focusable>
-              );
-            })}
-          </Focusable>
-        )}
-        <CompactTextField
-          value={launchOptions}
-          onChange={(e) => setLaunchOptions(e.target.value)}
-          placeholder="Extra launch options…"
-          style={{ width: "100%", marginBottom: finalLaunchOptions ? "6px" : "0" }}
-        />
-        {finalLaunchOptions && (
-          <div style={{ fontSize: "0.75em", color: "#555", wordBreak: "break-all" as const, marginTop: "4px" }}>
-            → {finalLaunchOptions}
-          </div>
-        )}
-      </div>
-
-      {/* ── Collections: Toggle Chips + Custom ──────────────────────────── */}
-      <label style={LABEL_STYLE}>
-        Collections
-        <span style={{ color: "#666", fontWeight: "normal" }}>
-          {" "}
-          (click to select)
-        </span>
-      </label>
-
-      <div
-        style={{
-          marginBottom: "8px",
-          border: "1px solid #444",
-          borderRadius: "4px",
-          padding: "8px",
-        }}
-      >
-        {steamCollections.length > 0 && (
-          <Focusable
-            focusClassName=""
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: "6px",
-              marginBottom: "10px",
-            }}
-          >
-            {steamCollections.map((name) => {
-              const selected = checkedCollections.includes(name);
-              return (
-                <Focusable
-                  key={name}
-                  onActivate={() => toggleCheckedCollection(name)}
-                  onClick={() => toggleCheckedCollection(name)}
-                  focusClassName="is-focused"
-                  style={{
-                    padding: "4px 12px",
-                    fontSize: "0.82em",
-                    border: selected
-                      ? "1px solid #0078d4"
-                      : "1px solid #555",
-                    borderRadius: "14px",
-                    background: selected ? "#0078d4" : "transparent",
-                    color: selected ? "white" : "#ccc",
-                    cursor: "pointer",
-                  }}
-                >
-                  {name}
-                </Focusable>
-              );
-            })}
-          </Focusable>
-        )}
-
-        {/* Custom collections */}
-        <label style={{ fontSize: "0.82em", color: "#888", display: "block", marginBottom: "2px" }}>
-          Custom (comma-separated)
-        </label>
-        <CompactTextField
-          value={customCollections}
-          onChange={(e) => setCustomCollections(e.target.value)}
-          placeholder={steamCollections.length > 0 ? "e.g. RPG, FPS" : "e.g. RPG, FPS, Favorites"}
-          style={{ width: "100%" }}
-        />
-      </div>
-
-      {/* Proton Version: inline picker */}
-      <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "2px" }}>
-        <span style={{ ...LABEL_STYLE, display: "inline", marginBottom: 0 }}>Proton Version</span>
-        <Focusable
-          onActivate={() => Navigation.NavigateToExternalWeb(
-            steamAppId
-              ? `https://www.protondb.com/app/${steamAppId}`
-              : `https://www.protondb.com/search?q=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`
-          )}
-          onClick={() => Navigation.NavigateToExternalWeb(
-            steamAppId
-              ? `https://www.protondb.com/app/${steamAppId}`
-              : `https://www.protondb.com/search?q=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`
-          )}
-          focusClassName="is-focused"
-          style={{ padding: "1px 5px", fontSize: "0.7em", borderRadius: "10px", cursor: "pointer", border: "1px solid #555", color: "#666", lineHeight: 1.2 }}
-        >
-          ℹ
-        </Focusable>
-      </div>
-      <Focusable
-        onActivate={() => setShowProtonPicker((p) => !p)}
-        onClick={() => setShowProtonPicker((p) => !p)}
-        focusClassName="is-focused"
-        style={{
-          ...BTN_STYLE,
-          display: "inline-block",
-          padding: "4px 12px",
-          marginBottom: protonPickerOpen ? "4px" : "10px",
-          background: protonVersion ? "transparent" : "transparent",
-          color: protonVersion ? "#e0e0e0" : "#888",
-        }}
-      >
-        {protonVersion || "— None —"}
-      </Focusable>
-      {protonPickerOpen && (
-        <div
-          style={{
-            marginBottom: "10px",
-            border: "1px solid #555",
-            borderRadius: "4px",
-            maxHeight: "200px",
-            overflowY: "auto",
-            padding: "2px 0",
-          }}
-        >
-          <Focusable
-            onActivate={() => { setProtonVersion(""); setShowProtonPicker(false); }}
-            onClick={() => { setProtonVersion(""); setShowProtonPicker(false); }}
-            focusClassName="is-focused"
-            style={{ margin: "0 2px", padding: "4px 10px", cursor: "pointer", fontSize: "0.85em", borderBottom: "1px solid #333", color: !protonVersion ? "#0078d4" : "#ccc" }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
-            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-          >
-            — None —
-          </Focusable>
-          {protonVersions.map((v) => (
-            <Focusable
-              key={v}
-              onActivate={() => { setProtonVersion(v); setShowProtonPicker(false); }}
-              onClick={() => { setProtonVersion(v); setShowProtonPicker(false); }}
-              focusClassName="is-focused"
-              style={{ margin: "0 2px", padding: "4px 10px", cursor: "pointer", fontSize: "0.85em", borderBottom: "1px solid #333", color: protonVersion === v ? "#0078d4" : "#ccc" }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-            >
-              {v}
-            </Focusable>
-          ))}
-        </div>
-      )}
-
-      {/* ── Dependencies: Toggle Chips + Custom ──────────────────────── */}
-      <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "2px" }}>
-        <span style={{ ...LABEL_STYLE, display: "inline", marginBottom: 0 }}>
-          Dependencies
-          <span style={{ color: "#666", fontWeight: "normal" }}> (click to select)</span>
-        </span>
-        <Focusable
-          onActivate={() => Navigation.NavigateToExternalWeb(
-            steamAppId
-              ? `https://steamdb.info/app/${steamAppId}/`
-              : `https://steamdb.info/search/?a=all&q=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`
-          )}
-          onClick={() => Navigation.NavigateToExternalWeb(
-            steamAppId
-              ? `https://steamdb.info/app/${steamAppId}/`
-              : `https://steamdb.info/search/?a=all&q=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`
-          )}
-          focusClassName="is-focused"
-          style={{ padding: "1px 5px", fontSize: "0.7em", borderRadius: "10px", cursor: "pointer", border: "1px solid #555", color: "#666", lineHeight: 1.2 }}
-        >
-          ℹ
-        </Focusable>
-      </div>
-
-      <div
-        style={{
-          marginBottom: "8px",
-          border: "1px solid #444",
-          borderRadius: "4px",
-          padding: "8px",
-        }}
-      >
-        <Focusable
-          focusClassName=""
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: "6px",
-            marginBottom: "10px",
-          }}
-        >
-          {popularDeps.map((dep) => {
-            const selected = checkedDeps.includes(dep);
-            return (
-              <Focusable
-                key={dep}
-                onActivate={() => toggleCheckedDep(dep)}
-                onClick={() => toggleCheckedDep(dep)}
-                focusClassName="is-focused"
-                style={{
-                  padding: "4px 12px",
-                  fontSize: "0.82em",
-                  border: selected
-                    ? "1px solid #0078d4"
-                    : "1px solid #555",
-                  borderRadius: "14px",
-                  background: selected ? "#0078d4" : "transparent",
-                  color: selected ? "white" : "#ccc",
-                  cursor: "pointer",
-                }}
-              >
-                {dep}
-              </Focusable>
-            );
-          })}
-        </Focusable>
-
-        {/* Custom dependencies */}
-        <label style={{ fontSize: "0.82em", color: "#888", display: "block", marginBottom: "2px" }}>
-          Custom (comma-separated)
-        </label>
-        <CompactTextField
-          value={customDeps}
-          onChange={(e) => setCustomDeps(e.target.value)}
-          style={{ width: "100%" }}
-        />
-      </div>
-
-      {/* Apply Config */}
-      <Focusable
-        onActivate={capabilities.can_write_config ? handleApplyConfig : undefined}
-        onClick={capabilities.can_write_config ? handleApplyConfig : undefined}
-        focusClassName="is-focused"
-        style={{
-          ...BTN_STYLE,
-          display: "inline-block",
-          marginBottom: "8px",
-          border: configDirty && capabilities.can_write_config ? "1px solid #27ae60" : "1px solid #555",
-          color: configDirty && capabilities.can_write_config ? "#2ecc71" : "#e0e0e0",
-          opacity: capabilities.can_write_config ? 1 : 0.4,
-        }}
-      >
-        {configDirty && capabilities.can_write_config ? "Apply Config *" : "Apply Config"}
-      </Focusable>
-      {configFeedback && (
-        <p
-          style={{
-            marginTop: "0",
-            marginBottom: "8px",
-            fontSize: "0.85em",
-            color: configFeedback.ok ? "#2ecc71" : "tomato",
-          }}
-        >
-          {configFeedback.msg}
-        </p>
-      )}
-
-      {/* ── Separator ──────────────────────────────────────────────────── */}
-      <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.12)", margin: "14px 0" }} />
-
-      {/* ── Steam Status ────────────────────────────────────────────────── */}
-      <div
-        style={{
-          fontSize: "0.85em",
-          color: "#aaa",
-          marginBottom: "12px",
-        }}
-      >
-        {steamInfo ? (
-          <>✅ In Steam (App {steamInfo.unsigned_appid})</>
-        ) : (
-          <>Not in Steam</>
-        )}
-        {currentProton && <> · Proton: {currentProton}</>}
-      </div>
-
-      {/* ── Restart required warning ─────────────────────────────────────── */}
-      {needsRestartAfterAdd && (
-        <div
-          style={{
-            padding: "8px 12px",
-            marginBottom: "10px",
-            borderRadius: "4px",
-            background: "rgba(230, 126, 34, 0.15)",
-            border: "1px solid rgba(230, 126, 34, 0.3)",
-            fontSize: "0.82em",
-            color: "#e67e22",
-          }}
-        >
-          ⚠ Restart Steam to unlock Init Prefix, Install Dependencies, and Apply Art
-        </div>
-      )}
-
-      {/* Capability lock notice */}
-      {!capabilities.can_play && (
-        <div style={{ padding: "8px 10px", borderRadius: "4px", background: "rgba(52,73,94,0.3)",
-          border: "1px solid #2c3e50", fontSize: "0.78em", color: "#7f8c8d", marginBottom: "8px" }}>
-          🔒 Steam & prefix actions unavailable — games on {selectedSource.source_type} sources can't be launched by Steam
-        </div>
-      )}
-
-      {/* ── Steam Actions ─────────────────────────────────────────────────── */}
-      <label style={{ ...LABEL_STYLE, marginTop: "14px", marginBottom: "6px", fontSize: "0.9em", color: "#999" }}>
-        Steam Actions
-      </label>
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: "6px",
-          marginBottom: "14px",
-          alignItems: "flex-start",
-        }}
-      >
-        <Focusable
-          onActivate={capabilities.can_play ? (steamInfo ? handleUpdateSteam : handleAddToSteam) : undefined}
-          onClick={capabilities.can_play ? (steamInfo ? handleUpdateSteam : handleAddToSteam) : undefined}
-          focusClassName="is-focused"
-          style={{
-            ...BTN_STYLE,
-            opacity: !capabilities.can_play || loading === "add" || loading === "update" ? 0.4 : 1,
-            border: capabilities.can_play && steamNeedsSync ? "1px solid #27ae60" : "1px solid #555",
-            color: capabilities.can_play && steamNeedsSync ? "#2ecc71" : "#e0e0e0",
-          }}
-        >
-          {loading === "add"
-            ? "Adding…"
-            : loading === "update"
-            ? "Updating…"
-            : steamInfo
-            ? "Update Steam"
-            : "Add to Steam"}
-        </Focusable>
-
-        <Focusable focusClassName="" style={{ display: "flex", gap: "6px" }}>
-          <Focusable
-            onActivate={capabilities.can_play ? handleInitPrefix : undefined}
-            onClick={capabilities.can_play ? handleInitPrefix : undefined}
-            focusClassName="is-focused"
-            style={{
-              ...BTN_STYLE,
-              opacity: !capabilities.can_play || !steamInfo || needsRestartAfterAdd || loading === "init" ? 0.4 : 1,
-            }}
-          >
-            {loading === "init" ? "Initing…" : forceReinit ? "Re-init Prefix" : "Init Prefix"}
-          </Focusable>
-
-          <Focusable
-            onActivate={() => setForceReinit(!forceReinit)}
-            onClick={() => setForceReinit(!forceReinit)}
-            focusClassName="is-focused"
-            style={{
-              ...BTN_STYLE,
-              padding: "8px 10px",
-              minWidth: "70px",
-              background: forceReinit ? "#ff6666" : "transparent",
-              borderColor: forceReinit ? "#ff6666" : "#555",
-              color: needsRestartAfterAdd ? "#555" : forceReinit ? "white" : "#aaa",
-              opacity: needsRestartAfterAdd ? 0.4 : 1,
-            }}
-          >
-            {forceReinit ? "☑ Force" : "☐ Force"}
-          </Focusable>
-        </Focusable>
-
-        <Focusable
-          onActivate={capabilities.can_play ? handleInstallDeps : undefined}
-          onClick={capabilities.can_play ? handleInstallDeps : undefined}
-          focusClassName="is-focused"
-          style={{
-            ...BTN_STYLE,
-            opacity: !capabilities.can_play || !steamInfo || needsRestartAfterAdd || mergedDeps.length === 0 || depInstall?.status === "installing" ? 0.4 : 1,
-            border: capabilities.can_play && depsNeedsInstall ? "1px solid #27ae60" : "1px solid #555",
-            color: capabilities.can_play && depsNeedsInstall ? "#2ecc71" : "#e0e0e0",
-          }}
-        >
-          {depInstall?.status === "installing" ? "Installing…" : "Install Dependencies"}
-        </Focusable>
-
-        {/* Restart Steam */}
-        <Focusable
-          onActivate={handleRestartSteam}
-          onClick={handleRestartSteam}
-          focusClassName="is-focused"
-          style={{
-            ...BTN_STYLE,
-            border: needsRestart ? "1px solid #27ae60" : "1px solid #555",
-            color: needsRestart ? "#2ecc71" : "#e0e0e0",
-          }}
-        >
-          {restarting ? "…" : "↺ Restart Steam"}
-        </Focusable>
-
-      </div>
-
-      {/* ── Dep install status banner ──────────────────────────────────────── */}
-      {depInstall && (
-        <div style={{ border: "1px solid #444", borderRadius: "4px", padding: "8px 10px", marginBottom: "6px", background: "#1a1a1a", fontSize: "0.82em" }}>
-          {depInstall.status === "installing" && (
-            <span style={{ color: "#aaa" }}>⟳ Installing dependencies — you can navigate away and come back</span>
-          )}
-          {depInstall.status === "done" && (
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ color: "#2ecc71" }}>✓ Installed: {(depInstall.installed || []).join(", ") || "done"}</span>
-              <Focusable onActivate={() => setDepInstall(null)} onClick={() => setDepInstall(null)} focusClassName="is-focused"
-                style={{ cursor: "pointer", color: "#666", padding: "0 4px", marginLeft: "8px" }}>✕</Focusable>
+          {/* Config copy status */}
+          {configCopy && (
+            <div style={{ border: "1px solid #444", borderRadius: "4px", padding: "8px 10px", marginTop: "6px", background: "#1a1a1a", fontSize: "0.82em" }}>
+              {configCopy.status === "running" && <span style={{ color: "#aaa" }}>⟳ Copying config…</span>}
+              {configCopy.status === "done" && (
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ color: "#2ecc71" }}>✓ Config copied</span>
+                  <Focusable onActivate={() => { setConfigCopy(null); clearConfigCopyStatus(configCopy.copy_id).catch(() => {}); }} onClick={() => { setConfigCopy(null); clearConfigCopyStatus(configCopy.copy_id).catch(() => {}); }} focusClassName="is-focused" style={{ cursor: "pointer", color: "#666", padding: "0 4px", marginLeft: "8px" }}>✕</Focusable>
+                </div>
+              )}
+              {configCopy.status === "failed" && (
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <span style={{ color: "tomato", wordBreak: "break-all", minWidth: 0, flex: 1 }}>✗ {configCopy.error || "Config copy failed"}</span>
+                  <Focusable onActivate={() => { setConfigCopy(null); clearConfigCopyStatus(configCopy.copy_id).catch(() => {}); }} onClick={() => { setConfigCopy(null); clearConfigCopyStatus(configCopy.copy_id).catch(() => {}); }} focusClassName="is-focused" style={{ cursor: "pointer", color: "#666", padding: "0 4px", marginLeft: "8px", flexShrink: 0 }}>✕</Focusable>
+                </div>
+              )}
             </div>
           )}
-          {depInstall.status === "failed" && (
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ color: "tomato" }}>✗ {depInstall.error || (depInstall.failed_deps?.length ? `Failed: ${depInstall.failed_deps.join(", ")}` : "Installation failed")}</span>
-              <Focusable onActivate={() => setDepInstall(null)} onClick={() => setDepInstall(null)} focusClassName="is-focused"
-                style={{ cursor: "pointer", color: "#666", padding: "0 4px", marginLeft: "8px" }}>✕</Focusable>
             </div>
           )}
         </div>
       )}
 
-      {/* ── Feedback ───────────────────────────────────────────────────── */}
-      {feedback && (
-        <p
-          style={{
-            marginTop: "12px",
-            color: feedback.ok ? "lightgreen" : "tomato",
-            fontSize: "0.9em",
-          }}
-        >
-          {feedback.msg}
-        </p>
-      )}
-
-      {/* ── SteamGridDB Art ─────────────────────────────────────────────────── */}
-      <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.08)", margin: "24px 0 8px" }} />
-
-      <label style={{ ...LABEL_STYLE, marginBottom: "8px" }}>
-        SteamGridDB Art
-        <span style={{ color: "#666", fontWeight: "normal" }}>
-          {" "}
-          (pick the matching game, then Apply)
-        </span>
-      </label>
-
-      <Focusable focusClassName="" style={{ display: "flex", gap: "6px", marginBottom: "6px" }}>
-        <Focusable
-          onActivate={handleOpenSgdbPicker}
-          onClick={handleOpenSgdbPicker}
-          focusClassName="is-focused"
-          style={{
-            ...BTN_STYLE,
-            flex: 1,
-            padding: "4px 12px",
-            color: selectedSgdbGame ? "#e0e0e0" : "#888",
-            opacity: needsRestartAfterAdd || !steamInfo ? 0.4 : 1,
-          }}
-        >
-          {selectedSgdbGame
-            ? `🎮 ${selectedSgdbGame.name} (ID: ${selectedSgdbGame.id})`
-            : "Search…"}
-        </Focusable>
-
-        <Focusable
-          onActivate={handleApplySgdbArt}
-          onClick={handleApplySgdbArt}
-          focusClassName="is-focused"
-          style={{
-            ...BTN_STYLE,
-            padding: "4px 12px",
-            opacity: !selectedSgdbGame || !steamInfo || needsRestartAfterAdd || loading === "art" ? 0.4 : 1,
-          }}
-        >
-          {loading === "art" ? "Applying…" : "Apply"}
-        </Focusable>
-      </Focusable>
-
-      {/* SGDB art feedback */}
-      {sgdbFeedback && (
-        <p
-          style={{
-            marginTop: "4px",
-            marginBottom: showSgdbPicker ? "4px" : "10px",
-            color: sgdbFeedback.ok ? "lightgreen" : "tomato",
-            fontSize: "0.85em",
-          }}
-        >
-          {sgdbFeedback.msg}
-        </p>
-      )}
-
-      {/* SGDB picker dropdown */}
-      {showSgdbPicker && (
-        <Focusable
-          style={{
-            marginBottom: "10px",
-            border: "1px solid #555",
-            borderRadius: "4px",
-            maxHeight: "180px",
-            overflowY: "auto",
-            padding: "2px 0",
-          }}
-        >
-          {sgdbGames.length === 0 && (
-            <p style={{ padding: "8px", margin: 0, fontSize: "0.85em", color: "#888" }}>
-              No matching games found on SteamGridDB for "{name}"
-            </p>
+      {/* ── Save Actions ───────────────────────────────────────────────────── */}
+      {syncPaths.length > 0 && (capabilities.can_write_config || !!steamInfo) && (
+        <div style={{ border: "1px solid #3a3a3a", borderRadius: "6px", marginBottom: "8px" }}>
+          <Focusable onActivate={() => setShowSaveActions((v) => !v)} onClick={() => setShowSaveActions((v) => !v)} focusClassName="is-focused"
+            style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", cursor: "pointer", background: "#1e1e1e", borderRadius: showSaveActions ? "6px 6px 0 0" : "6px" }}>
+            <span style={{ fontWeight: 600, fontSize: "0.9em", color: "#e0e0e0" }}>Save Actions</span>
+            <span style={{ fontSize: "0.78em", color: "#666" }}>{showSaveActions ? "▲" : "▼"}</span>
+          </Focusable>
+          {showSaveActions && (
+            <div style={{ padding: "8px 12px", borderTop: "1px solid #2a2a2a" }}>
+              <p style={{ fontSize: "0.78em", color: "#888", margin: "0 0 8px 0", lineHeight: 1.5 }}>
+                Back up and restore save files for this game. Backup copies saves from the Proton prefix to a safe folder; Restore brings them back. Save paths are configured in the Save Paths section above.
+              </p>
+              {/* Backup / Restore */}
+              {capabilities.can_write_config && steamInfo && (
+                <>
+                  <Focusable onActivate={handleBackupSaves} onClick={handleBackupSaves} focusClassName="is-focused"
+                    style={{ ...BTN_STYLE, display: "block", width: "100%", boxSizing: "border-box" as const, textAlign: "center" as const, marginBottom: "6px", opacity: saveSync?.status === "running" ? 0.4 : 1 }}>
+                    ↑ Backup Saves
+                  </Focusable>
+                  <Focusable onActivate={handleRestoreSaves} onClick={handleRestoreSaves} focusClassName="is-focused"
+                    style={{ ...BTN_STYLE, display: "block", width: "100%", boxSizing: "border-box" as const, textAlign: "center" as const, marginBottom: "6px", opacity: saveSync?.status === "running" ? 0.4 : 1 }}>
+                    ↓ Restore Saves
+                  </Focusable>
+                </>
+              )}
+              {/* Save sync status */}
+              {saveSync && (
+                <div style={{ border: "1px solid #444", borderRadius: "4px", padding: "5px 8px", background: "#1a1a1a", fontSize: "0.82em" }}>
+                  {saveSync.status === "running" && <span style={{ color: "#aaa" }}>⟳ {saveSync.direction === "backup" ? "Backing up" : saveSync.direction === "restore" ? "Restoring" : "Copying"} saves…</span>}
+                  {saveSync.status === "done" && (
+                    <div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ color: "#2ecc71" }}>✓ {saveSync.direction === "backup" ? "Saves backed up" : saveSync.direction === "restore" ? "Saves restored" : "Saves copied"}{saveSync.copied?.length ? ` (${saveSync.copied.length})` : ""}</span>
+                        <Focusable onActivate={() => { if (saveSync.sync_id) clearSaveSyncStatus(saveSync.sync_id).catch(() => {}); setSaveSync(null); }} onClick={() => { if (saveSync.sync_id) clearSaveSyncStatus(saveSync.sync_id).catch(() => {}); setSaveSync(null); }} focusClassName="is-focused" style={{ cursor: "pointer", color: "#666", padding: "0 4px" }}>✕</Focusable>
+                      </div>
+                      {saveSync.saves_dir && saveSync.direction === "backup" && (
+                        <div style={{ fontSize: "0.72em", color: "#555", fontFamily: "monospace", wordBreak: "break-all", marginTop: "3px" }}>{saveSync.saves_dir}</div>
+                      )}
+                    </div>
+                  )}
+                  {saveSync.status === "failed" && (
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "6px" }}>
+                      <span style={{ color: "tomato", wordBreak: "break-all", minWidth: 0, flex: 1 }}>✗ {saveSync.error ?? "Save sync failed"}</span>
+                      <Focusable onActivate={() => { if (saveSync.sync_id) clearSaveSyncStatus(saveSync.sync_id).catch(() => {}); setSaveSync(null); }} onClick={() => { if (saveSync.sync_id) clearSaveSyncStatus(saveSync.sync_id).catch(() => {}); setSaveSync(null); }} focusClassName="is-focused" style={{ cursor: "pointer", color: "#666", padding: "0 4px" }}>✕</Focusable>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           )}
-          {sgdbGames.map((g) => (
-            <Focusable
-              key={g.id}
-              onActivate={() => handleSelectSgdbGame(g)}
-              onClick={() => handleSelectSgdbGame(g)}
-              focusClassName="is-focused"
-              style={{
-                margin: "0 2px",
-                padding: "4px 10px",
-                cursor: "pointer",
-                fontSize: "0.85em",
-                borderBottom: "1px solid #333",
-                color: selectedSgdbGame?.id === g.id ? "#0078d4" : "#ccc",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-            >
-              🎮 {g.name} (ID: {g.id})
-            </Focusable>
-          ))}
-        </Focusable>
+        </div>
       )}
 
       {/* ── Danger Zone ──────────────────────────────────────────────────── */}
-      <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.08)", margin: "24px 0 8px" }} />
-      <div style={{ fontSize: "0.8em", color: "#e74c3c", marginBottom: "8px", fontWeight: "bold" }}>
-        ⚠ Danger Zone
-      </div>
+      <div style={{ border: "1px solid #3a3a3a", borderRadius: "6px", marginBottom: "8px" }}>
+        <Focusable
+          onActivate={() => setShowDangerZone((v) => !v)}
+          onClick={() => setShowDangerZone((v) => !v)}
+          focusClassName="is-focused"
+          style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", cursor: "pointer", background: "#1e1e1e", borderRadius: showDangerZone ? "6px 6px 0 0" : "6px" }}
+        >
+          <span style={{ fontWeight: 600, fontSize: "0.9em", color: "#e74c3c" }}>Danger Zone</span>
+          <span style={{ fontSize: "0.78em", color: "#666" }}>{showDangerZone ? "▲" : "▼"}</span>
+        </Focusable>
+        {showDangerZone && (
+          <div style={{ padding: "8px 12px", borderTop: "1px solid #2a2a2a" }}>
 
       {steamInfo && (
         <div>
@@ -2210,6 +2704,10 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart }) => {
           Remove Game from Source
         </Focusable>
       )}
+
+          </div>
+        )}
+      </div>
 
     </Focusable>
   );

@@ -49,6 +49,22 @@ def remove_source(source_id: str) -> bool:
     return True
 
 
+def reorder_source(source_id: str, direction: str) -> bool:
+    """Move source up or down in the list. Returns True if moved."""
+    sources = list_sources()
+    idx = next((i for i, s in enumerate(sources) if s["id"] == source_id), None)
+    if idx is None:
+        return False
+    if direction == "up" and idx > 0:
+        sources[idx - 1], sources[idx] = sources[idx], sources[idx - 1]
+    elif direction == "down" and idx < len(sources) - 1:
+        sources[idx], sources[idx + 1] = sources[idx + 1], sources[idx]
+    else:
+        return False
+    set_app_config({"sources": sources})
+    return True
+
+
 # ── Migration ─────────────────────────────────────────────────────────────────
 
 def migrate_games_folder_to_source() -> bool:

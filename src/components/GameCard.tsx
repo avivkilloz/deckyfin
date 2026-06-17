@@ -101,6 +101,7 @@ export const GameCard: VFC<Props> = ({ game, isInSteam, sourceCount, onClick }) 
               display: "flex",
               alignItems: "center",
               gap: "4px",
+              marginLeft: "auto",
             }}
           >
             <svg viewBox="0 0 24 24" width="12" height="12" fill="#c7d5e0">
