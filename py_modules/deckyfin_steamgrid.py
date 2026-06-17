@@ -351,12 +351,9 @@ def apply_steam_grid(
 
     appid_str = str(unsigned_appid)
 
-    # Map art types to filenames (non-Steam shortcut naming scheme)
+    # Only save the wide capsule ({appid}.png) — this is what the plugin's game cards display.
     type_map = {
-        "grid": (urls["grid_p"], f"{appid_str}_p.png"),
-        "hero": (urls["hero"], f"{appid_str}_hero.png"),
-        "logo": (urls["logo"], f"{appid_str}_logo.png"),
-        "capsule": (urls["grid_p"], f"{appid_str}.png"),
+        "wide capsule": (urls["wide"], f"{appid_str}.png"),
     }
 
     any_success = False
@@ -376,3 +373,8 @@ def apply_steam_grid(
 
     result["success"] = any_success
     return result
+
+
+def download_file(url: str, dest: Path) -> bool:
+    """Public alias for _download_file."""
+    return _download_file(url, dest)

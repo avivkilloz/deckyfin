@@ -48,7 +48,7 @@ from deckyfin_protontricks import (
     detect_protontricks_status as _detect_protontricks_status,
     install_protontricks_flatpak as _install_protontricks_flatpak,
 )
-from deckyfin_steamgrid import apply_steam_grid as _apply_steam_grid, set_api_key as _set_steamgrid_key, get_configured_api_key as _get_steamgrid_key, fetch_steamgrid_art_urls as _fetch_steamgrid_art_urls, search_steamgrid_games as _search_steamgrid_games, fetch_steamgrid_art_urls_by_id as _fetch_steamgrid_art_urls_by_id
+from deckyfin_steamgrid import apply_steam_grid as _apply_steam_grid, set_api_key as _set_steamgrid_key, get_configured_api_key as _get_steamgrid_key, fetch_steamgrid_art_urls as _fetch_steamgrid_art_urls, search_steamgrid_games as _search_steamgrid_games, fetch_steamgrid_art_urls_by_id as _fetch_steamgrid_art_urls_by_id, download_file as _download_file
 from deckyfin_steam_ctl import is_steam_running, restart_steam
 from deckyfin_game_state import (
     get_game_state,
@@ -1982,45 +1982,79 @@ class Plugin:
         _set_steamgrid_key(key)
         return {"success": True}
 
-    async def get_game_card_art(self, game_name: str, unsigned_appid: Optional[int] = None) -> dict:
+    async def apply_deckyfin_art(self, game_name: str) -> dict:
+        """Download a wide capsule from SteamGridDB and save it to the plugin's art folder.
+
+        Stores art as game_art/<safe_name>.png inside the plugin directory.
+        Works for any game regardless of whether it's in Steam.
+        """
+        import re
+        try:
+            urls = _fetch_steamgrid_art_urls(game_name)
+            if not urls.get("success") or not urls.get("wide"):
+                return {"success": False, "error": urls.get("error") or "No art found on SteamGridDB"}
+
+            import os
+            art_dir = Path(os.environ.get("DECKY_PLUGIN_RUNTIME_DIR", os.path.expanduser("~/.local/share/deckyfin")))
+            art_dir.mkdir(parents=True, exist_ok=True)
+
+            safe_name = re.sub(r'[^\w\-. ]', '_', game_name).strip()
+            dest = art_dir / f"art_{safe_name}.png"
+
+            if not _download_file(urls["wide"], dest):
+                return {"success": False, "error": "Failed to download art"}
+
+            return {"success": True}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    async def get_game_card_art(self, game_name: str) -> dict:
         """Get art for a game as a base64 data URI (for the library card).
 
-        If unsigned_appid is provided, reads the grid files directly without requiring
-        the game to be in Steam's shortcuts (supports pre-Steam art application).
+        Checks the plugin's own art folder first (written by apply_deckyfin_art),
+        then falls back to the Steam grid folder for games already in Steam.
         """
-        import base64
+        import base64, re
         try:
+            # 1. Plugin-managed art (Deckyfin Art) — stored in runtime data dir
+            import os
+            art_dir = Path(os.environ.get("DECKY_PLUGIN_RUNTIME_DIR", os.path.expanduser("~/.local/share/deckyfin")))
+            safe_name = re.sub(r'[^\w\-. ]', '_', game_name).strip()
+            plugin_art = art_dir / f"art_{safe_name}.png"
+            if plugin_art.exists():
+                raw = plugin_art.read_bytes()
+                b64 = base64.b64encode(raw).decode("ascii")
+                return {"data_uri": f"data:image/png;base64,{b64}"}
+
+            # 2. Steam grid folder (Steam Art / games already in Steam)
             from steam_games import get_steam_shortcut_info
             from steam_utils import get_user_id, find_steam_root
             from deckyfin_consts import STEAM_USERDATA_FOLDER
 
             uid = get_user_id()
-
-            if unsigned_appid is None:
-                info = get_steam_shortcut_info(game_name, uid)
-                if info:
-                    unsigned_appid = info.get("unsigned_appid")
-
-            if unsigned_appid:
-                steam_root = find_steam_root()
-                grid_folder = steam_root / STEAM_USERDATA_FOLDER / uid / "config" / "grid"
-                appid_str = str(unsigned_appid)
-                candidates = [
-                    grid_folder / f"{appid_str}.png",
-                    grid_folder / f"{appid_str}.jpg",
-                    grid_folder / f"{appid_str}_p.png",
-                    grid_folder / f"{appid_str}_p.jpg",
-                    grid_folder / f"{appid_str}_hero.png",
-                    grid_folder / f"{appid_str}_hero.jpg",
-                    grid_folder / f"{appid_str}_logo.png",
-                ]
-                for path in candidates:
-                    if path.exists():
-                        with open(path, "rb") as f:
-                            raw = f.read()
-                        ext = path.suffix.lstrip(".")
-                        b64 = base64.b64encode(raw).decode("ascii")
-                        return {"data_uri": f"data:image/{ext};base64,{b64}"}
+            info = get_steam_shortcut_info(game_name, uid)
+            if info:
+                unsigned_appid = info.get("unsigned_appid")
+                if unsigned_appid:
+                    steam_root = find_steam_root()
+                    grid_folder = steam_root / STEAM_USERDATA_FOLDER / uid / "config" / "grid"
+                    appid_str = str(unsigned_appid)
+                    candidates = [
+                        grid_folder / f"{appid_str}.png",
+                        grid_folder / f"{appid_str}.jpg",
+                        grid_folder / f"{appid_str}_p.png",
+                        grid_folder / f"{appid_str}_p.jpg",
+                        grid_folder / f"{appid_str}_hero.png",
+                        grid_folder / f"{appid_str}_hero.jpg",
+                        grid_folder / f"{appid_str}_logo.png",
+                    ]
+                    for path in candidates:
+                        if path.exists():
+                            with open(path, "rb") as f:
+                                raw = f.read()
+                            ext = path.suffix.lstrip(".")
+                            b64 = base64.b64encode(raw).decode("ascii")
+                            return {"data_uri": f"data:image/{ext};base64,{b64}"}
 
             return {"data_uri": None}
         except Exception as e:

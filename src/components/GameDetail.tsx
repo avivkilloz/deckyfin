@@ -66,7 +66,7 @@ const searchSteamApp = callable<
   [game_name: string],
   { success: boolean; results: Array<{ id: number; name: string }>; error?: string }
 >("search_steam_app");
-const getGameCardArt = callable<[game_name: string, unsigned_appid?: number], { data_uri: string | null }>("get_game_card_art");
+const getGameCardArt = callable<[game_name: string], { data_uri: string | null }>("get_game_card_art");
 const setGameProcessingState = callable<
   [name: string, state: Record<string, any> | null, source_id: string],
   { success: boolean }
@@ -135,14 +135,10 @@ const getGameSize = callable<
 const getPopularDeps = callable<[], string[]>("get_popular_deps");
 const getPopularLaunchers = callable<[], { label: string; value: string }[]>("get_popular_launchers");
 const getPopularSavePrefixes = callable<[], { label: string; path: string }[]>("get_popular_save_prefixes");
-const applySteamGridLegacy = callable<
-  [game_name: string, unsigned_appid: number],
-  { success: boolean; applied: string[]; errors: string[] }
->("apply_steam_grid");
-const calcShortcutAppId = callable<
-  [app_name: string, exe_path: string],
-  { success: boolean; unsigned_appid?: number }
->("calc_shortcut_app_id");
+const applyDeckyfinArt = callable<
+  [game_name: string],
+  { success: boolean; error?: string }
+>("apply_deckyfin_art");
 
 export type PopularLauncher = { label: string; value: string };
 
@@ -576,7 +572,9 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
   const { applyArtById } = useArtwork();
   const [headerArtUri, setHeaderArtUri] = useState<string | null>(null);
   useEffect(() => {
-    getGameCardArt(game.name).then((r) => setHeaderArtUri(r.data_uri || null)).catch(() => setHeaderArtUri(null));
+    getGameCardArt(game.name)
+      .then((r) => setHeaderArtUri(r.data_uri || null))
+      .catch(() => setHeaderArtUri(null));
   }, [game.name]);
 
   // ── Load capabilities when source changes ─────────────────────────────────
@@ -983,25 +981,12 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
     setLoading("deckyfin-art");
     setSgdbFeedback(null);
     try {
-      let appId: number;
-      if (steamInfo) {
-        appId = steamInfo.unsigned_appid;
+      const res = await applyDeckyfinArt(game.name);
+      if (res.success) {
+        setSgdbFeedback({ ok: true, msg: "Art applied — showing in plugin now" });
+        getGameCardArt(game.name).then((r) => setHeaderArtUri(r.data_uri || null)).catch(() => {});
       } else {
-        const calc = await calcShortcutAppId(name, executable);
-        if (!calc.success || calc.unsigned_appid == null) {
-          setSgdbFeedback({ ok: false, msg: "Could not calculate app ID" });
-          setLoading(null);
-          return;
-        }
-        appId = calc.unsigned_appid;
-      }
-      const res = await applySteamGridLegacy(name, appId);
-      if (res.applied && res.applied.length > 0) {
-        setSgdbFeedback({ ok: true, msg: `Art saved (${res.applied.length} file${res.applied.length > 1 ? "s" : ""}) — will appear in Steam after restart` });
-        // Pass the computed appId so art shows even if game isn't in Steam yet
-        getGameCardArt(game.name, appId).then((r) => setHeaderArtUri(r.data_uri || null)).catch(() => {});
-      } else {
-        setSgdbFeedback({ ok: false, msg: (res.errors || []).join("; ") || "No art found" });
+        setSgdbFeedback({ ok: false, msg: res.error || "No art found" });
       }
     } catch (err: any) {
       setSgdbFeedback({ ok: false, msg: err?.message || "Error" });
@@ -1925,7 +1910,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
           {showArtActions && (
             <div style={{ padding: "8px" }}>
               <p style={{ fontSize: "0.78em", color: "#888", margin: "0 0 8px 0", lineHeight: 1.5 }}>
-                Apply artwork to this game's Steam shortcut. Apply Steam Art uses Steam's native API and requires a configured SteamGridDB Game ID. Apply Deckyfin Art writes art files directly to disk (works before adding to Steam, but Steam restart is needed for them to appear in Steam's UI).
+                Apply artwork to this game. Apply Deckyfin Art fetches art from SteamGridDB and displays it immediately in the plugin's game card and game page — no Steam restart needed, works before adding to Steam. Apply Steam Art uses Steam's native API to push art into Steam's own UI and requires the game to be added to Steam first.
               </p>
               {!steamInfo && !needsRestartAfterAdd && (
                 <div style={{ padding: "8px 10px", borderRadius: "4px", background: "rgba(52,73,94,0.3)", border: "1px solid #2c3e50", fontSize: "0.78em", color: "#7f8c8d", marginBottom: "8px" }}>
@@ -1954,7 +1939,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
                 {loading === "deckyfin-art" ? "Applying…" : "Apply Deckyfin Art"}
               </Focusable>
               {sgdbFeedback && (
-                <div style={{ fontSize: "0.82em", marginTop: "6px", color: sgdbFeedback.ok ? "#2ecc71" : "tomato" }}>
+                <div style={{ fontSize: "0.82em", marginTop: "6px", color: sgdbFeedback.ok ? "#2ecc71" : "tomato", wordBreak: "break-word", overflowWrap: "break-word" }}>
                   {sgdbFeedback.msg}
                 </div>
               )}
