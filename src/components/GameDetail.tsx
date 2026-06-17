@@ -1,7 +1,7 @@
 import { VFC, useState, useEffect, useRef } from "react";
 import { callable } from "@decky/api";
 import { Navigation, Focusable } from "@decky/ui";
-import { GameConfig, MergedGame, GameSource, SourceCapabilities } from "../types";
+import { GameConfig, MergedGame, GameSource, SourceCapabilities, AssetType } from "../types";
 import { useArtwork } from "../hooks/useArtwork";
 import { CompactTextField } from "../components/CompactTextField";
 
@@ -135,10 +135,18 @@ const getGameSize = callable<
 const getPopularDeps = callable<[], string[]>("get_popular_deps");
 const getPopularLaunchers = callable<[], { label: string; value: string }[]>("get_popular_launchers");
 const getPopularSavePrefixes = callable<[], { label: string; path: string }[]>("get_popular_save_prefixes");
+const fetchDeckyfinArtOptions = callable<
+  [game_name: string, page: number, game_id?: number],
+  { game_id: number | null; urls: string[]; has_more: boolean; error?: string }
+>("fetch_deckyfin_art_options");
 const applyDeckyfinArt = callable<
-  [game_name: string],
+  [game_name: string, art_url: string],
   { success: boolean; error?: string }
 >("apply_deckyfin_art");
+const fetchSteamArtOptions = callable<
+  [game_id: number, art_type: string, page: number],
+  { urls: string[]; has_more: boolean; error?: string }
+>("fetch_steam_art_options");
 
 export type PopularLauncher = { label: string; value: string };
 
@@ -555,6 +563,23 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
   const [showGameSettings, setShowGameSettings] = useState(false);
   const [showSteamActions, setShowSteamActions] = useState(false);
   const [showArtActions, setShowArtActions] = useState(false);
+  type SteamArtTab = "wide" | "capsule" | "hero" | "logo" | "icon";
+  const [steamArtTab, setSteamArtTab] = useState<SteamArtTab>("wide");
+  const [steamArtOptions, setSteamArtOptions] = useState<string[]>([]);
+  const [steamArtOptionIdx, setSteamArtOptionIdx] = useState(0);
+  const [steamArtOptionsLoading, setSteamArtOptionsLoading] = useState(false);
+  const [steamArtPage, setSteamArtPage] = useState(0);
+  const [steamArtHasMore, setSteamArtHasMore] = useState(false);
+  const [steamArtFetchingMore, setSteamArtFetchingMore] = useState(false);
+  const [steamArtLoadedUrls, setSteamArtLoadedUrls] = useState<Set<string>>(new Set());
+  const [artOptions, setArtOptions] = useState<string[]>([]);
+  const [artOptionIdx, setArtOptionIdx] = useState(0);
+  const [artOptionsLoading, setArtOptionsLoading] = useState(false);
+  const [artGameId, setArtGameId] = useState<number | null>(null);
+  const [artPage, setArtPage] = useState(0);
+  const [artHasMore, setArtHasMore] = useState(false);
+  const [artFetchingMore, setArtFetchingMore] = useState(false);
+  const [artLoadedUrls, setArtLoadedUrls] = useState<Set<string>>(new Set());
   const [showPrefixActions, setShowPrefixActions] = useState(false);
   const [showTransferActions, setShowTransferActions] = useState(false);
   const [showSaveActions, setShowSaveActions] = useState(false);
@@ -569,7 +594,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
   const [pfxBrowserLoading, setPfxBrowserLoading] = useState(false);
 
   // ── Artwork ───────────────────────────────────────────────────────────────
-  const { applyArtById } = useArtwork();
+  const { applyArtById, applyArtByType } = useArtwork();
   const [headerArtUri, setHeaderArtUri] = useState<string | null>(null);
   useEffect(() => {
     getGameCardArt(game.name)
@@ -877,6 +902,46 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
     return () => clearTimeout(tid);
   }, [name, executable, startDir, steamAppId, protonVersion, launchOptions, checkedLaunchers, checkedDeps, customDeps, checkedCollections, customCollections, syncPaths, sgdbGameId, configSnapshot]);
 
+  // ── Fetch Deckyfin art options when Art Actions section opens ─────────────
+
+  useEffect(() => {
+    if (!showArtActions || sgdbGameId == null) return;
+    setArtOptions([]);
+    setArtOptionIdx(0);
+    setArtGameId(null);
+    setArtPage(0);
+    setArtHasMore(false);
+    setArtLoadedUrls(new Set());
+    setArtOptionsLoading(true);
+    fetchDeckyfinArtOptions(game.name, 0, sgdbGameId)
+      .then((r) => {
+        setArtOptions(r.urls || []);
+        setArtGameId(r.game_id ?? null);
+        setArtHasMore(r.has_more ?? false);
+      })
+      .catch(() => {})
+      .finally(() => setArtOptionsLoading(false));
+  }, [showArtActions, game.name, sgdbGameId]);
+
+  // ── Fetch Steam art options when tab or Art Actions section changes ──────────
+
+  useEffect(() => {
+    if (!showArtActions || sgdbGameId == null) return;
+    setSteamArtOptions([]);
+    setSteamArtOptionIdx(0);
+    setSteamArtPage(0);
+    setSteamArtHasMore(false);
+    setSteamArtLoadedUrls(new Set());
+    setSteamArtOptionsLoading(true);
+    fetchSteamArtOptions(sgdbGameId, steamArtTab, 0)
+      .then((r) => {
+        setSteamArtOptions(r.urls || []);
+        setSteamArtHasMore(r.has_more ?? false);
+      })
+      .catch(() => {})
+      .finally(() => setSteamArtOptionsLoading(false));
+  }, [showArtActions, steamArtTab, sgdbGameId]);
+
   // ── Prefix file browser ───────────────────────────────────────────────────
   const pfxBrowseTo = async (path: string) => {
     setPfxBrowserLoading(true);
@@ -960,12 +1025,12 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
   };
 
   const handleApplySgdbArt = async () => {
-    if (sgdbGameId == null || !steamInfo || needsRestartAfterAdd) return;
+    if (sgdbGameId == null) return;
     setLoading("art");
     setSgdbFeedback(null);
     try {
       const artName = selectedSgdbGame?.id === sgdbGameId ? selectedSgdbGame.name : name;
-      const { applied, errors } = await applyArtById(sgdbGameId, steamInfo.unsigned_appid, artName);
+      const { applied, errors } = await applyArtById(sgdbGameId, steamInfo!.unsigned_appid, artName);
       if (applied.length > 0) {
         setSgdbFeedback({ ok: true, msg: `Applied ${applied.join(", ")} art` });
       } else {
@@ -977,11 +1042,71 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
     setLoading(null);
   };
 
-  const handleApplyDeckyfin = async () => {
+  const STEAM_ART_ASSET_TYPE = {
+    wide: AssetType.GRID_L,
+    capsule: AssetType.GRID_P,
+    hero: AssetType.HERO,
+    logo: AssetType.LOGO,
+    icon: AssetType.ICON,
+  } as const;
+
+  const goSteamArtPrev = () => setSteamArtOptionIdx((i) => (i - 1 + steamArtOptions.length) % steamArtOptions.length);
+  const goSteamArtNext = () => {
+    const next = (steamArtOptionIdx + 1) % steamArtOptions.length;
+    setSteamArtOptionIdx(next);
+    if (next === steamArtOptions.length - 1 && steamArtHasMore && !steamArtFetchingMore && sgdbGameId != null) {
+      setSteamArtFetchingMore(true);
+      fetchSteamArtOptions(sgdbGameId, steamArtTab, steamArtPage + 1)
+        .then((r) => {
+          setSteamArtOptions((prev) => [...prev, ...(r.urls || [])]);
+          setSteamArtPage((p) => p + 1);
+          setSteamArtHasMore(r.has_more ?? false);
+        })
+        .catch(() => {})
+        .finally(() => setSteamArtFetchingMore(false));
+    }
+  };
+
+  const handleApplySteamArtType = async () => {
+    if (steamArtOptions.length === 0) return;
+    setLoading("steam-art-type");
+    setSgdbFeedback(null);
+    try {
+      const url = steamArtOptions[steamArtOptionIdx];
+      const ok = await applyArtByType(steamInfo!.unsigned_appid, url, STEAM_ART_ASSET_TYPE[steamArtTab]);
+      setSgdbFeedback(ok
+        ? { ok: true, msg: `Applied ${steamArtTab} art to Steam` }
+        : { ok: false, msg: `Failed to apply ${steamArtTab} art` });
+    } catch (err: any) {
+      setSgdbFeedback({ ok: false, msg: err?.message || "Error" });
+    }
+    setLoading(null);
+  };
+
+  const goArtPrev = () => setArtOptionIdx((i) => (i - 1 + artOptions.length) % artOptions.length);
+  const goArtNext = () => {
+    const next = (artOptionIdx + 1) % artOptions.length;
+    setArtOptionIdx(next);
+    if (next === artOptions.length - 1 && artHasMore && !artFetchingMore && artGameId != null) {
+      setArtFetchingMore(true);
+      fetchDeckyfinArtOptions(game.name, artPage + 1, artGameId)
+        .then((r) => {
+          setArtOptions((prev) => [...prev, ...(r.urls || [])]);
+          setArtPage((p) => p + 1);
+          setArtHasMore(r.has_more ?? false);
+        })
+        .catch(() => {})
+        .finally(() => setArtFetchingMore(false));
+    }
+  };
+
+  const handleApplyDeckyfin = async (overrideUrl?: string) => {
+    const url = overrideUrl ?? artOptions[artOptionIdx];
+    if (!url) return;
     setLoading("deckyfin-art");
     setSgdbFeedback(null);
     try {
-      const res = await applyDeckyfinArt(game.name);
+      const res = await applyDeckyfinArt(game.name, url);
       if (res.success) {
         setSgdbFeedback({ ok: true, msg: "Art applied — showing in plugin now" });
         getGameCardArt(game.name).then((r) => setHeaderArtUri(r.data_uri || null)).catch(() => {});
@@ -1899,55 +2024,6 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
         )}
       </div>
 
-      {/* ── Art Actions ────────────────────────────────────────────────────── */}
-      {capabilities.can_play && (
-        <div style={{ border: "1px solid #3a3a3a", borderRadius: "6px", marginBottom: "8px" }}>
-          <Focusable onActivate={() => setShowArtActions((v) => !v)} onClick={() => setShowArtActions((v) => !v)} focusClassName="is-focused"
-            style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", cursor: "pointer", background: "#1e1e1e", borderRadius: showArtActions ? "6px 6px 0 0" : "6px" }}>
-            <span style={{ fontWeight: 600, fontSize: "0.9em", color: "#e0e0e0" }}>Art Actions</span>
-            <span style={{ fontSize: "0.78em", color: "#666" }}>{showArtActions ? "▲" : "▼"}</span>
-          </Focusable>
-          {showArtActions && (
-            <div style={{ padding: "8px" }}>
-              <p style={{ fontSize: "0.78em", color: "#888", margin: "0 0 8px 0", lineHeight: 1.5 }}>
-                Apply artwork to this game. Apply Deckyfin Art fetches art from SteamGridDB and displays it immediately in the plugin's game card and game page — no Steam restart needed, works before adding to Steam. Apply Steam Art uses Steam's native API to push art into Steam's own UI and requires the game to be added to Steam first.
-              </p>
-              {!steamInfo && !needsRestartAfterAdd && (
-                <div style={{ padding: "8px 10px", borderRadius: "4px", background: "rgba(52,73,94,0.3)", border: "1px solid #2c3e50", fontSize: "0.78em", color: "#7f8c8d", marginBottom: "8px" }}>
-                  🔒 Apply Steam Art requires the game to be added to Steam first
-                </div>
-              )}
-              {needsRestartAfterAdd && (
-                <div style={{ padding: "8px 12px", marginBottom: "8px", borderRadius: "4px", background: "rgba(230,126,34,0.15)", border: "1px solid rgba(230,126,34,0.3)", fontSize: "0.82em", color: "#e67e22" }}>
-                  ⚠ Restart Steam to unlock Steam art actions
-                </div>
-              )}
-              <Focusable
-                onActivate={capabilities.can_play ? handleApplySgdbArt : undefined}
-                onClick={capabilities.can_play ? handleApplySgdbArt : undefined}
-                focusClassName="is-focused"
-                style={{ ...BTN_STYLE, display: "block", width: "100%", boxSizing: "border-box" as const, textAlign: "center" as const, marginBottom: "6px",
-                  opacity: !steamInfo || needsRestartAfterAdd || sgdbGameId == null || loading === "art" ? 0.4 : 1 }}>
-                {loading === "art" ? "Applying…" : "Apply Steam Art"}
-              </Focusable>
-              <Focusable
-                onActivate={capabilities.can_play ? handleApplyDeckyfin : undefined}
-                onClick={capabilities.can_play ? handleApplyDeckyfin : undefined}
-                focusClassName="is-focused"
-                style={{ ...BTN_STYLE, display: "block", width: "100%", boxSizing: "border-box" as const, textAlign: "center" as const,
-                  opacity: loading === "deckyfin-art" ? 0.4 : 1 }}>
-                {loading === "deckyfin-art" ? "Applying…" : "Apply Deckyfin Art"}
-              </Focusable>
-              {sgdbFeedback && (
-                <div style={{ fontSize: "0.82em", marginTop: "6px", color: sgdbFeedback.ok ? "#2ecc71" : "tomato", wordBreak: "break-word", overflowWrap: "break-word" }}>
-                  {sgdbFeedback.msg}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
       {/* ── Prefix Actions ─────────────────────────────────────────────────── */}
       <div style={{ border: "1px solid #3a3a3a", borderRadius: "6px", marginBottom: "8px" }}>
         <Focusable onActivate={() => setShowPrefixActions((v) => !v)} onClick={() => setShowPrefixActions((v) => !v)} focusClassName="is-focused"
@@ -2096,6 +2172,190 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
           </div>
         )}
       </div>
+
+      {/* ── Art Actions ────────────────────────────────────────────────────── */}
+      <div style={{ border: "1px solid #3a3a3a", borderRadius: "6px", marginBottom: "8px" }}>
+          <Focusable onActivate={() => setShowArtActions((v) => !v)} onClick={() => setShowArtActions((v) => !v)} focusClassName="is-focused"
+            style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", cursor: "pointer", background: "#1e1e1e", borderRadius: showArtActions ? "6px 6px 0 0" : "6px" }}>
+            <span style={{ fontWeight: 600, fontSize: "0.9em", color: "#e0e0e0" }}>Art Actions</span>
+            <span style={{ fontSize: "0.78em", color: "#666" }}>{showArtActions ? "▲" : "▼"}</span>
+          </Focusable>
+          {showArtActions && (
+            <div style={{ padding: "8px" }}>
+              <p style={{ fontSize: "0.78em", color: "#888", margin: "0 0 8px 0", lineHeight: 1.5 }}>
+                Apply artwork to this game. Apply Deckyfin Art fetches art from{" "}
+                <span
+                  style={{ color: "#51cbf8", cursor: "pointer", textDecoration: "underline" }}
+                  onClick={() => Navigation.NavigateToExternalWeb(sgdbGameId != null ? `https://www.steamgriddb.com/game/${sgdbGameId}` : `https://www.steamgriddb.com/search/grids?term=${encodeURIComponent(name)}`)}
+                >
+                  SteamGridDB
+                </span>
+                {" "}and displays it immediately in the plugin's game card and game page — no Steam restart needed, works before adding to Steam. Apply Steam Art uses Steam's native API to push art into Steam's own UI and requires the game to be added to Steam first.
+              </p>
+              {/* ── Steam Art picker ── */}
+              <div style={{ borderTop: "1px solid #2a2a2a", paddingTop: "8px", marginBottom: "8px" }}>
+                <div style={{ fontSize: "0.78em", color: "#aaa", marginBottom: "6px", fontWeight: 600 }}>Steam Art</div>
+                {sgdbGameId == null ? (
+                  <div style={{ fontSize: "0.78em", color: "#555", padding: "8px 0", marginBottom: "6px" }}>
+                    Set a SteamGridDB ID in Game Settings to browse Steam art options.
+                  </div>
+                ) : (
+                  <>
+                    {/* Type tabs — row 1: Wide/Capsule/Hero, row 2: Logo/Icon centered */}
+                    {(() => {
+                      const tabStyle = (tab: typeof steamArtTab): React.CSSProperties => ({
+                        ...BTN_STYLE, flex: 1, textAlign: "center", padding: "3px 0", margin: "0 2px", fontSize: "0.78em",
+                        background: steamArtTab === tab ? "rgba(81,203,248,0.15)" : undefined,
+                        borderColor: steamArtTab === tab ? "#51cbf8" : undefined,
+                        color: steamArtTab === tab ? "#51cbf8" : undefined,
+                      });
+                      const tabLabel = { wide: "Wide", capsule: "Capsule", hero: "Hero", logo: "Logo", icon: "Icon" };
+                      return (
+                        <div style={{ marginBottom: "8px" }}>
+                          <Focusable focusClassName="" style={{ display: "flex", gap: "4px", marginBottom: "4px" }}>
+                            {(["wide", "capsule", "hero"] as const).map((tab) => (
+                              <Focusable key={tab} onActivate={() => setSteamArtTab(tab)} onClick={() => setSteamArtTab(tab)} focusClassName="is-focused" style={tabStyle(tab)}>
+                                {tabLabel[tab]}
+                              </Focusable>
+                            ))}
+                          </Focusable>
+                          <Focusable focusClassName="" style={{ display: "flex", gap: "4px", justifyContent: "center" }}>
+                            {(["logo", "icon"] as const).map((tab) => (
+                              <Focusable key={tab} onActivate={() => setSteamArtTab(tab)} onClick={() => setSteamArtTab(tab)} focusClassName="is-focused" style={{ ...tabStyle(tab), flex: "0 0 calc(33.33% - 2px)" }}>
+                                {tabLabel[tab]}
+                              </Focusable>
+                            ))}
+                          </Focusable>
+                        </div>
+                      );
+                    })()}
+                    {steamArtOptionsLoading && (
+                      <div style={{ textAlign: "center", fontSize: "0.82em", color: "#888", padding: "12px 0" }}>Loading…</div>
+                    )}
+                    {!steamArtOptionsLoading && steamArtOptions.length > 0 && (() => {
+                      const useContain = steamArtTab === "logo" || steamArtTab === "capsule" || steamArtTab === "icon";
+                      const containerStyle: React.CSSProperties = steamArtTab === "wide"
+                        ? { position: "relative", width: "100%", paddingBottom: "46.7%", marginBottom: "6px", borderRadius: "4px", overflow: "hidden", background: "#111" }
+                        : steamArtTab === "capsule"
+                        ? { position: "relative", width: "100%", height: "280px", marginBottom: "6px", borderRadius: "4px", overflow: "hidden", background: "#111" }
+                        : steamArtTab === "hero"
+                        ? { position: "relative", width: "100%", paddingBottom: "32.3%", marginBottom: "6px", borderRadius: "4px", overflow: "hidden", background: "#111" }
+                        : steamArtTab === "icon"
+                        ? { position: "relative", width: "100%", height: "100px", marginBottom: "6px", borderRadius: "4px", overflow: "hidden", background: "#111" }
+                        : { position: "relative", width: "100%", height: "90px", marginBottom: "6px", borderRadius: "4px", overflow: "hidden", background: "#111" };
+                      const currentUrl = steamArtOptions[steamArtOptionIdx];
+                      return (
+                        <div style={{ marginBottom: "6px" }}>
+                          <div style={containerStyle}>
+                            <img
+                              src={currentUrl}
+                              onLoad={() => setSteamArtLoadedUrls((prev) => new Set(prev).add(currentUrl))}
+                              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: useContain ? "contain" : "cover" }}
+                            />
+                            {!steamArtLoadedUrls.has(currentUrl) && (
+                              <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.5)" }}>
+                                <span style={{ fontSize: "1.4em", color: "#aaa" }}>⟳</span>
+                              </div>
+                            )}
+                          </div>
+                          <Focusable focusClassName="" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <Focusable onActivate={goSteamArtPrev} onClick={goSteamArtPrev} focusClassName="is-focused" style={{ ...BTN_STYLE, flex: "0 0 auto", padding: "4px 10px", margin: "0 2px" }}>‹</Focusable>
+                            <span style={{ flex: 1, textAlign: "center", fontSize: "0.78em", color: "#888" }}>{steamArtOptionIdx + 1}</span>
+                            <Focusable onActivate={goSteamArtNext} onClick={goSteamArtNext} focusClassName="is-focused" style={{ ...BTN_STYLE, flex: "0 0 auto", padding: "4px 10px", margin: "0 2px" }}>›</Focusable>
+                          </Focusable>
+                        </div>
+                      );
+                    })()}
+                    {!steamArtOptionsLoading && steamArtOptions.length === 0 && (
+                      <div style={{ textAlign: "center", fontSize: "0.82em", color: "#555", padding: "8px 0" }}>
+                        No {steamArtTab} art found on SteamGridDB
+                      </div>
+                    )}
+                    <Focusable
+                      onActivate={steamArtOptions.length > 0 ? handleApplySteamArtType : undefined}
+                      onClick={steamArtOptions.length > 0 ? handleApplySteamArtType : undefined}
+                      focusClassName="is-focused"
+                      style={{ ...BTN_STYLE, display: "block", width: "100%", boxSizing: "border-box" as const, textAlign: "center" as const, marginBottom: "4px",
+                        opacity: steamArtOptions.length === 0 || loading === "steam-art-type" ? 0.4 : 1 }}>
+                      {loading === "steam-art-type" ? "Applying…" : `Apply ${steamArtTab === "wide" ? "Wide" : steamArtTab === "capsule" ? "Capsule" : steamArtTab === "hero" ? "Hero" : steamArtTab === "logo" ? "Logo" : "Icon"} Art`}
+                    </Focusable>
+                    <Focusable
+                      onActivate={sgdbGameId != null ? handleApplySgdbArt : undefined}
+                      onClick={sgdbGameId != null ? handleApplySgdbArt : undefined}
+                      focusClassName="is-focused"
+                      style={{ ...BTN_STYLE, display: "block", width: "100%", boxSizing: "border-box" as const, textAlign: "center" as const, marginBottom: "4px",
+                        opacity: loading === "art" ? 0.4 : 1 }}>
+                      {loading === "art" ? "Applying…" : "Auto Apply All Steam Art"}
+                    </Focusable>
+                  </>
+                )}
+              </div>
+
+              {/* ── Deckyfin Art picker ── */}
+              <div style={{ borderTop: "1px solid #2a2a2a", paddingTop: "8px" }}>
+                <div style={{ fontSize: "0.78em", color: "#aaa", marginBottom: "6px", fontWeight: 600 }}>Deckyfin Art</div>
+                {sgdbGameId == null ? (
+                  <div style={{ fontSize: "0.78em", color: "#555", padding: "8px 0", marginBottom: "6px" }}>
+                    Set a SteamGridDB ID in Game Settings to browse art options.
+                  </div>
+                ) : <>
+                {artOptionsLoading && (
+                  <div style={{ textAlign: "center", fontSize: "0.82em", color: "#888", padding: "12px 0" }}>
+                    Loading…
+                  </div>
+                )}
+                {!artOptionsLoading && artOptions.length > 0 && (
+                  <div style={{ marginBottom: "8px" }}>
+                    <div style={{ position: "relative", width: "100%", paddingBottom: "46.5%", marginBottom: "6px", borderRadius: "4px", overflow: "hidden", background: "#111" }}>
+                      <img
+                        src={artOptions[artOptionIdx]}
+                        onLoad={() => setArtLoadedUrls((prev) => new Set(prev).add(artOptions[artOptionIdx]))}
+                        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+                      />
+                      {!artLoadedUrls.has(artOptions[artOptionIdx]) && (
+                        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.5)" }}>
+                          <span style={{ fontSize: "1.4em", color: "#aaa" }}>⟳</span>
+                        </div>
+                      )}
+                    </div>
+                    <Focusable focusClassName="" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <Focusable onActivate={goArtPrev} onClick={goArtPrev} focusClassName="is-focused" style={{ ...BTN_STYLE, flex: "0 0 auto", padding: "4px 10px", margin: "0 2px" }}>‹</Focusable>
+                      <span style={{ flex: 1, textAlign: "center", fontSize: "0.78em", color: "#888" }}>{artOptionIdx + 1}</span>
+                      <Focusable onActivate={goArtNext} onClick={goArtNext} focusClassName="is-focused" style={{ ...BTN_STYLE, flex: "0 0 auto", padding: "4px 10px", margin: "0 2px" }}>›</Focusable>
+                    </Focusable>
+                  </div>
+                )}
+                {!artOptionsLoading && artOptions.length === 0 && (
+                  <div style={{ textAlign: "center", fontSize: "0.82em", color: "#555", padding: "8px 0", marginBottom: "6px" }}>
+                    No art options found on SteamGridDB
+                  </div>
+                )}
+                <Focusable
+                  onActivate={capabilities.can_play && artOptions.length > 0 ? () => handleApplyDeckyfin() : undefined}
+                  onClick={capabilities.can_play && artOptions.length > 0 ? () => handleApplyDeckyfin() : undefined}
+                  focusClassName="is-focused"
+                  style={{ ...BTN_STYLE, display: "block", width: "100%", boxSizing: "border-box" as const, textAlign: "center" as const, marginBottom: "4px",
+                    opacity: loading === "deckyfin-art" || artOptions.length === 0 ? 0.4 : 1 }}>
+                  {loading === "deckyfin-art" ? "Applying…" : "Apply Deckyfin Art"}
+                </Focusable>
+                <Focusable
+                  onActivate={capabilities.can_play && artOptions.length > 0 ? () => handleApplyDeckyfin(artOptions[0]) : undefined}
+                  onClick={capabilities.can_play && artOptions.length > 0 ? () => handleApplyDeckyfin(artOptions[0]) : undefined}
+                  focusClassName="is-focused"
+                  style={{ ...BTN_STYLE, display: "block", width: "100%", boxSizing: "border-box" as const, textAlign: "center" as const,
+                    opacity: loading === "deckyfin-art" || artOptions.length === 0 ? 0.4 : 1 }}>
+                  {loading === "deckyfin-art" ? "Applying…" : "Auto Apply Deckyfin Art"}
+                </Focusable>
+                </>}
+              </div>
+              {sgdbFeedback && (
+                <div style={{ fontSize: "0.82em", marginTop: "6px", color: sgdbFeedback.ok ? "#2ecc71" : "tomato", wordBreak: "break-word", overflowWrap: "break-word" }}>
+                  {sgdbFeedback.msg}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
       {/* ── Transfer Actions ──────────────────────────────────────────────── */}
       {(game.sources.length >= 2 ||

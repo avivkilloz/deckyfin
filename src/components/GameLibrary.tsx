@@ -2,6 +2,7 @@ import { VFC, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { callable } from "@decky/api";
 import { Focusable } from "@decky/ui";
 import { MergedGame, Source, TransferStatus } from "../types";
+import { useArtwork } from "../hooks/useArtwork";
 import { GameCard } from "../components/GameCard";
 import { SettingsPage } from "../components/SettingsPage";
 import { GameDetail } from "../components/GameDetail";
@@ -32,6 +33,11 @@ const clearPrefixInitStatus = callable<[prefix_id: string], { success: boolean }
 const listSaveSyncStatuses = callable<[], Record<string, { sync_id: string; game_name: string; source_id: string; direction: string; from_source_id?: string; to_source_id?: string; status: string; error: string | null; copied: string[]; saves_dir?: string }>>("list_save_sync_statuses");
 const clearSaveSyncStatus = callable<[sync_id: string], { success: boolean }>("clear_save_sync_status");
 const backupAllSaves = callable<[source_id: string], { success: boolean; started?: string[]; skipped?: string[]; failed?: string[]; error?: string }>("backup_all_saves");
+const batchAddToSteam = callable<[source_id: string], { success: boolean; job_id?: string; error?: string }>("batch_add_to_steam");
+const getArtEligibleGames = callable<[], { name: string; sgdb_id: number; unsigned_appid: number | null }[]>("get_art_eligible_games");
+const applyDeckyfinCardArt = callable<[game_name: string, sgdb_id: number], { success: boolean; error?: string }>("apply_deckyfin_card_art");
+const listBatchAddStatuses = callable<[], Record<string, { job_id: string; source_name: string; status: string; current_game: string; total: number; processed: number; added: string[]; updated: string[]; skipped: string[]; failed: { name: string; reason: string }[]; needs_restart: boolean; error: string | null }>>("list_batch_add_statuses");
+const clearBatchAddStatus = callable<[job_id: string], { success: boolean }>("clear_batch_add_status");
 
 function fmtBytes(b: number): string {
   if (b >= 1e9) return (b / 1e9).toFixed(1) + " GB";
@@ -63,7 +69,12 @@ const CHIP = (active: boolean): React.CSSProperties => ({
   margin: "0 2px",
 });
 
+// Module-level: survives component unmount so art apply progress is visible after reopening the panel.
+type ArtApplyProgress = { running: boolean; current: number; total: number; currentGame: string; applied: string[]; failed: { name: string; reason: string }[] };
+let _artApplySnapshot: ArtApplyProgress | null = null;
+
 export const GameLibrary: VFC = () => {
+  const { applyArtById } = useArtwork();
   const [games, setGames] = useState<MergedGame[]>([]);
   const [steamNames, setSteamNames] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -85,6 +96,34 @@ export const GameLibrary: VFC = () => {
   const [backupAllRunning, setBackupAllRunning] = useState(false);
   const [backupAllFeedback, setBackupAllFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
 
+  const [showAddToSteamPicker, setShowAddToSteamPicker] = useState(false);
+  const [addToSteamSourceId, setAddToSteamSourceId] = useState<string | null>(null);
+  const [addToSteamRunning, setAddToSteamRunning] = useState(false);
+
+  const [applyArtRunning, setApplyArtRunning] = useState(false);
+  const [showApplyArtConfirm, setShowApplyArtConfirm] = useState(false);
+
+  type BatchAddEntry = { job_id: string; source_name: string; status: string; current_game: string; total: number; processed: number; added: string[]; updated: string[]; skipped: string[]; failed: { name: string; reason: string }[]; needs_restart: boolean; error: string | null };
+  const [batchAddJobs, setBatchAddJobs] = useState<Record<string, BatchAddEntry>>({});
+  const [dismissedBatchAddIds, setDismissedBatchAddIds] = useState<Set<string>>(new Set());
+  const dismissBatchAdd = (id: string) => setDismissedBatchAddIds((prev) => new Set([...prev, id]));
+
+  const [artApplyProgress, _setArtApplyProgressState] = useState<ArtApplyProgress | null>(() => _artApplySnapshot);
+  // Wrapper that keeps the module-level snapshot in sync so progress survives panel close/reopen.
+  const setArtApplyProgress = useCallback((update: ArtApplyProgress | null | ((prev: ArtApplyProgress | null) => ArtApplyProgress | null)) => {
+    const next = typeof update === "function" ? update(_artApplySnapshot) : update;
+    _artApplySnapshot = next;
+    _setArtApplyProgressState(next);
+  }, []);
+  // When this component remounts while a loop is running on a previous (unmounted) instance,
+  // the old instance's _setArtApplyProgressState calls are silently dropped by React.
+  // Poll _artApplySnapshot so this instance stays in sync with the still-running loop.
+  useEffect(() => {
+    if (!artApplyProgress?.running) return;
+    const poll = setInterval(() => { _setArtApplyProgressState(_artApplySnapshot); }, 500);
+    return () => clearInterval(poll);
+  }, [artApplyProgress?.running]);
+
   type SaveSyncEntry = { sync_id: string; game_name: string; source_id: string; direction: string; from_source_id?: string; to_source_id?: string; status: string; error: string | null; copied: string[]; total_games?: number; completed_games?: number; failed_games?: number; skipped_games?: number };
   const [saveSyncs, setSaveSyncs] = useState<Record<string, SaveSyncEntry>>({});
 
@@ -92,7 +131,6 @@ export const GameLibrary: VFC = () => {
   const [filterSourceIds, setFilterSourceIds] = useState<Set<string>>(new Set());
   const [filterSteamStatus, setFilterSteamStatus] = useState<SteamFilter>("all");
   const [filterCollections, setFilterCollections] = useState<Set<string>>(new Set());
-  const [showSteamPicker, setShowSteamPicker] = useState(false);
 
   const hasActiveFilters =
     searchQuery !== "" || filterSourceIds.size > 0 || filterSteamStatus !== "all" || filterCollections.size > 0;
@@ -129,11 +167,11 @@ export const GameLibrary: VFC = () => {
 
   // Derive unique sources from loaded games
   const allSources = useMemo(() => {
-    const seen = new Map<string, { id: string; name: string }>();
+    const seen = new Map<string, { id: string; name: string; type: string }>();
     games.forEach((g) =>
       g.sources.forEach((s) => {
         if (!seen.has(s.source_id))
-          seen.set(s.source_id, { id: s.source_id, name: s.source_name });
+          seen.set(s.source_id, { id: s.source_id, name: s.source_name, type: s.source_type });
       })
     );
     return Array.from(seen.values());
@@ -179,6 +217,69 @@ export const GameLibrary: VFC = () => {
     setBackupAllRunning(false);
   }, [setSaveSyncs]);
 
+  const handleAddToSteam = useCallback(async (sourceId: string) => {
+    setAddToSteamRunning(true);
+    try {
+      const res = await batchAddToSteam(sourceId);
+      if (res.success) {
+        setShowAddToSteamPicker(false);
+        setAddToSteamSourceId(null);
+        listBatchAddStatuses().then((s) => setBatchAddJobs(s || {})).catch(() => {});
+      }
+    } catch (_) {}
+    setAddToSteamRunning(false);
+  }, []);
+
+  const handleApplyGamesArt = useCallback(async () => {
+    setApplyArtRunning(true);
+    try {
+      const games = await getArtEligibleGames();
+      if (!games?.length) { setApplyArtRunning(false); return; }
+
+      setArtApplyProgress({ running: true, current: 0, total: games.length, currentGame: "", applied: [], failed: [] });
+
+      const applied: string[] = [];
+      const failed: { name: string; reason: string }[] = [];
+
+      for (let i = 0; i < games.length; i++) {
+        const g = games[i];
+        setArtApplyProgress((prev) => prev ? { ...prev, current: i, currentGame: g.name } : prev);
+
+        const errors: string[] = [];
+        let anyOk = false;
+
+        if (g.unsigned_appid) {
+          try {
+            const res = await applyArtById(g.sgdb_id, g.unsigned_appid, g.name);
+            if (res.applied.length > 0) anyOk = true;
+            else errors.push(...res.errors);
+          } catch (err: any) {
+            errors.push(err?.message || "Failed to apply Steam art");
+          }
+        }
+
+        try {
+          const res = await applyDeckyfinCardArt(g.name, g.sgdb_id);
+          if (res.success) anyOk = true;
+          else if (res.error) errors.push(res.error);
+        } catch (err: any) {
+          errors.push(err?.message || "Failed to apply card art");
+        }
+
+        if (anyOk) {
+          applied.push(g.name);
+        } else {
+          failed.push({ name: g.name, reason: errors.join("; ") || "Unknown error" });
+        }
+      }
+
+      setArtApplyProgress({ running: false, current: games.length, total: games.length, currentGame: "", applied, failed });
+    } catch (_) {
+      setArtApplyProgress((prev) => prev ? { ...prev, running: false } : null);
+    }
+    setApplyArtRunning(false);
+  }, [applyArtById]);
+
   useEffect(() => {
     getNeedsRestart().then((val) => setNeedsRestartState(val)).catch(() => {});
   }, []);
@@ -199,10 +300,27 @@ export const GameLibrary: VFC = () => {
     } catch (_) {
       setSteamNames(new Set());
     }
-    // On first load only: restore the last open view and view mode from persisted config
+    // On first load only: restore the last open view and view mode from persisted config,
+    // and pre-load all background task state so the tasks view never flashes "No background tasks."
     if (shouldRestoreState.current) {
       shouldRestoreState.current = false;
-      const [uiStateRes, viewModeRes] = await Promise.allSettled([getUiState(), getViewMode()]);
+      const [
+        uiStateRes, viewModeRes,
+        transfersRes, sourcesRes, protonRes, depRes, copyRes, prefixRes, syncRes, batchAddRes,
+      ] = await Promise.allSettled([
+        getUiState(), getViewMode(),
+        listActiveTransfers(), listAllSources(), getProtonInstallStatuses(),
+        getDepInstallStatuses(), listConfigCopyStatuses(), listPrefixInitStatuses(),
+        listSaveSyncStatuses(), listBatchAddStatuses(),
+      ]);
+      if (transfersRes.status === "fulfilled") setActiveTransfers(transfersRes.value || []);
+      if (sourcesRes.status === "fulfilled") setXferSources(sourcesRes.value || []);
+      if (protonRes.status === "fulfilled") setProtonInstalls(protonRes.value || {});
+      if (depRes.status === "fulfilled") setDepInstalls(depRes.value || {});
+      if (copyRes.status === "fulfilled") setConfigCopies(copyRes.value || {});
+      if (prefixRes.status === "fulfilled") setPrefixInits(prefixRes.value || {});
+      if (syncRes.status === "fulfilled") setSaveSyncs(syncRes.value || {});
+      if (batchAddRes.status === "fulfilled") setBatchAddJobs(batchAddRes.value || {});
       if (viewModeRes.status === "fulfilled" && (viewModeRes.value === "card" || viewModeRes.value === "list")) {
         setViewMode(viewModeRes.value);
       }
@@ -260,16 +378,17 @@ export const GameLibrary: VFC = () => {
   const dismissSync = (id: string) => setDismissedSyncIds((prev) => new Set([...prev, id]));
 
   const refreshBgTasks = useCallback(async () => {
-    listActiveTransfers().then((t) => setActiveTransfers(t || [])).catch(() => {});
-    listAllSources().then((s) => setXferSources(s || [])).catch(() => {});
-    getProtonInstallStatuses().then((s) => setProtonInstalls(s || {})).catch(() => {});
-    getDepInstallStatuses().then((s) => setDepInstalls(s || {})).catch(() => {});
-    listConfigCopyStatuses().then((s) => setConfigCopies(s || {})).catch(() => {});
-    listPrefixInitStatuses().then((s) => setPrefixInits(s || {})).catch(() => {});
-    listSaveSyncStatuses().then((s) => setSaveSyncs(s || {})).catch(() => {});
+    await Promise.allSettled([
+      listActiveTransfers().then((t) => setActiveTransfers(t || [])),
+      listAllSources().then((s) => setXferSources(s || [])),
+      getProtonInstallStatuses().then((s) => setProtonInstalls(s || {})),
+      getDepInstallStatuses().then((s) => setDepInstalls(s || {})),
+      listConfigCopyStatuses().then((s) => setConfigCopies(s || {})),
+      listPrefixInitStatuses().then((s) => setPrefixInits(s || {})),
+      listSaveSyncStatuses().then((s) => setSaveSyncs(s || {})),
+      listBatchAddStatuses().then((s) => setBatchAddJobs(s || {})),
+    ]);
   }, []);
-
-  useEffect(() => { refreshBgTasks(); }, [refreshBgTasks]);
 
   const hasRunningTransfer = activeTransfers.some((t) => t.status === "running" || t.status === "queued");
   const hasRunningProton = Object.values(protonInstalls).some((s) => s.status === "downloading" || s.status === "extracting");
@@ -277,6 +396,8 @@ export const GameLibrary: VFC = () => {
   const hasRunningCopy = Object.values(configCopies).some((s) => s.status === "running");
   const hasRunningPrefix = Object.values(prefixInits).some((s) => s.status === "running");
   const hasRunningSaveSync = Object.values(saveSyncs).some((s) => s.status === "running");
+  const hasRunningBatchAdd = Object.values(batchAddJobs).some((s) => s.status === "running");
+  const hasRunningArtApply = artApplyProgress?.running ?? false;
 
   const runningTaskCount =
     activeTransfers.filter((t) => t.status === "running" || t.status === "queued").length +
@@ -284,10 +405,12 @@ export const GameLibrary: VFC = () => {
     Object.values(depInstalls).filter((s) => s.status === "installing").length +
     Object.values(configCopies).filter((s) => s.status === "running").length +
     Object.values(prefixInits).filter((s) => s.status === "running").length +
-    Object.values(saveSyncs).filter((s) => s.status === "running").length;
+    Object.values(saveSyncs).filter((s) => s.status === "running").length +
+    Object.values(batchAddJobs).filter((s) => s.status === "running").length +
+    (artApplyProgress?.running ? 1 : 0);
 
   useEffect(() => {
-    if (!hasRunningTransfer && !hasRunningProton && !hasRunningDep && !hasRunningCopy && !hasRunningPrefix && !hasRunningSaveSync) return;
+    if (!hasRunningTransfer && !hasRunningProton && !hasRunningDep && !hasRunningCopy && !hasRunningPrefix && !hasRunningSaveSync && !hasRunningBatchAdd) return;
     const poll = setInterval(async () => {
       try {
         if (hasRunningTransfer) {
@@ -314,10 +437,14 @@ export const GameLibrary: VFC = () => {
           const s = await listSaveSyncStatuses();
           setSaveSyncs(s || {});
         }
+        if (hasRunningBatchAdd) {
+          const s = await listBatchAddStatuses();
+          setBatchAddJobs(s || {});
+        }
       } catch (_) {}
     }, 2000);
     return () => clearInterval(poll);
-  }, [hasRunningTransfer, hasRunningProton, hasRunningDep, hasRunningCopy, hasRunningPrefix]);
+  }, [hasRunningTransfer, hasRunningProton, hasRunningDep, hasRunningCopy, hasRunningPrefix, hasRunningSaveSync, hasRunningBatchAdd]);
 
   const openGame = (game: MergedGame) => {
     setInitialSourceId(null); // manual navigation — no source restore
@@ -348,14 +475,15 @@ export const GameLibrary: VFC = () => {
     const visibleCopies = Object.entries(configCopies).filter(([id]) => !dismissedCopyIds.has(id));
     const visiblePrefixes = Object.entries(prefixInits).filter(([id]) => !dismissedPrefixIds.has(id));
     const visibleSyncs = Object.entries(saveSyncs).filter(([id]) => !dismissedSyncIds.has(id));
-    const hasAnyVisible = visibleTransfers.length > 0 || visibleProtons.length > 0 || visibleDeps.length > 0 || visibleCopies.length > 0 || visiblePrefixes.length > 0 || visibleSyncs.length > 0;
+    const visibleBatchAdds = Object.entries(batchAddJobs).filter(([id]) => !dismissedBatchAddIds.has(id));
+    const hasAnyVisible = visibleTransfers.length > 0 || visibleProtons.length > 0 || visibleDeps.length > 0 || visibleCopies.length > 0 || visiblePrefixes.length > 0 || visibleSyncs.length > 0 || visibleBatchAdds.length > 0 || artApplyProgress !== null;
 
     return (
       <div style={{ padding: "8px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "14px" }}>
           <Focusable
-            onActivate={() => setView("library")}
-            onClick={() => setView("library")}
+            onActivate={() => { saveUiState({ view: "library" }).catch(() => {}); setView("library"); }}
+            onClick={() => { saveUiState({ view: "library" }).catch(() => {}); setView("library"); }}
             focusClassName="is-focused"
             style={{ ...BTN, padding: "6px 9px", display: "flex", alignItems: "center", justifyContent: "center" }}
           >
@@ -562,6 +690,101 @@ export const GameLibrary: VFC = () => {
             </div>
           );
         })}
+
+        {/* Batch Add to Steam jobs */}
+        {visibleBatchAdds.map(([id, s]) => (
+          <div key={id} style={{ border: "1px solid #444", borderRadius: "4px", padding: "8px 10px", marginBottom: "6px", background: "#1a1a1a", fontSize: "0.82em" }}>
+            {s.status === "running" && (
+              <>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+                  <span>▸ Adding to Steam — <strong>{s.source_name}</strong> ({s.processed}/{s.total})</span>
+                </div>
+                {s.current_game && (
+                  <div style={{ color: "#888", fontSize: "0.9em" }}>{s.current_game}…</div>
+                )}
+                <div style={{ background: "#333", borderRadius: "2px", height: "4px", marginTop: "4px" }}>
+                  <div style={{ width: s.total > 0 ? `${Math.round((s.processed / s.total) * 100)}%` : "0%", background: "#0078d4", borderRadius: "2px", height: "100%", transition: "width 0.3s" }} />
+                </div>
+              </>
+            )}
+            {s.status === "done" && (
+              <>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <span style={{ color: s.failed.length > 0 ? "tomato" : "#2ecc71", flex: 1 }}>
+                    {s.failed.length > 0 ? "⚠" : "✓"} <strong>{s.source_name}</strong>: {[
+                      s.added.length > 0 && `Added ${s.added.length}`,
+                      s.updated.length > 0 && `Updated ${s.updated.length}`,
+                      s.skipped.length > 0 && `Skipped ${s.skipped.length}`,
+                      s.failed.length > 0 && `Failed ${s.failed.length}`,
+                    ].filter(Boolean).join(", ") || "Nothing to do"}
+                    {s.needs_restart && <span style={{ color: "#888" }}> — Restart Steam</span>}
+                  </span>
+                  <Focusable
+                    onActivate={() => { dismissBatchAdd(id); clearBatchAddStatus(id).catch(() => {}); if (s.needs_restart) setNeedsRestartState(true); }}
+                    onClick={() => { dismissBatchAdd(id); clearBatchAddStatus(id).catch(() => {}); if (s.needs_restart) setNeedsRestartState(true); }}
+                    focusClassName="is-focused"
+                    style={{ cursor: "pointer", color: "#666", padding: "0 4px", marginLeft: "8px", flexShrink: 0 }}
+                  >✕</Focusable>
+                </div>
+                {s.failed.length > 0 && (
+                  <div style={{ marginTop: "4px", borderTop: "1px solid #2a2a2a", paddingTop: "4px" }}>
+                    {s.failed.map((f) => (
+                      <div key={f.name} style={{ color: "#888", fontSize: "0.9em", marginTop: "2px" }}>
+                        <span style={{ color: "tomato" }}>{f.name}</span>: {f.reason}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        ))}
+
+        {/* Apply Art progress (frontend-driven, no restart needed) */}
+        {artApplyProgress !== null && (
+          <div style={{ border: "1px solid #444", borderRadius: "4px", padding: "8px 10px", marginBottom: "6px", background: "#1a1a1a", fontSize: "0.82em" }}>
+            {artApplyProgress.running && (
+              <>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+                  <span>▸ Applying art ({artApplyProgress.current}/{artApplyProgress.total || "?"})</span>
+                </div>
+                {artApplyProgress.currentGame && (
+                  <div style={{ color: "#888", fontSize: "0.9em" }}>{artApplyProgress.currentGame}…</div>
+                )}
+                {artApplyProgress.total > 0 && (
+                  <div style={{ background: "#333", borderRadius: "2px", height: "4px", marginTop: "4px" }}>
+                    <div style={{ width: `${Math.round((artApplyProgress.current / artApplyProgress.total) * 100)}%`, background: "#0078d4", borderRadius: "2px", height: "100%", transition: "width 0.3s" }} />
+                  </div>
+                )}
+              </>
+            )}
+            {!artApplyProgress.running && (
+              <>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <span style={{ color: artApplyProgress.failed.length > 0 ? "tomato" : "#2ecc71", flex: 1 }}>
+                    {artApplyProgress.failed.length > 0 ? "⚠" : "✓"} Applied art for {artApplyProgress.applied.length}/{artApplyProgress.total} game(s)
+                    {artApplyProgress.failed.length > 0 && ` (${artApplyProgress.failed.length} failed)`}
+                  </span>
+                  <Focusable
+                    onActivate={() => setArtApplyProgress(null)}
+                    onClick={() => setArtApplyProgress(null)}
+                    focusClassName="is-focused"
+                    style={{ cursor: "pointer", color: "#666", padding: "0 4px", marginLeft: "8px", flexShrink: 0 }}
+                  >✕</Focusable>
+                </div>
+                {artApplyProgress.failed.length > 0 && (
+                  <div style={{ marginTop: "4px", borderTop: "1px solid #2a2a2a", paddingTop: "4px" }}>
+                    {artApplyProgress.failed.map((f) => (
+                      <div key={f.name} style={{ color: "#888", fontSize: "0.9em", marginTop: "2px" }}>
+                        <span style={{ color: "tomato" }}>{f.name}</span>: {f.reason}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
     );
   }
@@ -737,7 +960,7 @@ export const GameLibrary: VFC = () => {
             {showBackupAllPicker && (
               <div style={{ margin: "2px 10px 6px", padding: "8px", background: "#1a1a1a", borderRadius: "4px", border: "1px solid #2a2a2a" }}>
                 <div style={{ fontSize: "0.78em", color: "#888", marginBottom: "6px" }}>
-                  Select source to backup saves for:
+                  Select destination source for save backups:
                 </div>
                 {allSources.length === 0 ? (
                   <div style={{ fontSize: "0.8em", color: "#666" }}>No sources found.</div>
@@ -808,6 +1031,146 @@ export const GameLibrary: VFC = () => {
                 >✕</Focusable>
               </div>
             )}
+
+            {/* Divider */}
+            <div style={{ borderTop: "1px solid #2a2a2a", margin: "2px 10px" }} />
+
+            {/* Add Games to Steam */}
+            <Focusable
+              onActivate={() => { setShowAddToSteamPicker((v) => !v); setAddToSteamSourceId(null); }}
+              onClick={() => { setShowAddToSteamPicker((v) => !v); setAddToSteamSourceId(null); }}
+              focusClassName="is-focused"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                margin: "0 2px",
+                padding: "7px 10px",
+                cursor: "pointer",
+                fontSize: "0.85em",
+                borderRadius: "4px",
+                color: "#e0e0e0",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.05)")}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+            >
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style={{ display: "block", flexShrink: 0 }}>
+                <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z" />
+              </svg>
+              Add Games to Steam
+            </Focusable>
+
+            {/* Source picker for Add to Steam */}
+            {showAddToSteamPicker && (
+              <div style={{ margin: "2px 10px 6px", padding: "8px", background: "#1a1a1a", borderRadius: "4px", border: "1px solid #2a2a2a" }}>
+                <div style={{ fontSize: "0.78em", color: "#888", marginBottom: "6px" }}>
+                  Select source to add games to Steam from:
+                </div>
+                {allSources.filter((s) => s.type !== "mount").length === 0 ? (
+                  <div style={{ fontSize: "0.8em", color: "#666" }}>No sources found.</div>
+                ) : (
+                  <Focusable style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+                    {allSources.filter((s) => s.type !== "mount").map((src) => (
+                      <Focusable
+                        key={src.id}
+                        onActivate={() => setAddToSteamSourceId((v) => v === src.id ? null : src.id)}
+                        onClick={() => setAddToSteamSourceId((v) => v === src.id ? null : src.id)}
+                        focusClassName="is-focused"
+                        style={{
+                          margin: "0 2px",
+                          padding: "4px 10px",
+                          borderRadius: "4px",
+                          cursor: "pointer",
+                          fontSize: "0.82em",
+                          border: addToSteamSourceId === src.id ? "1px solid #27ae60" : "1px solid #333",
+                          color: addToSteamSourceId === src.id ? "#2ecc71" : "#c0c0c0",
+                          background: addToSteamSourceId === src.id ? "#1a3a1a" : "transparent",
+                        }}
+                      >
+                        {src.name}
+                      </Focusable>
+                    ))}
+                  </Focusable>
+                )}
+                {addToSteamSourceId && (
+                  <Focusable
+                    onActivate={() => !addToSteamRunning && handleAddToSteam(addToSteamSourceId)}
+                    onClick={() => !addToSteamRunning && handleAddToSteam(addToSteamSourceId)}
+                    focusClassName="is-focused"
+                    style={{
+                      margin: "6px 2px 0",
+                      padding: "5px 10px",
+                      borderRadius: "4px",
+                      cursor: addToSteamRunning ? "default" : "pointer",
+                      fontSize: "0.82em",
+                      border: "1px solid #27ae60",
+                      color: "#2ecc71",
+                      background: "#1a3a1a",
+                      textAlign: "center" as const,
+                      opacity: addToSteamRunning ? 0.5 : 1,
+                    }}
+                  >
+                    {addToSteamRunning ? "Starting…" : "Confirm Add to Steam"}
+                  </Focusable>
+                )}
+              </div>
+            )}
+
+            {/* Divider */}
+            <div style={{ borderTop: "1px solid #2a2a2a", margin: "2px 10px" }} />
+
+            {/* Apply Games Art */}
+            <Focusable
+              onActivate={() => !applyArtRunning && setShowApplyArtConfirm((v) => !v)}
+              onClick={() => !applyArtRunning && setShowApplyArtConfirm((v) => !v)}
+              focusClassName="is-focused"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                margin: "0 2px",
+                padding: "7px 10px",
+                cursor: applyArtRunning ? "default" : "pointer",
+                fontSize: "0.85em",
+                borderRadius: "4px",
+                color: applyArtRunning ? "#555" : "#e0e0e0",
+                opacity: applyArtRunning ? 0.6 : 1,
+              }}
+              onMouseEnter={(e) => { if (!applyArtRunning) e.currentTarget.style.background = "rgba(255,255,255,0.05)"; }}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+            >
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style={{ display: "block", flexShrink: 0 }}>
+                <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" />
+              </svg>
+              {applyArtRunning ? "Applying art…" : "Apply Games Art"}
+            </Focusable>
+
+            {showApplyArtConfirm && (
+              <div style={{ margin: "2px 10px 6px", padding: "8px", background: "#1a1a1a", borderRadius: "4px", border: "1px solid #2a2a2a" }}>
+                <div style={{ fontSize: "0.78em", color: "#e0a800", marginBottom: "8px" }}>
+                  This will overwrite existing art for all games with a SteamGridDB ID configured, replacing it with the default first result from SteamGridDB.
+                </div>
+                <Focusable focusClassName="" style={{ display: "flex", gap: "6px" }}>
+                  <Focusable
+                    onActivate={() => { setShowApplyArtConfirm(false); handleApplyGamesArt(); }}
+                    onClick={() => { setShowApplyArtConfirm(false); handleApplyGamesArt(); }}
+                    focusClassName="is-focused"
+                    style={{ margin: "0 2px", padding: "4px 10px", borderRadius: "4px", cursor: "pointer", fontSize: "0.82em", border: "1px solid #27ae60", color: "#2ecc71", background: "#1a3a1a", flex: 1, textAlign: "center" as const }}
+                  >
+                    Confirm
+                  </Focusable>
+                  <Focusable
+                    onActivate={() => setShowApplyArtConfirm(false)}
+                    onClick={() => setShowApplyArtConfirm(false)}
+                    focusClassName="is-focused"
+                    style={{ margin: "0 2px", padding: "4px 10px", borderRadius: "4px", cursor: "pointer", fontSize: "0.82em", border: "1px solid #555", color: "#aaa", background: "transparent", flex: 1, textAlign: "center" as const }}
+                  >
+                    Cancel
+                  </Focusable>
+                </Focusable>
+              </div>
+            )}
+
           </div>
         )}
       </div>
@@ -950,37 +1313,19 @@ export const GameLibrary: VFC = () => {
           <div style={{ fontSize: "0.75em", color: "#888", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.05em" }}>
             Steam Status
           </div>
-          <Focusable
-            onActivate={() => setShowSteamPicker((p) => !p)}
-            onClick={() => setShowSteamPicker((p) => !p)}
-            focusClassName="is-focused"
-            style={{
-              ...BTN,
-              display: "inline-block",
-              padding: "4px 12px",
-              marginBottom: showSteamPicker ? "4px" : "0",
-              color: filterSteamStatus !== "all" ? "#e0e0e0" : "#888",
-            }}
-          >
-            {filterSteamStatus === "all" ? "— All —" : filterSteamStatus === "in-steam" ? "In Steam" : "Not in Steam"}
+          <Focusable focusClassName="" style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "12px" }}>
+            {(["all", "in-steam", "not-in-steam"] as const).map((opt) => (
+              <Focusable
+                key={opt}
+                onActivate={() => setFilterSteamStatus(opt)}
+                onClick={() => setFilterSteamStatus(opt)}
+                focusClassName="is-focused"
+                style={CHIP(filterSteamStatus === opt)}
+              >
+                {opt === "all" ? "— All —" : opt === "in-steam" ? "In Steam" : "Not in Steam"}
+              </Focusable>
+            ))}
           </Focusable>
-          {showSteamPicker && (
-            <div style={{ border: "1px solid #555", borderRadius: "4px", padding: "2px 0" }}>
-              {(["all", "in-steam", "not-in-steam"] as const).map((opt) => (
-                <Focusable
-                  key={opt}
-                  onActivate={() => { setFilterSteamStatus(opt); setShowSteamPicker(false); }}
-                  onClick={() => { setFilterSteamStatus(opt); setShowSteamPicker(false); }}
-                  focusClassName="is-focused"
-                  style={{ margin: "0 2px", padding: "4px 10px", cursor: "pointer", fontSize: "0.85em", borderBottom: "1px solid #333", color: filterSteamStatus === opt ? "#0078d4" : "#ccc" }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                >
-                  {opt === "all" ? "— All —" : opt === "in-steam" ? "In Steam" : "Not in Steam"}
-                </Focusable>
-              ))}
-            </div>
-          )}
         </div>
       )}
 

@@ -102,17 +102,35 @@ def _load_vdf_binary(path: Path):
 
 
 def _save_vdf_binary(data, path: Path):
-    """Save data to a binary VDF file."""
-    import vdf
-    with open(path, "wb") as f:
-        vdf.binary_dump(data, f)
+    """Save data to a binary VDF file (atomic write to prevent corruption on failure)."""
+    import vdf, os
+    tmp = path.with_suffix(".vdf.tmp")
+    try:
+        with open(tmp, "wb") as f:
+            vdf.binary_dump(data, f)
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+        raise
 
 
 def _save_vdf_text(data, path: Path):
-    """Save data to a text-format VDF file."""
-    import vdf
-    with open(path, "w", encoding="utf-8") as f:
-        vdf.dump(data, f)
+    """Save data to a text-format VDF file (atomic write to prevent corruption on failure)."""
+    import vdf, os
+    tmp = path.with_suffix(".vdf.tmp")
+    try:
+        with open(tmp, "w", encoding="utf-8") as f:
+            vdf.dump(data, f)
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+        raise
 
 
 def _get_localconfig_path(user_id: str) -> Path:

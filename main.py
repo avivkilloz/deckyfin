@@ -48,7 +48,7 @@ from deckyfin_protontricks import (
     detect_protontricks_status as _detect_protontricks_status,
     install_protontricks_flatpak as _install_protontricks_flatpak,
 )
-from deckyfin_steamgrid import apply_steam_grid as _apply_steam_grid, set_api_key as _set_steamgrid_key, get_configured_api_key as _get_steamgrid_key, fetch_steamgrid_art_urls as _fetch_steamgrid_art_urls, search_steamgrid_games as _search_steamgrid_games, fetch_steamgrid_art_urls_by_id as _fetch_steamgrid_art_urls_by_id, download_file as _download_file
+from deckyfin_steamgrid import apply_steam_grid as _apply_steam_grid, set_api_key as _set_steamgrid_key, get_configured_api_key as _get_steamgrid_key, fetch_steamgrid_art_urls as _fetch_steamgrid_art_urls, search_steamgrid_games as _search_steamgrid_games, fetch_steamgrid_art_urls_by_id as _fetch_steamgrid_art_urls_by_id, download_file as _download_file, fetch_steamgrid_art_page as _fetch_steamgrid_art_page, search_game as _sgdb_search_game, fetch_steam_art_options_page as _fetch_steam_art_options_page
 from deckyfin_steam_ctl import is_steam_running, restart_steam
 from deckyfin_game_state import (
     get_game_state,
@@ -71,7 +71,7 @@ from steam_utils import get_user_id, list_steam_users
 from steam_games import convert_appid_to_unsigned_32bit
 from deckyfin_consts import APP_NAME, APP_VERSION
 
-DEBUG_LOG = Path(__file__).parent / "debug.log"
+DEBUG_LOG = Path(os.environ.get("DECKY_PLUGIN_RUNTIME_DIR", str(Path(__file__).parent))) / "debug.log"
 
 
 def _debug(msg: str):
@@ -105,6 +105,12 @@ _save_sync_registry: dict = {}
 # Key: sync_id (UUID hex[:8])
 # Value: {sync_id, game_name, source_id, direction: "backup"|"restore"|"copy",
 #         from_source_id?, to_source_id?, status: "running"|"done"|"failed", error, copied}
+
+_batch_add_registry: dict = {}
+# Key: job_id (UUID hex[:8])
+# Value: {job_id, source_name, status: "running"|"done"|"failed", current_game,
+#         total, processed, added, updated, skipped, failed, needs_restart, error}
+
 
 # Navigation state — in-memory only, intentionally cleared on Python restart (Steam restart).
 # Sidebar close/reopen keeps the Python process alive so state is preserved.
@@ -758,55 +764,78 @@ class Plugin:
         if not path:
             return {"success": False, "message": "Source has no path"}
 
-        try:
-            games_path = Path(path)
-            games_path.mkdir(parents=True, exist_ok=True)
-            get_app_folder(games_path).mkdir(parents=True, exist_ok=True)
-            get_saves_folder(games_path).mkdir(parents=True, exist_ok=True)
-            existing_config = get_games_config(games_path)
-            existing_games = {g["name"]: g for g in existing_config.get("games", [])}
-            current_folders = {fi["name"]: fi["path"] for fi in detect_game_folders(games_path)}
-            # Fix slug paths from older entries
-            for name, game in existing_games.items():
-                if name in current_folders and game.get("path") != current_folders[name]:
-                    game["path"] = current_folders[name]
-            # Remove entries for folders that no longer exist
-            existing_games = {n: g for n, g in existing_games.items() if n in current_folders}
-            # Add blank entries for new folders
-            new_games = []
-            for name, folder_path in current_folders.items():
-                if name not in existing_games:
-                    existing_games[name] = {
-                        "name": name,
-                        "path": folder_path,
-                        "executable": "",
-                        "steam_app_id": None,
-                        "proton_version": "",
-                        "proton_dependencies": [],
-                        "proton_sync_paths": [],
-                        "categories": [],
-                        "launch_options": "",
-                    }
-                    new_games.append(name)
-            save_games_config({"games": list(existing_games.values())}, games_path)
-            return {
-                "success": True,
-                "message": "Source initialized successfully",
-                "games_count": len(existing_games),
-                "games_initialized": new_games,
-            }
-        except PermissionError:
-            # FUSE mount (e.g. SSHFS without -o allow_root) — retry as path owner.
-            # os.seteuid alone is not enough; subprocess with full setuid/setgid required.
-            owner_uid, owner_gid = _owner_creds_for(path)
-            if os.getuid() == 0 and owner_uid != 0:
-                result = _run_source_script("init", path, owner_uid, owner_gid)
-                if result is not None:
-                    return result
-            return {"success": False, "message": "Permission denied on source path"}
-        except Exception as e:
-            _debug(f"initialize_source: error for {path!r}: {e!r}")
-            return {"success": False, "message": str(e)}
+        games_path = Path(path)
+        for attempt in range(2):
+            try:
+                games_path.mkdir(parents=True, exist_ok=True)
+                get_app_folder(games_path).mkdir(parents=True, exist_ok=True)
+                get_saves_folder(games_path).mkdir(parents=True, exist_ok=True)
+                existing_config = get_games_config(games_path)
+                existing_games = {g["name"]: g for g in existing_config.get("games", [])}
+                current_folders = {fi["name"]: fi["path"] for fi in detect_game_folders(games_path)}
+                # Fix slug paths from older entries
+                for name, game in existing_games.items():
+                    if name in current_folders and game.get("path") != current_folders[name]:
+                        game["path"] = current_folders[name]
+                # Remove entries for folders that no longer exist
+                existing_games = {n: g for n, g in existing_games.items() if n in current_folders}
+                # Add blank entries for new folders
+                new_games = []
+                for name, folder_path in current_folders.items():
+                    if name not in existing_games:
+                        existing_games[name] = {
+                            "name": name,
+                            "path": folder_path,
+                            "executable": "",
+                            "steam_app_id": None,
+                            "proton_version": "",
+                            "proton_dependencies": [],
+                            "proton_sync_paths": [],
+                            "categories": [],
+                            "launch_options": "",
+                        }
+                        new_games.append(name)
+                save_games_config({"games": list(existing_games.values())}, games_path)
+                return {
+                    "success": True,
+                    "message": "Source initialized successfully",
+                    "games_count": len(existing_games),
+                    "games_initialized": new_games,
+                }
+            except PermissionError:
+                if attempt == 0 and source.get("type") == "local":
+                    # .deckyfin owned by nobody (old plugin ran as nobody; now runs as deck).
+                    # deck owns the parent games dir, so it can rename .deckyfin away even
+                    # though it doesn't own .deckyfin itself, then recreate it as deck.
+                    app_folder = get_app_folder(games_path)
+                    old_folder = app_folder.parent / ".deckyfin.nobody"
+                    try:
+                        import json as _json
+                        saved_config = None
+                        cfg_file = app_folder / "config.json"
+                        if cfg_file.exists():
+                            saved_config = _json.loads(cfg_file.read_text(encoding="utf-8"))
+                        if app_folder.exists():
+                            os.rename(str(app_folder), str(old_folder))
+                        app_folder.mkdir(parents=True, exist_ok=True)
+                        get_saves_folder(games_path).mkdir(parents=True, exist_ok=True)
+                        if saved_config:
+                            save_games_config(saved_config, games_path)
+                        _debug(f"initialize_source: repaired {str(app_folder)!r} (old dir renamed to {old_folder.name!r})")
+                        continue
+                    except Exception as repair_err:
+                        _debug(f"initialize_source: repair failed: {repair_err!r}")
+                # FUSE mount (e.g. SSHFS without -o allow_root) — retry as path owner.
+                # os.seteuid alone is not enough; subprocess with full setuid/setgid required.
+                owner_uid, owner_gid = _owner_creds_for(path)
+                if os.getuid() == 0 and owner_uid != 0:
+                    result = _run_source_script("init", path, owner_uid, owner_gid)
+                    if result is not None:
+                        return result
+                return {"success": False, "message": "Permission denied on source path"}
+            except Exception as e:
+                _debug(f"initialize_source: error for {path!r}: {e!r}")
+                return {"success": False, "message": str(e)}
 
     # ── Steam ─────────────────────────────────────────────────────────────
 
@@ -1192,10 +1221,37 @@ class Plugin:
             folder = get_games_folder()
             games_path = str(folder) if folder else None
         if not games_path:
+            _debug(f"scan_game_exes: no games_path (source_id={source_id!r})")
             return [{"error": "Games folder not configured"}]
         game_dir = Path(games_path) / subfolder
+        # Fuzzy fallback for case-sensitive filesystems: stored path may be a slug
+        # (lowercase with hyphens) while actual folder uses spaces/different casing.
+        if not game_dir.exists() and game_dir.parent.is_dir():
+            def _normalize(s: str) -> str:
+                return s.lower().replace("-", " ").replace("_", " ")
+            target_norm = _normalize(subfolder)
+            for entry in game_dir.parent.iterdir():
+                if entry.is_dir() and _normalize(entry.name) == target_norm:
+                    game_dir = entry
+                    _debug(f"scan_game_exes: slug-corrected {subfolder!r} → {entry.name!r}")
+                    break
+        _debug(f"scan_game_exes: scanning game_dir={str(game_dir)!r} exists={game_dir.exists()} is_dir={game_dir.is_dir()}")
+        if game_dir.exists() and game_dir.is_dir():
+            try:
+                top_entries = sorted(p.name for p in game_dir.iterdir())[:20]
+                _debug(f"scan_game_exes: top-level entries={top_entries!r}")
+            except Exception as _e:
+                _debug(f"scan_game_exes: cannot list game_dir: {_e}")
+        else:
+            try:
+                source_root = Path(games_path)
+                root_entries = sorted(p.name for p in source_root.iterdir())[:20] if source_root.is_dir() else []
+                _debug(f"scan_game_exes: game_dir not found; source root entries={root_entries!r}")
+            except Exception as _e:
+                _debug(f"scan_game_exes: cannot list source root: {_e}")
         if os.getuid() == 0:
             owner_uid, owner_gid = _owner_creds_for(games_path)
+            _debug(f"scan_game_exes: running as root, owner_uid={owner_uid} owner_gid={owner_gid}")
             if owner_uid != 0:
                 proc = subprocess.run(
                     ["python3", "-c",
@@ -1208,9 +1264,14 @@ class Plugin:
                     capture_output=True, text=True, timeout=30,
                     preexec_fn=functools.partial(_drop_privs, owner_uid, owner_gid),
                 )
+                _debug(f"scan_game_exes: subprocess rc={proc.returncode} stderr={proc.stderr!r}")
                 if proc.returncode == 0:
-                    return [l for l in proc.stdout.splitlines() if l.strip()]
-        return find_game_executables(game_dir)
+                    results = [l for l in proc.stdout.splitlines() if l.strip()]
+                    _debug(f"scan_game_exes: subprocess found {len(results)} exe(s)")
+                    return results
+        results = find_game_executables(game_dir)
+        _debug(f"scan_game_exes: find_game_executables returned {len(results)} exe(s): {results[:5]!r}")
+        return results
 
     async def get_game_size(self, game_name: str, source_id: Optional[str] = None) -> dict:
         """Return total disk usage in bytes for a game folder on a given source."""
@@ -1429,6 +1490,163 @@ class Plugin:
             "app_id": app_id,
             "unsigned_appid": convert_appid_to_unsigned_32bit(app_id),
         }
+
+    async def batch_add_to_steam(self, source_id: str) -> dict:
+        """Start a background job to add/update all configured games in a source to Steam.
+
+        Returns immediately with {success, job_id}. Track progress via list_batch_add_statuses.
+        """
+        source = _get_source_by_id(source_id)
+        if not source:
+            return {"success": False, "error": "Source not found"}
+        job_id = _uuid.uuid4().hex[:8]
+        source_name = source.get("name", source_id)
+        games = _load_source_games(source)
+        _batch_add_registry[job_id] = {
+            "job_id": job_id,
+            "source_name": source_name,
+            "status": "running",
+            "current_game": "",
+            "total": len(games),
+            "processed": 0,
+            "added": [],
+            "updated": [],
+            "skipped": [],
+            "failed": [],
+            "needs_restart": False,
+            "error": None,
+        }
+
+        def _run():
+            try:
+                uid = get_user_id()
+            except Exception:
+                uid = None
+            source_path = source.get("path", "")
+            for cfg in games:
+                name = cfg.get("name", "")
+                _batch_add_registry[job_id]["current_game"] = name
+                exe = (cfg.get("executable") or "").strip()
+                if not exe:
+                    _batch_add_registry[job_id]["skipped"].append(name)
+                    _batch_add_registry[job_id]["processed"] += 1
+                    continue
+                # Resolve relative paths against the source root (same as add_steam_shortcut does).
+                if exe and not Path(exe).is_absolute() and source_path:
+                    exe = str(Path(source_path) / exe)
+                try:
+                    start_dir = cfg.get("start_dir") or None
+                    if start_dir and not Path(start_dir).is_absolute() and source_path:
+                        start_dir = str(Path(source_path) / start_dir)
+                    launch_options = cfg.get("launch_options") or ""
+                    proton_version = cfg.get("proton_version") or None
+                    collections = cfg.get("collections") or None
+                    steam_info = get_steam_shortcut_info(name, uid) if uid else None
+                    if steam_info and steam_info.get("unsigned_appid"):
+                        app_id = update_nonsteam_game(name, exe, start_dir or "", launch_options, collections=collections)
+                        if app_id is not None:
+                            _batch_add_registry[job_id]["updated"].append(name)
+                            _batch_add_registry[job_id]["needs_restart"] = True
+                            try:
+                                update_game_state(source_id, name, {"needs_restart": True})
+                            except Exception:
+                                pass
+                        else:
+                            _batch_add_registry[job_id]["failed"].append({"name": name, "reason": "update_nonsteam_game returned None"})
+                    else:
+                        app_id = add_nonsteam_game(exe, name, start_dir, launch_options, collections=collections)
+                        if app_id is not None:
+                            _batch_add_registry[job_id]["added"].append(name)
+                            _batch_add_registry[job_id]["needs_restart"] = True
+                            try:
+                                update_game_state(source_id, name, {"needs_restart_after_add": True, "needs_restart": True})
+                            except Exception:
+                                pass
+                            if proton_version and uid:
+                                try:
+                                    set_proton_version(app_id, proton_version, uid, name)
+                                except Exception:
+                                    pass
+                        else:
+                            _batch_add_registry[job_id]["failed"].append({"name": name, "reason": "add_nonsteam_game returned None"})
+                except Exception as e:
+                    _debug(f"batch_add_to_steam: error for {name!r}: {e}")
+                    _batch_add_registry[job_id]["failed"].append({"name": name, "reason": str(e)})
+                _batch_add_registry[job_id]["processed"] += 1
+            _batch_add_registry[job_id]["current_game"] = ""
+            _batch_add_registry[job_id]["status"] = "done"
+
+        _threading.Thread(target=_run, daemon=True).start()
+        return {"success": True, "job_id": job_id}
+
+    async def list_batch_add_statuses(self) -> dict:
+        """Return a snapshot of all batch-add-to-steam job statuses."""
+        return {k: dict(v) for k, v in _batch_add_registry.items()}
+
+    async def clear_batch_add_status(self, job_id: str) -> dict:
+        """Remove a completed batch-add-to-steam job from the registry."""
+        _batch_add_registry.pop(job_id, None)
+        return {"success": True}
+
+    async def get_art_eligible_games(self) -> list:
+        """Return all games that have a SteamGridDB ID configured, deduplicated by name.
+
+        Each entry: {name, sgdb_id, unsigned_appid}.
+        unsigned_appid is None for games not yet added to Steam.
+        """
+        import re as _re
+        try:
+            uid = get_user_id()
+        except Exception:
+            uid = None
+        seen_names: set = set()
+        eligible = []
+        for source in _list_sources():
+            try:
+                games = _load_source_games(source)
+            except Exception:
+                continue
+            for cfg in games:
+                sgdb_id = cfg.get("steamgriddb_game_id")
+                if not sgdb_id:
+                    continue
+                name = cfg.get("name", "")
+                if name in seen_names:
+                    continue
+                seen_names.add(name)
+                steam_info = None
+                try:
+                    steam_info = get_steam_shortcut_info(name, uid) if uid else None
+                except Exception:
+                    pass
+                eligible.append({
+                    "name": name,
+                    "sgdb_id": int(sgdb_id),
+                    "unsigned_appid": (steam_info or {}).get("unsigned_appid"),
+                })
+        return eligible
+
+    async def apply_deckyfin_card_art(self, game_name: str, sgdb_id: int) -> dict:
+        """Download and save the wide art for a game to the Deckyfin card art cache.
+
+        This updates the plugin thumbnail shown in the GameCard list.
+        Returns {success, error}.
+        """
+        import re as _re, os as _os
+        try:
+            art_dir = Path(_os.environ.get("DECKY_PLUGIN_RUNTIME_DIR", _os.path.expanduser("~/.local/share/deckyfin")))
+            art_dir.mkdir(parents=True, exist_ok=True)
+            wide_data = _fetch_steamgrid_art_page(int(sgdb_id), page=0, limit=1)
+            wide_url = (wide_data.get("urls") or [None])[0]
+            if not wide_url:
+                return {"success": False, "error": "No wide art found on SteamGridDB"}
+            safe_name = _re.sub(r'[^\w\-. ]', '_', game_name).strip()
+            dest = art_dir / f"art_{safe_name}.png"
+            if _download_file(wide_url, dest):
+                return {"success": True}
+            return {"success": False, "error": "Download failed"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
 
     async def remove_steam_shortcut(self, app_name: str, user_id: Optional[str] = None) -> dict:
         removed = remove_nonsteam_game(app_name, user_id)
@@ -1982,26 +2200,49 @@ class Plugin:
         _set_steamgrid_key(key)
         return {"success": True}
 
-    async def apply_deckyfin_art(self, game_name: str) -> dict:
-        """Download a wide capsule from SteamGridDB and save it to the plugin's art folder.
+    async def fetch_deckyfin_art_options(self, game_name: str, page: int = 0, game_id: Optional[int] = None) -> dict:
+        """Fetch a page of art options for the Deckyfin art picker.
 
-        Stores art as game_art/<safe_name>.png inside the plugin directory.
-        Works for any game regardless of whether it's in Steam.
+        On first call (page=0, game_id=None) searches SGDB by name to get the game_id,
+        then returns the first page. Subsequent calls pass game_id directly to skip search.
+        Returns: game_id (int|None), urls (list[str]), has_more (bool), error (str|None).
         """
-        import re
         try:
-            urls = _fetch_steamgrid_art_urls(game_name)
-            if not urls.get("success") or not urls.get("wide"):
-                return {"success": False, "error": urls.get("error") or "No art found on SteamGridDB"}
+            if game_id is None:
+                game_id = _sgdb_search_game(game_name)
+                if not game_id:
+                    return {"game_id": None, "urls": [], "has_more": False, "error": f"No SteamGridDB result for '{game_name}'"}
+            result = _fetch_steamgrid_art_page(game_id, page)
+            result["game_id"] = game_id
+            result["error"] = None
+            return result
+        except Exception as e:
+            return {"game_id": game_id, "urls": [], "has_more": False, "error": str(e)}
 
-            import os
+    async def fetch_steam_art_options(self, game_id: int, art_type: str, page: int = 0) -> dict:
+        """Fetch a page of Steam art options for a specific art type.
+
+        art_type: 'wide' (920x430), 'capsule' (600x900), 'hero', 'logo'
+        Returns: urls (list[str]), has_more (bool), error (str|None).
+        """
+        try:
+            result = _fetch_steam_art_options_page(game_id, art_type, page)
+            result["error"] = None
+            return result
+        except Exception as e:
+            return {"urls": [], "has_more": False, "error": str(e)}
+
+    async def apply_deckyfin_art(self, game_name: str, art_url: str) -> dict:
+        """Download the chosen art URL and save it as Deckyfin Art for the game."""
+        import re, os
+        try:
             art_dir = Path(os.environ.get("DECKY_PLUGIN_RUNTIME_DIR", os.path.expanduser("~/.local/share/deckyfin")))
             art_dir.mkdir(parents=True, exist_ok=True)
 
             safe_name = re.sub(r'[^\w\-. ]', '_', game_name).strip()
             dest = art_dir / f"art_{safe_name}.png"
 
-            if not _download_file(urls["wide"], dest):
+            if not _download_file(art_url, dest):
                 return {"success": False, "error": "Failed to download art"}
 
             return {"success": True}

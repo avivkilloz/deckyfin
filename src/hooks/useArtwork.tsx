@@ -123,11 +123,6 @@ export function useArtwork() {
       assetType: SteamAssetType,
       appOverview?: any
     ): Promise<boolean> => {
-      // Icons on shortcuts need the legacy shortcuts.vdf approach
-      if (assetType === AssetType.ICON) {
-        return false; // caller should use applySteamGridLegacy for icons
-      }
-
       const b64data = await downloadImage(url);
       if (!b64data) return false;
 

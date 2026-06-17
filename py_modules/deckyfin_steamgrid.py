@@ -244,6 +244,47 @@ def fetch_steamgrid_art_urls_by_id(game_id: int, game_name: str | None = None) -
     return _fetch_art_urls_for_game_id(game_id, game_name)
 
 
+def fetch_steam_art_options_page(game_id: int, art_type: str, page: int = 0, limit: int = 20) -> dict:
+    """Fetch a page of Steam art options for a specific art type.
+
+    art_type: 'wide' (920x430 grids), 'capsule' (600x900 grids), 'hero', 'logo'
+    Returns: urls (list[str]), has_more (bool).
+    """
+    if art_type == "wide":
+        data = _api_get(f"/grids/game/{game_id}?dimensions=920x430&limit={limit}&page={page}")
+    elif art_type == "capsule":
+        data = _api_get(f"/grids/game/{game_id}?dimensions=600x900&limit={limit}&page={page}")
+    elif art_type == "hero":
+        data = _api_get(f"/heroes/game/{game_id}?limit={limit}&page={page}")
+    elif art_type == "logo":
+        data = _api_get(f"/logos/game/{game_id}?limit={limit}&page={page}")
+    elif art_type == "icon":
+        data = _api_get(f"/icons/game/{game_id}?limit={limit}&page={page}")
+    else:
+        return {"urls": [], "has_more": False}
+
+    if not data or not data.get("success"):
+        return {"urls": [], "has_more": False}
+    items = data.get("data") or []
+    urls = [item["url"] for item in items if item.get("url")]
+    return {"urls": urls, "has_more": len(items) >= limit}
+
+
+def fetch_steamgrid_art_page(game_id: int, page: int = 0, limit: int = 20) -> dict:
+    """Fetch one page of wide/landscape capsule art URLs for a game.
+
+    Filters to landscape-only images (aspect ratio > 1.5) so portrait and hero
+    art is excluded. Requests a larger raw batch to compensate for filtering.
+    Returns: urls (list[str]), has_more (bool).
+    """
+    data = _api_get(f"/grids/game/{game_id}?dimensions=920x430&limit={limit}&page={page}")
+    if not data or not data.get("success"):
+        return {"urls": [], "has_more": False}
+    items = data.get("data") or []
+    urls = [item["url"] for item in items if item.get("url")]
+    return {"urls": urls, "has_more": len(items) >= limit}
+
+
 def fetch_steamgrid_art_urls(game_name: str) -> dict:
     """One-step: search game by name → fetch art URLs.
 
@@ -372,6 +413,71 @@ def apply_steam_grid(
             result["errors"].append(f"Failed to download {art_type}")
 
     result["success"] = any_success
+    return result
+
+
+def apply_all_art_file_copy(
+    game_name: str,
+    sgdb_id: int,
+    unsigned_appid: int,
+    user_id: Optional[str] = None,
+) -> dict:
+    """Fetch all art types from SteamGridDB and copy to Steam grid folder.
+
+    Downloads wide, portrait, hero, and logo art directly to the grid folder.
+    Steam must be restarted for the art to appear. Used by batch art apply.
+    Returns: {success, applied (list of art type names), errors (list)}
+    """
+    result: dict = {"success": False, "applied": [], "errors": []}
+
+    if not user_id:
+        try:
+            user_id = get_user_id()
+        except Exception as e:
+            result["errors"].append(f"Could not determine user: {e}")
+            return result
+
+    urls = _fetch_art_urls_for_game_id(sgdb_id, game_name)
+    if not urls.get("success"):
+        result["errors"].append(urls.get("error") or f"No art found for SGDB ID {sgdb_id}")
+        return result
+
+    try:
+        steam_root = find_steam_root()
+    except Exception as e:
+        result["errors"].append(f"Could not find Steam: {e}")
+        return result
+
+    grid_folder = _get_grid_folder(steam_root, user_id)
+    try:
+        grid_folder.mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        result["errors"].append(f"Could not create grid folder: {e}")
+        return result
+
+    appid_str = str(unsigned_appid)
+    type_map = {
+        "wide": (urls.get("wide"), f"{appid_str}.png"),
+        "capsule": (urls.get("grid_p"), f"{appid_str}p.png"),
+        "hero": (urls.get("hero"), f"{appid_str}_hero.png"),
+        "logo": (urls.get("logo"), f"{appid_str}_logo.png"),
+    }
+
+    any_ok = False
+    for art_type, (url, filename) in type_map.items():
+        if not url:
+            result["errors"].append(f"No {art_type} URL on SteamGridDB")
+            continue
+        dest = grid_folder / filename
+        if _download_file(url, dest):
+            _fix_ownership(dest)
+            result["applied"].append(art_type)
+            any_ok = True
+            logger.info("Applied %s art for %s (%s)", art_type, game_name, filename)
+        else:
+            result["errors"].append(f"Failed to download {art_type}")
+
+    result["success"] = any_ok
     return result
 
 
