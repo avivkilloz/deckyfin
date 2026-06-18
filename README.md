@@ -62,12 +62,17 @@ sudo systemctl restart plugin_loader.service
 
 ## Usage
 
-1. Open the **Quick Access Menu** (QAM) — the `...` button or `STEAM` button
-2. Select the **Deckyfin** icon (![Deckyfin icon](src/assets/icon.svg))
-3. Go to **Settings** → set your **Games Folder** (e.g. `~/Games`, `/mnt/games`)
-4. Tap **Add Game** → browse subdirectories, pick an `.exe`
-5. Configure resolution, Proton version, dependencies to install
-6. **Setup** — creates the shortcut, initializes the prefix, installs deps
+1. Open the **Quick Access Menu** (QAM) — the `...` button on Steam Deck, or the Decky overlay on desktop.
+2. Select the **Deckyfin** icon in the sidebar.
+3. Go to **Settings** → **Add Source** → choose a name and the folder where your games live (e.g. `/mnt/games`, `~/Games`).
+4. Back in the library, select a game to open its detail page.
+5. Pick the `.exe`, set a Proton version, and optionally list dependencies (e.g. `vcrun2022,d3dx9`).
+6. Tap **Save** to write the config, then **Setup** to:
+   - Add the game to Steam as a non-Steam shortcut
+   - Initialize the Proton prefix
+   - Install any listed dependencies via winetricks/protontricks
+7. Tap **Apply Art** to fetch and set cover art from SteamGridDB (requires a free API key in Settings).
+8. Restart Steam when prompted — the game will appear in your library.
 
 ## Development
 

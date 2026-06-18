@@ -4,7 +4,7 @@ import { Navigation, Focusable } from "@decky/ui";
 import { Source } from "../types";
 import { CompactTextField } from "../components/CompactTextField";
 
-const GUIDES_BASE = "https://github.com/avivkilloz/deckyfin/blob/feature/multi-source/guides";
+const GUIDES_BASE = "https://github.com/avivkilloz/deckyfin/blob/main/guides";
 const SOURCE_GUIDE_URLS: Record<string, string> = {
   local: `${GUIDES_BASE}/source-local.md`,
   mount: `${GUIDES_BASE}/source-mount.md`,
