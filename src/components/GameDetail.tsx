@@ -479,6 +479,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
   const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
   const [configFeedback, setConfigFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
   const [sgdbFeedback, setSgdbFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [steamArtFeedback, setSteamArtFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
   const [restarting, setRestarting] = useState(false);
 
   // ── Green button state ────────────────────────────────────────────────────
@@ -1051,17 +1052,17 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
   const handleApplySgdbArt = async () => {
     if (sgdbGameId == null) return;
     setLoading("art");
-    setSgdbFeedback(null);
+    setSteamArtFeedback(null);
     try {
       const artName = selectedSgdbGame?.id === sgdbGameId ? selectedSgdbGame.name : name;
       const { applied, errors } = await applyArtById(sgdbGameId, steamInfo!.unsigned_appid, artName);
       if (applied.length > 0) {
-        setSgdbFeedback({ ok: true, msg: `Applied ${applied.join(", ")} art` });
+        setSteamArtFeedback({ ok: true, msg: `Applied ${applied.join(", ")} art` });
       } else {
-        setSgdbFeedback({ ok: false, msg: errors.join("; ") || "No art found" });
+        setSteamArtFeedback({ ok: false, msg: errors.join("; ") || "No art found" });
       }
     } catch (err: any) {
-      setSgdbFeedback({ ok: false, msg: err?.message || "Error" });
+      setSteamArtFeedback({ ok: false, msg: err?.message || "Error" });
     }
     setLoading(null);
   };
@@ -1094,15 +1095,15 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
   const handleApplySteamArtType = async () => {
     if (steamArtOptions.length === 0) return;
     setLoading("steam-art-type");
-    setSgdbFeedback(null);
+    setSteamArtFeedback(null);
     try {
       const url = steamArtOptions[steamArtOptionIdx];
       const ok = await applyArtByType(steamInfo!.unsigned_appid, url, STEAM_ART_ASSET_TYPE[steamArtTab]);
-      setSgdbFeedback(ok
+      setSteamArtFeedback(ok
         ? { ok: true, msg: `Applied ${steamArtTab} art to Steam` }
         : { ok: false, msg: `Failed to apply ${steamArtTab} art` });
     } catch (err: any) {
-      setSgdbFeedback({ ok: false, msg: err?.message || "Error" });
+      setSteamArtFeedback({ ok: false, msg: err?.message || "Error" });
     }
     setLoading(null);
   };
@@ -1883,14 +1884,14 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
               </p>
             </div>
             <div style={{ padding: "2px 0", maxHeight: "200px", overflowY: "auto" }}>
-              <Focusable onActivate={() => { setProtonVersion(""); setShowProtonVersion(false); }} onClick={() => { setProtonVersion(""); setShowProtonVersion(false); }} focusClassName="is-focused"
+              <Focusable onActivate={() => setProtonVersion("")} onClick={() => setProtonVersion("")} focusClassName="is-focused"
                 style={{ margin: "0 2px", padding: "4px 10px", cursor: "pointer", fontSize: "0.85em", borderBottom: "1px solid #2a2a2a", color: !protonVersion ? "#0078d4" : "#ccc" }}
                 onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.06)")}
                 onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
                 — None —
               </Focusable>
               {protonVersions.map((v) => (
-                <Focusable key={v} onActivate={() => { setProtonVersion(v); setShowProtonVersion(false); }} onClick={() => { setProtonVersion(v); setShowProtonVersion(false); }} focusClassName="is-focused"
+                <Focusable key={v} onActivate={() => setProtonVersion(v)} onClick={() => setProtonVersion(v)} focusClassName="is-focused"
                   style={{ margin: "0 2px", padding: "4px 10px", cursor: "pointer", fontSize: "0.85em", borderBottom: "1px solid #2a2a2a", color: protonVersion === v ? "#0078d4" : "#ccc" }}
                   onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.06)")}
                   onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
@@ -2342,6 +2343,11 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
                         opacity: loading === "art" ? 0.4 : 1 }}>
                       {loading === "art" ? "Applying…" : "Auto Apply All Steam Art"}
                     </Focusable>
+                    {steamArtFeedback && (
+                      <div style={{ fontSize: "0.82em", marginTop: "6px", color: steamArtFeedback.ok ? "#2ecc71" : "tomato", wordBreak: "break-word", overflowWrap: "break-word" }}>
+                        {steamArtFeedback.msg}
+                      </div>
+                    )}
                   </>
                 )}
               </div>
@@ -2401,13 +2407,13 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
                     opacity: loading === "deckyfin-art" || artOptions.length === 0 ? 0.4 : 1 }}>
                   {loading === "deckyfin-art" ? "Applying…" : "Auto Apply Deckyfin Art"}
                 </Focusable>
+                {sgdbFeedback && (
+                  <div style={{ fontSize: "0.82em", marginTop: "6px", color: sgdbFeedback.ok ? "#2ecc71" : "tomato", wordBreak: "break-word", overflowWrap: "break-word" }}>
+                    {sgdbFeedback.msg}
+                  </div>
+                )}
                 </>}
               </div>}
-              {sgdbFeedback && (
-                <div style={{ fontSize: "0.82em", marginTop: "6px", color: sgdbFeedback.ok ? "#2ecc71" : "tomato", wordBreak: "break-word", overflowWrap: "break-word" }}>
-                  {sgdbFeedback.msg}
-                </div>
-              )}
             </div>
           )}
         </div>
