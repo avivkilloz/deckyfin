@@ -23,3 +23,5 @@ tests/fixtures/generated/
 
 # Brainstorming companion
 .superpowers/
+.hermes/
+.claude/
