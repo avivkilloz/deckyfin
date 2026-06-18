@@ -33,6 +33,7 @@ from deckyfin_config import (
     get_saves_folder,
     get_games_config,
     save_games_config,
+    slugify,
     GameConfigError,
 )
 from steam_games import add_nonsteam_game, list_nonsteam_games, remove_nonsteam_game, get_steam_shortcut_info, update_nonsteam_game, purge_nonsteam_game_data, list_steam_collections, create_steam_collection, delete_steam_collection
@@ -161,7 +162,7 @@ sys.path.insert(0, sys.argv[1])
 from pathlib import Path
 from deckyfin_config import (
     get_games_config, detect_game_folders,
-    get_app_folder, get_saves_folder, save_games_config,
+    get_app_folder, get_saves_folder, save_games_config, slugify,
 )
 
 games_path = Path(sys.argv[2])
@@ -173,36 +174,50 @@ if mode == "init":
     get_saves_folder(games_path).mkdir(parents=True, exist_ok=True)
 
 existing_config = get_games_config(games_path)
-existing_games = {g["name"]: g for g in existing_config.get("games", [])}
+raw_games = existing_config.get("games", [])
+
+# Build lookup indexes: by id (preferred) and by path (migration fallback)
+existing_by_id = {}
+existing_by_path = {}
+for g in raw_games:
+    if g.get("id"):
+        existing_by_id[g["id"]] = g
+    if g.get("path"):
+        existing_by_path[g["path"]] = g
 
 if mode == "init":
-    # Current folders on disk (name → folder_name)
-    current_folders = {fi["name"]: fi["path"] for fi in detect_game_folders(games_path)}
+    current_folders = {fi["path"]: fi for fi in detect_game_folders(games_path)}
 
-    # Update path field for existing entries whose path was stored as a slug
-    for name, game in existing_games.items():
-        if name in current_folders and game.get("path") != current_folders[name]:
-            game["path"] = current_folders[name]
-
-    # Remove entries for folders that no longer exist
-    existing_games = {n: g for n, g in existing_games.items() if n in current_folders}
-
-    # Add blank entries for new folders
+    matched_games = {}
     new_games = []
-    for name, folder_path in current_folders.items():
-        if name not in existing_games:
-            existing_games[name] = {
-                "name": name, "path": folder_path, "executable": "",
-                "steam_app_id": None, "proton_version": "",
+    for folder_path, folder_info in current_folders.items():
+        game_id = slugify(folder_path)
+        existing = existing_by_id.get(game_id) or existing_by_path.get(folder_path)
+        if existing:
+            g = dict(existing)
+            g["id"] = game_id
+            g["path"] = folder_path
+            matched_games[game_id] = g
+        else:
+            matched_games[game_id] = {
+                "id": game_id, "name": folder_info["name"], "path": folder_path,
+                "executable": "", "steam_app_id": None, "proton_version": "",
                 "proton_dependencies": [], "proton_sync_paths": [],
                 "categories": [], "launch_options": "",
             }
-            new_games.append(name)
+            new_games.append(folder_info["name"])
 
-    save_games_config({"games": list(existing_games.values())}, games_path)
-    print(json.dumps({"success": True, "games_count": len(existing_games), "games_initialized": new_games}))
+    save_games_config({"games": list(matched_games.values())}, games_path)
+    print(json.dumps({"success": True, "games_count": len(matched_games), "games_initialized": new_games}))
 else:
-    print(json.dumps(list(existing_games.values())))
+    # load mode: migrate id on the fly without writing (read-only)
+    result = []
+    for g in raw_games:
+        if not g.get("id"):
+            g = dict(g)
+            g["id"] = slugify(g.get("path") or g.get("name", ""))
+        result.append(g)
+    print(json.dumps(result))
 """
 
 
@@ -771,20 +786,30 @@ class Plugin:
                 get_app_folder(games_path).mkdir(parents=True, exist_ok=True)
                 get_saves_folder(games_path).mkdir(parents=True, exist_ok=True)
                 existing_config = get_games_config(games_path)
-                existing_games = {g["name"]: g for g in existing_config.get("games", [])}
-                current_folders = {fi["name"]: fi["path"] for fi in detect_game_folders(games_path)}
-                # Fix slug paths from older entries
-                for name, game in existing_games.items():
-                    if name in current_folders and game.get("path") != current_folders[name]:
-                        game["path"] = current_folders[name]
-                # Remove entries for folders that no longer exist
-                existing_games = {n: g for n, g in existing_games.items() if n in current_folders}
-                # Add blank entries for new folders
+                raw_games = existing_config.get("games", [])
+                # Build lookup indexes: by id (preferred) and by path (migration fallback)
+                existing_by_id: dict = {}
+                existing_by_path: dict = {}
+                for g in raw_games:
+                    if g.get("id"):
+                        existing_by_id[g["id"]] = g
+                    if g.get("path"):
+                        existing_by_path[g["path"]] = g
+                current_folders = {fi["path"]: fi for fi in detect_game_folders(games_path)}
+                matched_games: dict = {}
                 new_games = []
-                for name, folder_path in current_folders.items():
-                    if name not in existing_games:
-                        existing_games[name] = {
-                            "name": name,
+                for folder_path, folder_info in current_folders.items():
+                    game_id = slugify(folder_path)
+                    existing = existing_by_id.get(game_id) or existing_by_path.get(folder_path)
+                    if existing:
+                        g = dict(existing)
+                        g["id"] = game_id
+                        g["path"] = folder_path
+                        matched_games[game_id] = g
+                    else:
+                        matched_games[game_id] = {
+                            "id": game_id,
+                            "name": folder_info["name"],
                             "path": folder_path,
                             "executable": "",
                             "steam_app_id": None,
@@ -794,12 +819,12 @@ class Plugin:
                             "categories": [],
                             "launch_options": "",
                         }
-                        new_games.append(name)
-                save_games_config({"games": list(existing_games.values())}, games_path)
+                        new_games.append(folder_info["name"])
+                save_games_config({"games": list(matched_games.values())}, games_path)
                 return {
                     "success": True,
                     "message": "Source initialized successfully",
-                    "games_count": len(existing_games),
+                    "games_count": len(matched_games),
                     "games_initialized": new_games,
                 }
             except PermissionError:
@@ -985,7 +1010,7 @@ class Plugin:
     # ── Games ─────────────────────────────────────────────────────────────
 
     async def get_games(self) -> list:
-        """Return all games from all sources, merged by name."""
+        """Return all games from all sources, merged by id."""
         sources = _list_sources()
         merged: dict[str, dict] = {}
         current_uid = os.getuid()
@@ -1006,16 +1031,21 @@ class Plugin:
                 _debug(f"get_games: failed to load source {source['id']}: {e}")
                 continue
             for game in games:
-                name = game.get("name", "")
-                if not name:
+                # Derive stable id (migrate on-the-fly for entries written before v0.2)
+                game_id = game.get("id")
+                if not game_id:
+                    game_id = slugify(game.get("path") or game.get("name", ""))
+                    game = {**game, "id": game_id}
+                if not game_id:
                     continue
+                name = game.get("name", game_id)
                 # Overlay ephemeral state from central store (state takes precedence over config)
                 state = get_game_state(source["id"], name)
                 if state:
                     game = {**game, **state}
-                if name not in merged:
-                    merged[name] = {"name": name, "sources": []}
-                merged[name]["sources"].append({
+                if game_id not in merged:
+                    merged[game_id] = {"id": game_id, "name": name, "sources": []}
+                merged[game_id]["sources"].append({
                     "source_id": source["id"],
                     "source_name": source["name"],
                     "source_type": source["type"],
@@ -1579,17 +1609,16 @@ class Plugin:
         return {"success": True}
 
     async def get_art_eligible_games(self) -> list:
-        """Return all games that have a SteamGridDB ID configured, deduplicated by name.
+        """Return all games that have a SteamGridDB ID configured, deduplicated by id.
 
-        Each entry: {name, sgdb_id, unsigned_appid}.
+        Each entry: {id, name, sgdb_id, unsigned_appid}.
         unsigned_appid is None for games not yet added to Steam.
         """
-        import re as _re
         try:
             uid = get_user_id()
         except Exception:
             uid = None
-        seen_names: set = set()
+        seen_ids: set = set()
         eligible = []
         for source in _list_sources():
             try:
@@ -1600,23 +1629,25 @@ class Plugin:
                 sgdb_id = cfg.get("steamgriddb_game_id")
                 if not sgdb_id:
                     continue
-                name = cfg.get("name", "")
-                if name in seen_names:
+                game_id = cfg.get("id") or slugify(cfg.get("path") or cfg.get("name", ""))
+                if game_id in seen_ids:
                     continue
-                seen_names.add(name)
+                seen_ids.add(game_id)
+                name = cfg.get("name", game_id)
                 steam_info = None
                 try:
                     steam_info = get_steam_shortcut_info(name, uid) if uid else None
                 except Exception:
                     pass
                 eligible.append({
+                    "id": game_id,
                     "name": name,
                     "sgdb_id": int(sgdb_id),
                     "unsigned_appid": (steam_info or {}).get("unsigned_appid"),
                 })
         return eligible
 
-    async def apply_deckyfin_card_art(self, game_name: str, sgdb_id: int) -> dict:
+    async def apply_deckyfin_card_art(self, game_name: str, sgdb_id: int, game_id: Optional[str] = None) -> dict:
         """Download and save the wide art for a game to the Deckyfin card art cache.
 
         This updates the plugin thumbnail shown in the GameCard list.
@@ -1630,8 +1661,8 @@ class Plugin:
             wide_url = (wide_data.get("urls") or [None])[0]
             if not wide_url:
                 return {"success": False, "error": "No wide art found on SteamGridDB"}
-            safe_name = _re.sub(r'[^\w\-. ]', '_', game_name).strip()
-            dest = art_dir / f"art_{safe_name}.png"
+            file_key = game_id if game_id else _re.sub(r'[^\w\-. ]', '_', game_name).strip()
+            dest = art_dir / f"art_{file_key}.png"
             if _download_file(wide_url, dest):
                 return {"success": True}
             return {"success": False, "error": "Download failed"}
@@ -2222,15 +2253,15 @@ class Plugin:
         except Exception as e:
             return {"urls": [], "has_more": False, "error": str(e)}
 
-    async def apply_deckyfin_art(self, game_name: str, art_url: str) -> dict:
+    async def apply_deckyfin_art(self, game_name: str, art_url: str, game_id: Optional[str] = None) -> dict:
         """Download the chosen art URL and save it as Deckyfin Art for the game."""
         import re, os
         try:
             art_dir = Path(os.environ.get("DECKY_PLUGIN_RUNTIME_DIR", os.path.expanduser("~/.local/share/deckyfin")))
             art_dir.mkdir(parents=True, exist_ok=True)
 
-            safe_name = re.sub(r'[^\w\-. ]', '_', game_name).strip()
-            dest = art_dir / f"art_{safe_name}.png"
+            file_key = game_id if game_id else re.sub(r'[^\w\-. ]', '_', game_name).strip()
+            dest = art_dir / f"art_{file_key}.png"
 
             if not _download_file(art_url, dest):
                 return {"success": False, "error": "Failed to download art"}
@@ -2239,7 +2270,7 @@ class Plugin:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
-    async def get_game_card_art(self, game_name: str) -> dict:
+    async def get_game_card_art(self, game_name: str, game_id: Optional[str] = None) -> dict:
         """Get art for a game as a base64 data URI (for the library card).
 
         Checks the plugin's own art folder first (written by apply_deckyfin_art),
@@ -2250,9 +2281,14 @@ class Plugin:
             # 1. Plugin-managed art (Deckyfin Art) — stored in runtime data dir
             import os
             art_dir = Path(os.environ.get("DECKY_PLUGIN_RUNTIME_DIR", os.path.expanduser("~/.local/share/deckyfin")))
+            # Check id-based filename first (new), then name-based (migration fallback)
+            candidates_deckyfin = []
+            if game_id:
+                candidates_deckyfin.append(art_dir / f"art_{game_id}.png")
             safe_name = re.sub(r'[^\w\-. ]', '_', game_name).strip()
-            plugin_art = art_dir / f"art_{safe_name}.png"
-            if plugin_art.exists():
+            candidates_deckyfin.append(art_dir / f"art_{safe_name}.png")
+            plugin_art = next((p for p in candidates_deckyfin if p.exists()), None)
+            if plugin_art is not None:
                 raw = plugin_art.read_bytes()
                 b64 = base64.b64encode(raw).decode("ascii")
                 return {"data_uri": f"data:image/png;base64,{b64}"}

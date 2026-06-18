@@ -1,6 +1,7 @@
 /** TypeScript types matching the Python backend models. */
 
 export interface GameConfig {
+  id?: string;
   name: string;
   path?: string;
   executable: string;
@@ -117,6 +118,7 @@ export interface GameSource {
 }
 
 export interface MergedGame {
+  id: string;
   name: string;
   sources: GameSource[];
 }

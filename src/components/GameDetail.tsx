@@ -72,7 +72,7 @@ const searchSteamApp = callable<
   [game_name: string],
   { success: boolean; results: Array<{ id: number; name: string }>; error?: string }
 >("search_steam_app");
-const getGameCardArt = callable<[game_name: string], { data_uri: string | null }>("get_game_card_art");
+const getGameCardArt = callable<[game_name: string, game_id?: string], { data_uri: string | null }>("get_game_card_art");
 const setGameProcessingState = callable<
   [name: string, state: Record<string, any> | null, source_id: string],
   { success: boolean }
@@ -146,7 +146,7 @@ const fetchDeckyfinArtOptions = callable<
   { game_id: number | null; urls: string[]; has_more: boolean; error?: string }
 >("fetch_deckyfin_art_options");
 const applyDeckyfinArt = callable<
-  [game_name: string, art_url: string],
+  [game_name: string, art_url: string, game_id?: string],
   { success: boolean; error?: string }
 >("apply_deckyfin_art");
 const fetchSteamArtOptions = callable<
@@ -606,12 +606,12 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
   const [headerArtUri, setHeaderArtUri] = useState<string | null>(null);
   useEffect(() => {
     if (!artEnabled) { setHeaderArtUri(null); return; }
-    const cached = getCachedArt(game.name);
+    const cached = getCachedArt(game.id);
     if (cached !== undefined) { setHeaderArtUri(cached); return; }
-    getGameCardArt(game.name)
-      .then((r) => { const uri = r.data_uri || null; setCachedArt(game.name, uri); setHeaderArtUri(uri); })
+    getGameCardArt(game.name, game.id)
+      .then((r) => { const uri = r.data_uri || null; setCachedArt(game.id, uri); setHeaderArtUri(uri); })
       .catch(() => setHeaderArtUri(null));
-  }, [game.name, artEnabled]);
+  }, [game.id, game.name, artEnabled]);
 
   // ── Load capabilities when source changes ─────────────────────────────────
   useEffect(() => {
@@ -1131,11 +1131,11 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
     setLoading("deckyfin-art");
     setSgdbFeedback(null);
     try {
-      const res = await applyDeckyfinArt(game.name, url);
+      const res = await applyDeckyfinArt(game.name, url, game.id);
       if (res.success) {
         setSgdbFeedback({ ok: true, msg: "Art applied — showing in plugin now" });
-        invalidateArtCache(game.name);
-        getGameCardArt(game.name).then((r) => { const uri = r.data_uri || null; setCachedArt(game.name, uri); setHeaderArtUri(uri); }).catch(() => {});
+        invalidateArtCache(game.id);
+        getGameCardArt(game.name, game.id).then((r) => { const uri = r.data_uri || null; setCachedArt(game.id, uri); setHeaderArtUri(uri); }).catch(() => {});
       } else {
         setSgdbFeedback({ ok: false, msg: res.error || "No art found" });
       }
@@ -1634,6 +1634,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
           <div style={{ borderTop: "1px solid #2a2a2a" }}>
             <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", fontSize: "0.78em" }}>
               {([
+                ["ID", currentConfig.id || "—"],
                 ["Name", name],
                 ["Executable", executable],
                 ["Start Dir", startDir || "—"],

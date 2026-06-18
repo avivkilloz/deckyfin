@@ -36,8 +36,8 @@ const listSaveSyncStatuses = callable<[], Record<string, { sync_id: string; game
 const clearSaveSyncStatus = callable<[sync_id: string], { success: boolean }>("clear_save_sync_status");
 const backupAllSaves = callable<[source_id: string], { success: boolean; started?: string[]; skipped?: string[]; failed?: string[]; error?: string }>("backup_all_saves");
 const batchAddToSteam = callable<[source_id: string], { success: boolean; job_id?: string; error?: string }>("batch_add_to_steam");
-const getArtEligibleGames = callable<[], { name: string; sgdb_id: number; unsigned_appid: number | null }[]>("get_art_eligible_games");
-const applyDeckyfinCardArt = callable<[game_name: string, sgdb_id: number], { success: boolean; error?: string }>("apply_deckyfin_card_art");
+const getArtEligibleGames = callable<[], { id: string; name: string; sgdb_id: number; unsigned_appid: number | null }[]>("get_art_eligible_games");
+const applyDeckyfinCardArt = callable<[game_name: string, sgdb_id: number, game_id?: string], { success: boolean; error?: string }>("apply_deckyfin_card_art");
 const listBatchAddStatuses = callable<[], Record<string, { job_id: string; source_name: string; status: string; current_game: string; total: number; processed: number; added: string[]; updated: string[]; skipped: string[]; failed: { name: string; reason: string }[]; needs_restart: boolean; error: string | null }>>("list_batch_add_statuses");
 const clearBatchAddStatus = callable<[job_id: string], { success: boolean }>("clear_batch_add_status");
 
@@ -262,7 +262,7 @@ export const GameLibrary: VFC = () => {
         }
 
         try {
-          const res = await applyDeckyfinCardArt(g.name, g.sgdb_id);
+          const res = await applyDeckyfinCardArt(g.name, g.sgdb_id, g.id);
           if (res.success) anyOk = true;
           else if (res.error) errors.push(res.error);
         } catch (err: any) {
@@ -1387,7 +1387,7 @@ export const GameLibrary: VFC = () => {
         >
           {filteredGames.map((game) => (
             <GameCard
-              key={game.name}
+              key={game.id}
               game={game.sources[0]?.config ?? { name: game.name, executable: "" }}
               isInSteam={steamNames.has(game.name)}
               sourceCount={game.sources.length}
@@ -1400,7 +1400,7 @@ export const GameLibrary: VFC = () => {
         <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
           {filteredGames.map((game) => (
             <Focusable
-              key={game.name}
+              key={game.id}
               onActivate={() => openGame(game)}
               onClick={() => openGame(game)}
               focusClassName="is-focused"

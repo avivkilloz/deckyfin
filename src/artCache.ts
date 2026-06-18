@@ -15,14 +15,14 @@
 
 const artCache = new Map<string, string | null>();
 
-export function getCachedArt(gameName: string): string | null | undefined {
-  return artCache.get(gameName);
+export function getCachedArt(gameId: string): string | null | undefined {
+  return artCache.get(gameId);
 }
-export function setCachedArt(gameName: string, uri: string | null): void {
-  artCache.set(gameName, uri);
+export function setCachedArt(gameId: string, uri: string | null): void {
+  artCache.set(gameId, uri);
 }
-export function invalidateArtCache(gameName: string): void {
-  artCache.delete(gameName);
+export function invalidateArtCache(gameId: string): void {
+  artCache.delete(gameId);
 }
 
 // ── Steam shortcut info ───────────────────────────────────────────────────────

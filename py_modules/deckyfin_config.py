@@ -6,6 +6,7 @@ No Steam dependency - pure file I/O.
 
 import json
 import logging
+import re
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 
@@ -20,6 +21,15 @@ from deckyfin_consts import (
 )
 
 logger = logging.getLogger(LOGGER_CONFIG)
+
+
+def slugify(text: str) -> str:
+    """Convert a string to a stable, filesystem-safe slug used as the game identity."""
+    text = text.lower().strip()
+    text = re.sub(r"[^\w\s-]", "", text)
+    text = re.sub(r"[\s_]+", "-", text)
+    text = re.sub(r"-+", "-", text)
+    return text.strip("-")
 
 
 # ── App-Level Config (~/.config/deckyfin/config.json) ──────────────────────
@@ -204,36 +214,51 @@ def initialize_app_structure(games_folder: Optional[str] = None) -> Dict[str, An
 
         config_file = get_games_config_file(games_path)
         existing_config = get_games_config(games_path)
-        existing_games = {
-            game.get("name"): game for game in existing_config.get("games", [])
-        }
+        raw_games = existing_config.get("games", [])
+
+        # Build lookup indexes: by id (preferred) and by path (migration fallback)
+        existing_by_id: Dict[str, Any] = {}
+        existing_by_path: Dict[str, Any] = {}
+        for g in raw_games:
+            if g.get("id"):
+                existing_by_id[g["id"]] = g
+            if g.get("path"):
+                existing_by_path[g["path"]] = g
 
         detected_folders = detect_game_folders(games_path)
         games_initialized = []
+        matched_games: Dict[str, Any] = {}
 
         for folder_info in detected_folders:
             folder_name = folder_info["name"]
             folder_path = folder_info["path"]
+            game_id = slugify(folder_path)
 
-            if folder_name in existing_games:
-                continue
+            existing = existing_by_id.get(game_id) or existing_by_path.get(folder_path)
+            if existing:
+                g = dict(existing)
+                g["id"] = game_id
+                g["path"] = folder_path
+                matched_games[game_id] = g
+            else:
+                matched_games[game_id] = {
+                    "id": game_id,
+                    "name": folder_name,
+                    "path": folder_path,
+                    "executable": "",
+                    "steam_app_id": None,
+                    "proton_version": "",
+                    "proton_dependencies": [],
+                    "proton_sync_paths": [],
+                    "categories": [],
+                    "launch_options": "",
+                    "selected_launchers": [],
+                }
+                games_initialized.append(folder_name)
 
-            game_config = {
-                "name": folder_name,
-                "path": folder_path,
-                "executable": "",
-                "steam_app_id": None,
-                "proton_version": "",
-                "proton_dependencies": [],
-                "proton_sync_paths": [],
-                "categories": [],
-                "launch_options": "",
-                "selected_launchers": [],
-            }
-            existing_games[folder_name] = game_config
-            games_initialized.append(folder_name)
+        existing_games = matched_games
 
-        updated_config = {"games": list(existing_games.values())}
+        updated_config = {"games": list(existing_games.values())}  # type: ignore[attr-defined]
         save_games_config(updated_config, games_path)
 
         return {
