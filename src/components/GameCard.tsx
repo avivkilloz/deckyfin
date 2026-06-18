@@ -2,6 +2,7 @@ import { VFC, useState, useEffect } from "react";
 import { callable } from "@decky/api";
 import { Focusable } from "@decky/ui";
 import { GameConfig } from "../types";
+import { getCachedArt, setCachedArt } from "../artCache";
 
 const getGameCardArt = callable<
   [game_name: string],
@@ -21,9 +22,11 @@ export const GameCard: VFC<Props> = ({ game, isInSteam, sourceCount, onClick, ar
 
   useEffect(() => {
     if (!artEnabled) { setArtUri(null); return; }
+    const cached = getCachedArt(game.name);
+    if (cached !== undefined) { setArtUri(cached); return; }
     getGameCardArt(game.name)
-      .then((res) => setArtUri(res.data_uri || null))
-      .catch(() => setArtUri(null));
+      .then((res) => { const uri = res.data_uri || null; setCachedArt(game.name, uri); setArtUri(uri); })
+      .catch(() => { setCachedArt(game.name, null); setArtUri(null); });
   }, [game.name, artEnabled]);
 
   return (

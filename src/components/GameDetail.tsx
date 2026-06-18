@@ -4,6 +4,12 @@ import { Navigation, Focusable } from "@decky/ui";
 import { GameConfig, MergedGame, GameSource, SourceCapabilities, AssetType } from "../types";
 import { useArtwork } from "../hooks/useArtwork";
 import { CompactTextField } from "../components/CompactTextField";
+import {
+  getCachedArt, setCachedArt, invalidateArtCache,
+  getCachedSteamInfo, setCachedSteamInfo, invalidateSteamInfoCache,
+  getCachedCapabilities, setCachedCapabilities,
+  getCachedGameSize, setCachedGameSize,
+} from "../artCache";
 
 const removeGame = callable<[name: string, source_id: string], { success: boolean }>(
   "remove_game"
@@ -599,16 +605,20 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
   const [headerArtUri, setHeaderArtUri] = useState<string | null>(null);
   useEffect(() => {
     if (!artEnabled) { setHeaderArtUri(null); return; }
+    const cached = getCachedArt(game.name);
+    if (cached !== undefined) { setHeaderArtUri(cached); return; }
     getGameCardArt(game.name)
-      .then((r) => setHeaderArtUri(r.data_uri || null))
+      .then((r) => { const uri = r.data_uri || null; setCachedArt(game.name, uri); setHeaderArtUri(uri); })
       .catch(() => setHeaderArtUri(null));
   }, [game.name, artEnabled]);
 
   // ── Load capabilities when source changes ─────────────────────────────────
   useEffect(() => {
     if (!selectedSource) return;
+    const cached = getCachedCapabilities(selectedSource.source_id);
+    if (cached !== undefined) { setCapabilities(cached); return; }
     getSourceCapabilities(selectedSource.source_id)
-      .then(setCapabilities)
+      .then((caps) => { setCachedCapabilities(selectedSource.source_id, caps); setCapabilities(caps); })
       .catch(() => setCapabilities({ can_play: true, can_write_config: true, can_download_to: true }));
   }, [selectedSource?.source_id]);
 
@@ -663,12 +673,18 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
   }, []);
 
   useEffect(() => {
-    // Mark all sources as loading (null), then fetch sizes one by one
-    setSourceSizes(Object.fromEntries(game.sources.map((s) => [s.source_id, null])));
+    // Populate from cache immediately, then fetch only what's missing
+    const initial = Object.fromEntries(game.sources.map((s) => {
+      const cached = getCachedGameSize(`${game.name}:${s.source_id}`);
+      return [s.source_id, cached !== undefined ? cached : null];
+    }));
+    setSourceSizes(initial);
     game.sources.forEach((src) => {
+      if (getCachedGameSize(`${game.name}:${src.source_id}`) !== undefined) return;
       getGameSize(game.name, src.source_id)
         .then((res) => {
           if (res.success) {
+            setCachedGameSize(`${game.name}:${src.source_id}`, res.size);
             setSourceSizes((prev) => ({ ...prev, [src.source_id]: res.size }));
           }
         })
@@ -712,10 +728,16 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
   }, [transferId]);
 
   useEffect(() => {
+    const cached = getCachedSteamInfo(game.name);
+    if (cached !== undefined) { if (cached) setSteamInfo(cached); return; }
     getSteamShortcut(game.name)
       .then((res) => {
         if (res.success && res.app_id && res.unsigned_appid) {
-          setSteamInfo({ app_id: res.app_id, unsigned_appid: res.unsigned_appid });
+          const info = { app_id: res.app_id, unsigned_appid: res.unsigned_appid };
+          setCachedSteamInfo(game.name, info);
+          setSteamInfo(info);
+        } else {
+          setCachedSteamInfo(game.name, null);
         }
       })
       .catch(() => {});
@@ -1111,7 +1133,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
       const res = await applyDeckyfinArt(game.name, url);
       if (res.success) {
         setSgdbFeedback({ ok: true, msg: "Art applied — showing in plugin now" });
-        getGameCardArt(game.name).then((r) => setHeaderArtUri(r.data_uri || null)).catch(() => {});
+        invalidateArtCache(game.name);
+        getGameCardArt(game.name).then((r) => { const uri = r.data_uri || null; setCachedArt(game.name, uri); setHeaderArtUri(uri); }).catch(() => {});
       } else {
         setSgdbFeedback({ ok: false, msg: res.error || "No art found" });
       }
@@ -1193,7 +1216,9 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
         selectedSource.source_id
       );
       if (res.success && res.app_id && res.unsigned_appid) {
-        setSteamInfo({ app_id: res.app_id, unsigned_appid: res.unsigned_appid });
+        const info = { app_id: res.app_id, unsigned_appid: res.unsigned_appid };
+        setCachedSteamInfo(game.name, info);
+        setSteamInfo(info);
         setNeedsRestartAfterAdd(true);
         setNeedsRestart(true);
         setLastSyncedSnapshot({ name, executable, start_dir: startDir || null, launch_options: finalLaunchOptions || null, proton_version: protonVersion || null, collections: mergedCollections });
@@ -1226,7 +1251,9 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
         selectedSource.source_id
       );
       if (res.success && res.app_id && res.unsigned_appid) {
-        setSteamInfo({ app_id: res.app_id, unsigned_appid: res.unsigned_appid });
+        const info = { app_id: res.app_id, unsigned_appid: res.unsigned_appid };
+        setCachedSteamInfo(game.name, info);
+        setSteamInfo(info);
         setNeedsRestart(true);
         setLastSyncedSnapshot({ name, executable, start_dir: startDir || null, launch_options: finalLaunchOptions || null, proton_version: protonVersion || null, collections: mergedCollections });
         updateGameConfig(storedName, { steam_snapshot: JSON.stringify({ name, executable, start_dir: startDir || null, launch_options: finalLaunchOptions || null, proton_version: protonVersion || null, collections: mergedCollections }), needs_restart: true }, selectedSource.source_id).catch(() => {});
@@ -1250,6 +1277,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
     try {
       const res = await removeSteamShortcut(name);
       if (res.success) {
+        setCachedSteamInfo(game.name, null);
         setSteamInfo(null);
         setFeedback({ ok: true, msg: "Removed from Steam — restart Steam to apply" });
         onNeedsRestart?.();
@@ -1268,6 +1296,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
     try {
       const res = await purgeSteamGameData(name);
       if (res.success) {
+        setCachedSteamInfo(game.name, null);
         setSteamInfo(null);
         setFeedback({ ok: true, msg: "All Steam data purged — restart Steam to apply" });
         onNeedsRestart?.();
