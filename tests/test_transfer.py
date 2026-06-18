@@ -146,8 +146,11 @@ def test_copy_game_folder_uses_subprocess_when_root_with_fuse_owner():
         dst = Path(dst_tmp) / "Game"
         calls = []
 
-        # Patch os.getuid to return 0 (simulate running as root)
-        with unittest.mock.patch("deckyfin_transfer.os.getuid", return_value=0):
+        # Patch os.getuid to return 0 (simulate running as root).
+        # Also patch _drop_privs with a no-op lambda so the preexec_fn in the
+        # forked subprocess doesn't attempt a real setuid (which would fail in CI).
+        with unittest.mock.patch("deckyfin_transfer.os.getuid", return_value=0), \
+             unittest.mock.patch("deckyfin_transfer._drop_privs", new=lambda uid, gid: None):
             copy_game_folder(src, dst, lambda b: calls.append(b), owner_uid=1000, owner_gid=1000)
 
         # Files should still be copied (subprocess ran as current user, can access tmp)

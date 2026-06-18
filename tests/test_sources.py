@@ -39,10 +39,10 @@ def test_add_source_local(tmp_path, monkeypatch):
     importlib.reload(deckyfin_config)
     importlib.reload(deckyfin_sources)
     from deckyfin_sources import add_source, list_sources
-    source = add_source("My Games", "local", "/home/deck/Games", None)
+    source = add_source("My Games", "local", str(tmp_path), None)
     assert source["name"] == "My Games"
     assert source["type"] == "local"
-    assert source["path"] == "/home/deck/Games"
+    assert source["path"] == str(tmp_path)
     assert source["url"] is None
     assert len(source["id"]) > 0
     assert len(list_sources()) == 1
@@ -70,7 +70,7 @@ def test_remove_source(tmp_path, monkeypatch):
     importlib.reload(deckyfin_config)
     importlib.reload(deckyfin_sources)
     from deckyfin_sources import add_source, remove_source, list_sources
-    source = add_source("My Games", "local", "/home/deck/Games", None)
+    source = add_source("My Games", "local", str(tmp_path), None)
     assert remove_source(source["id"]) is True
     assert list_sources() == []
 
