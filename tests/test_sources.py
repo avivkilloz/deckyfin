@@ -215,3 +215,81 @@ def test_load_source_games_offline(tmp_path, monkeypatch):
     from deckyfin_sources import load_source_games
     source = {"id": "x", "type": "local", "path": "/nonexistent/xyz", "url": None}
     assert load_source_games(source) == []
+
+
+# ── validate_local_path / add_source validation ───────────────────────────────
+
+def _reload_sources(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    import importlib, deckyfin_config, deckyfin_sources
+    importlib.reload(deckyfin_config)
+    importlib.reload(deckyfin_sources)
+    return deckyfin_sources
+
+
+def test_validate_local_path_not_exist(tmp_path, monkeypatch):
+    """Raises ValueError when path does not exist."""
+    import pytest
+    mod = _reload_sources(tmp_path, monkeypatch)
+    with pytest.raises(ValueError, match="does not exist"):
+        mod._validate_local_path(str(tmp_path / "nonexistent"))
+
+
+def test_validate_local_path_not_a_dir(tmp_path, monkeypatch):
+    """Raises ValueError when path is a file, not a directory."""
+    import pytest
+    f = tmp_path / "file.txt"
+    f.write_text("x")
+    mod = _reload_sources(tmp_path, monkeypatch)
+    with pytest.raises(ValueError, match="not a directory"):
+        mod._validate_local_path(str(f))
+
+
+def test_validate_local_path_not_writable(tmp_path, monkeypatch):
+    """Raises ValueError when path exists but is not writable."""
+    import pytest, os, stat
+    d = tmp_path / "ro"
+    d.mkdir()
+    os.chmod(d, stat.S_IRUSR | stat.S_IXUSR)  # r-x, no write
+    mod = _reload_sources(tmp_path, monkeypatch)
+    try:
+        with pytest.raises(ValueError, match="not writable"):
+            mod._validate_local_path(str(d))
+    finally:
+        os.chmod(d, stat.S_IRWXU)  # restore so tmp_path cleanup works
+
+
+def test_validate_local_path_network_fs(tmp_path, monkeypatch):
+    """Raises ValueError when path is on a known network filesystem."""
+    import pytest
+    mod = _reload_sources(tmp_path, monkeypatch)
+    # Patch _fstype_for_path to simulate an SSHFS mount
+    monkeypatch.setattr(mod, "_fstype_for_path", lambda p: "fuse.sshfs")
+    with pytest.raises(ValueError, match="network filesystem"):
+        mod._validate_local_path(str(tmp_path))
+
+
+def test_validate_local_path_valid(tmp_path, monkeypatch):
+    """Does not raise for a writable local directory."""
+    mod = _reload_sources(tmp_path, monkeypatch)
+    monkeypatch.setattr(mod, "_fstype_for_path", lambda p: "ext4")
+    mod._validate_local_path(str(tmp_path))  # should not raise
+
+
+def test_add_source_rejects_network_path(tmp_path, monkeypatch):
+    """add_source raises when a local source path is on a network filesystem."""
+    import pytest
+    _make_app_config(tmp_path, {})
+    mod = _reload_sources(tmp_path, monkeypatch)
+    monkeypatch.setattr(mod, "_fstype_for_path", lambda p: "cifs")
+    with pytest.raises(ValueError, match="network filesystem"):
+        mod.add_source("NAS", "local", str(tmp_path), None)
+
+
+def test_add_source_mount_skips_validation(tmp_path, monkeypatch):
+    """add_source does not validate path for mount-type sources."""
+    _make_app_config(tmp_path, {})
+    mod = _reload_sources(tmp_path, monkeypatch)
+    # Even a non-existent path is fine for mount type
+    source = mod.add_source("NAS", "mount", "/home/deck/nonexistent-mount", None)
+    assert source["type"] == "mount"

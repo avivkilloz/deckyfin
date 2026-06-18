@@ -1221,7 +1221,6 @@ class Plugin:
             folder = get_games_folder()
             games_path = str(folder) if folder else None
         if not games_path:
-            _debug(f"scan_game_exes: no games_path (source_id={source_id!r})")
             return [{"error": "Games folder not configured"}]
         game_dir = Path(games_path) / subfolder
         # Fuzzy fallback for case-sensitive filesystems: stored path may be a slug
@@ -1235,23 +1234,8 @@ class Plugin:
                     game_dir = entry
                     _debug(f"scan_game_exes: slug-corrected {subfolder!r} → {entry.name!r}")
                     break
-        _debug(f"scan_game_exes: scanning game_dir={str(game_dir)!r} exists={game_dir.exists()} is_dir={game_dir.is_dir()}")
-        if game_dir.exists() and game_dir.is_dir():
-            try:
-                top_entries = sorted(p.name for p in game_dir.iterdir())[:20]
-                _debug(f"scan_game_exes: top-level entries={top_entries!r}")
-            except Exception as _e:
-                _debug(f"scan_game_exes: cannot list game_dir: {_e}")
-        else:
-            try:
-                source_root = Path(games_path)
-                root_entries = sorted(p.name for p in source_root.iterdir())[:20] if source_root.is_dir() else []
-                _debug(f"scan_game_exes: game_dir not found; source root entries={root_entries!r}")
-            except Exception as _e:
-                _debug(f"scan_game_exes: cannot list source root: {_e}")
         if os.getuid() == 0:
             owner_uid, owner_gid = _owner_creds_for(games_path)
-            _debug(f"scan_game_exes: running as root, owner_uid={owner_uid} owner_gid={owner_gid}")
             if owner_uid != 0:
                 proc = subprocess.run(
                     ["python3", "-c",
@@ -1264,14 +1248,9 @@ class Plugin:
                     capture_output=True, text=True, timeout=30,
                     preexec_fn=functools.partial(_drop_privs, owner_uid, owner_gid),
                 )
-                _debug(f"scan_game_exes: subprocess rc={proc.returncode} stderr={proc.stderr!r}")
                 if proc.returncode == 0:
-                    results = [l for l in proc.stdout.splitlines() if l.strip()]
-                    _debug(f"scan_game_exes: subprocess found {len(results)} exe(s)")
-                    return results
-        results = find_game_executables(game_dir)
-        _debug(f"scan_game_exes: find_game_executables returned {len(results)} exe(s): {results[:5]!r}")
-        return results
+                    return [l for l in proc.stdout.splitlines() if l.strip()]
+        return find_game_executables(game_dir)
 
     async def get_game_size(self, game_name: str, source_id: Optional[str] = None) -> dict:
         """Return total disk usage in bytes for a game folder on a given source."""

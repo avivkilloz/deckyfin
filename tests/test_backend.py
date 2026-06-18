@@ -229,7 +229,8 @@ class TestGameConfigIO:
 
         result = initialize_app_structure(str(self.games_folder))
         assert result["success"]
-        assert result["games_count"] == 2
+        # setUp already creates "the-witcher-3", so total is 3
+        assert result["games_count"] == 3
 
 
 # ── App Config File I/O Tests ─────────────────────────────────────────────
@@ -282,12 +283,111 @@ class TestProtonDetection:
     """Proton version name checks — no disk access needed."""
 
     def test_is_ge_proton_true(self):
-        from proton import is_ge_proton
+        from deckyfin_proton import is_ge_proton
         assert is_ge_proton("GE-Proton10-25")
         assert is_ge_proton("GE_Proton-42")
 
     def test_is_ge_proton_false(self):
-        from proton import is_ge_proton
+        from deckyfin_proton import is_ge_proton
         assert not is_ge_proton("Proton 9.0")
         assert not is_ge_proton("Proton Experimental")
         assert not is_ge_proton("")
+
+
+# ── Exe path resolution (batch_add_to_steam logic) ───────────────────────────
+
+def _resolve_exe(source_path: str, exe: str) -> str:
+    """Mirror of the path-resolution logic in batch_add_to_steam._run()."""
+    from pathlib import Path
+    if exe and not Path(exe).is_absolute() and source_path:
+        return str(Path(source_path) / exe)
+    return exe
+
+
+def _resolve_start_dir(source_path: str, start_dir) -> str | None:
+    from pathlib import Path
+    if start_dir and not Path(start_dir).is_absolute() and source_path:
+        return str(Path(source_path) / start_dir)
+    return start_dir
+
+
+def test_batch_exe_relative_gets_prefixed():
+    """Relative exe path is prefixed with the source root."""
+    result = _resolve_exe("/home/deck/Games", "Cyberpunk 2077/bin/x64/Cyberpunk2077.exe")
+    assert result == "/home/deck/Games/Cyberpunk 2077/bin/x64/Cyberpunk2077.exe"
+
+
+def test_batch_exe_absolute_unchanged():
+    """Absolute exe path is left as-is."""
+    result = _resolve_exe("/home/deck/Games", "/run/media/mmcblk0p1/Games/Game/game.exe")
+    assert result == "/run/media/mmcblk0p1/Games/Game/game.exe"
+
+
+def test_batch_exe_no_source_path_unchanged():
+    """Relative exe with no source path is returned unchanged."""
+    result = _resolve_exe("", "Game/game.exe")
+    assert result == "Game/game.exe"
+
+
+def test_batch_start_dir_relative_gets_prefixed():
+    """Relative start_dir is prefixed with the source root."""
+    result = _resolve_start_dir("/home/deck/Games", "Cyberpunk 2077/bin/x64")
+    assert result == "/home/deck/Games/Cyberpunk 2077/bin/x64"
+
+
+def test_batch_start_dir_none_unchanged():
+    """None start_dir stays None."""
+    result = _resolve_start_dir("/home/deck/Games", None)
+    assert result is None
+
+
+# ── Slug normalizer (scan_game_exes fuzzy matching) ───────────────────────────
+
+def _normalize(s: str) -> str:
+    """Mirror of the normalizer inside scan_game_exes."""
+    return s.lower().replace("-", " ").replace("_", " ")
+
+
+def test_slug_normalize_hyphens():
+    assert _normalize("mars-first-logistics") == "mars first logistics"
+
+
+def test_slug_normalize_underscores():
+    assert _normalize("red_dead_redemption") == "red dead redemption"
+
+
+def test_slug_normalize_mixed_case():
+    assert _normalize("Mars First Logistics") == "mars first logistics"
+
+
+def test_slug_normalize_matches_folder():
+    """Slug stored in config matches actual folder name after normalizing both."""
+    assert _normalize("mars-first-logistics") == _normalize("Mars First Logistics")
+
+
+def test_slug_normalize_no_match():
+    """Completely different strings don't match after normalization."""
+    assert _normalize("cyberpunk-2077") != _normalize("Witcher 3")
+
+
+# ── find_game_executables (deckyfin_config) ───────────────────────────────────
+
+def test_find_game_executables_returns_relative_paths(tmp_path):
+    """find_game_executables returns paths relative to game_dir."""
+    from deckyfin_config import find_game_executables
+    game = tmp_path / "MyGame"
+    game.mkdir()
+    (game / "MyGame.exe").write_bytes(b"")
+    (game / "subdir").mkdir()
+    (game / "subdir" / "helper.exe").write_bytes(b"")
+    exes = find_game_executables(game)
+    assert "MyGame.exe" in exes
+    assert str(Path("subdir") / "helper.exe") in exes
+    for e in exes:
+        assert not Path(e).is_absolute()
+
+
+def test_find_game_executables_nonexistent_dir(tmp_path):
+    """find_game_executables returns [] for a missing directory."""
+    from deckyfin_config import find_game_executables
+    assert find_game_executables(tmp_path / "no_such_dir") == []

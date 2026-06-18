@@ -1332,7 +1332,39 @@ export const GameLibrary: VFC = () => {
       {/* Game list */}
       {error && <p style={{ color: "red" }}>{error}</p>}
       {!loading && !error && games.length === 0 && (
-        <p>No games found. Add sources in Settings, then Rescan.</p>
+        <div style={{ padding: "24px 16px", textAlign: "center", color: "#aaa" }}>
+          {xferSources.length === 0 ? (
+            <>
+              <div style={{ fontSize: "2em", marginBottom: "8px" }}>🎮</div>
+              <div style={{ fontWeight: "bold", color: "#eee", marginBottom: "6px" }}>Welcome to Deckyfin</div>
+              <div style={{ fontSize: "0.82em", marginBottom: "16px", lineHeight: 1.5 }}>
+                Deckyfin lets you play your Windows games stored on a local drive or home server — without moving files to the SSD.
+              </div>
+              <div style={{ fontSize: "0.8em", textAlign: "left", marginBottom: "16px", lineHeight: 1.8, background: "#1a1a1a", borderRadius: "6px", padding: "10px 14px" }}>
+                <div>1. Open <strong>Settings → Sources</strong> and add your games folder</div>
+                <div>2. Tap <strong>Rescan</strong> on the source to detect games</div>
+                <div>3. Open a game, set the executable and Proton version</div>
+                <div>4. Tap <strong>Add to Steam</strong> — done</div>
+              </div>
+              <Focusable
+                focusClassName="is-focused"
+                onActivate={() => { saveUiState({ view: "settings" }).catch(() => {}); setView("settings"); }}
+                onClick={() => { saveUiState({ view: "settings" }).catch(() => {}); setView("settings"); }}
+                style={{ display: "inline-block", padding: "6px 20px", borderRadius: "4px", background: "#0078d4", color: "white", fontSize: "0.85em", cursor: "pointer", border: "none" }}
+              >
+                Go to Settings
+              </Focusable>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: "1.6em", marginBottom: "8px" }}>📂</div>
+              <div style={{ fontWeight: "bold", color: "#eee", marginBottom: "6px" }}>No games found</div>
+              <div style={{ fontSize: "0.82em", lineHeight: 1.5 }}>
+                You have {xferSources.length} source{xferSources.length !== 1 ? "s" : ""} configured. Open <strong>Settings → Sources</strong> and tap <strong>Rescan</strong> on each source to detect games.
+              </div>
+            </>
+          )}
+        </div>
       )}
       {viewMode === "card" ? (
         <div

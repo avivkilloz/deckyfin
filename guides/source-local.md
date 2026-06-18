@@ -78,6 +78,6 @@ Changes are saved back to `.deckyfin/config.json` in the source folder.
 
 ## Notes
 
-- Deckyfin runs inside Decky Loader as root. For local sources, root has unrestricted access — no special setup needed.
+- Deckyfin runs inside Decky Loader as the `deck` user. For local sources on the internal SSD or SD card, `deck` has full access — no special setup needed.
 - If you move or rename the source folder, update the path in **Settings → Sources**.
 - Multiple sources can point to different folders (e.g. one per SD card, one for the internal SSD).

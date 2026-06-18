@@ -637,8 +637,11 @@ export const SettingsPage: VFC<Props> = ({ onBack }) => {
               <CompactTextField value={newSourceUrl} onChange={(e) => setNewSourceUrl(e.target.value)} placeholder="http://10.0.0.1:8080" style={{ width: "100%", marginBottom: "8px" }} />
             </>
           )}
-          <Focusable onActivate={handleAddSource} onClick={handleAddSource} focusClassName="is-focused"
-            style={{ ...BTN_STYLE, borderColor: "#27ae60", color: "#2ecc71", display: "inline-block" }}>
+          <Focusable
+            onActivate={newSourceType !== "agent" ? handleAddSource : undefined}
+            onClick={newSourceType !== "agent" ? handleAddSource : undefined}
+            focusClassName="is-focused"
+            style={{ ...BTN_STYLE, borderColor: newSourceType === "agent" ? "#444" : "#27ae60", color: newSourceType === "agent" ? "#555" : "#2ecc71", display: "inline-block", cursor: newSourceType === "agent" ? "not-allowed" : "pointer" }}>
             Add
           </Focusable>
           {addSourceMsg && <span style={{ marginLeft: "8px", fontSize: "0.82em", color: "tomato" }}>{addSourceMsg}</span>}
