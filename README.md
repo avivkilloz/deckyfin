@@ -8,7 +8,15 @@ Decky quick-access panel.
 
 ## Installation
 
-### Prerequisites
+### Install from Decky Store (recommended)
+
+1. Install [Decky Loader](https://decky.xyz) if you haven't already.
+2. Open the Decky store (plug icon in the Quick Access menu).
+3. Search for **Deckyfin** and click Install.
+
+That's it — no build steps needed.
+
+### Prerequisites (developer / manual install)
 
 | Requirement | Why | Install |
 |---|---|---|
