@@ -12,6 +12,59 @@ from deckyfin_config import get_app_config, set_app_config, get_games_config
 from deckyfin_consts import SOURCES_FILE
 
 
+# ── Filesystem helpers ────────────────────────────────────────────────────────
+
+_NETWORK_FSTYPES = frozenset({
+    "cifs", "smbfs",                          # SMB/Windows shares
+    "nfs", "nfs4", "nfs3",                    # NFS
+    "fuse.sshfs",                             # SSHFS
+    "fuse.davfs",                             # WebDAV
+    "fuse.rclone", "fuse.s3fs",               # cloud storage
+    "glusterfs", "ceph",                      # distributed FS
+    "afs", "ncpfs",                           # AFS / Novell
+})
+
+
+def _fstype_for_path(path: str) -> Optional[str]:
+    """Return the filesystem type of the mount point that covers `path`."""
+    try:
+        real = os.path.realpath(path)
+        best_len = -1
+        best_fstype = None
+        with open("/proc/mounts") as f:
+            for line in f:
+                parts = line.split()
+                if len(parts) < 3:
+                    continue
+                mnt, fstype = parts[1], parts[2]
+                mnt_norm = mnt.rstrip("/") or "/"
+                if real == mnt_norm or real.startswith(mnt_norm + "/"):
+                    if len(mnt_norm) > best_len:
+                        best_len = len(mnt_norm)
+                        best_fstype = fstype
+        return best_fstype
+    except Exception:
+        return None
+
+
+def _validate_local_path(path: str) -> None:
+    """Raise ValueError if `path` is unsuitable as a local source."""
+    p = Path(path)
+    if not p.exists():
+        raise ValueError(f"Path does not exist: {path}")
+    if not p.is_dir():
+        raise ValueError(f"Path is not a directory: {path}")
+    if not os.access(str(p), os.W_OK):
+        raise ValueError(f"Path is not writable (Deckyfin needs to create a .deckyfin folder inside it): {path}")
+    fstype = _fstype_for_path(str(p))
+    if fstype in _NETWORK_FSTYPES:
+        raise ValueError(
+            f"'{path}' is on a network filesystem ({fstype}). "
+            "Use source type 'Mount' for network paths — it skips local-only operations "
+            "like Proton prefix init that won't work over the network."
+        )
+
+
 # ── Source CRUD ───────────────────────────────────────────────────────────────
 
 def list_sources() -> list:
@@ -26,6 +79,8 @@ def get_source_by_id(source_id: str) -> Optional[dict]:
 
 def add_source(name: str, type_: str, path: Optional[str], url: Optional[str]) -> dict:
     """Add a new source and return it."""
+    if type_ == "local" and path:
+        _validate_local_path(path)
     source = {
         "id": str(uuid.uuid4())[:8],
         "name": name,

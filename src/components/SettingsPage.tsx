@@ -558,7 +558,7 @@ export const SettingsPage: VFC<Props> = ({ onBack }) => {
           <div style={{ fontSize: "0.78em", color: "#888", marginBottom: "4px" }}>Name</div>
           <CompactTextField value={newSourceName} onChange={(e) => setNewSourceName(e.target.value)} style={{ width: "100%", marginBottom: "8px" }} />
           <div style={{ fontSize: "0.78em", color: "#888", marginBottom: "4px" }}>Type</div>
-          <div style={{ display: "flex", gap: "6px", marginBottom: "8px", alignItems: "center" }}>
+          <div style={{ display: "flex", gap: "6px", marginBottom: "6px", alignItems: "center" }}>
             {(["local", "mount", "agent"] as const).map((t) => (
               <Focusable key={t} onActivate={() => setNewSourceType(t)} onClick={() => setNewSourceType(t)} focusClassName="is-focused"
                 style={{ padding: "3px 10px", fontSize: "0.82em", borderRadius: "12px", cursor: "pointer",
@@ -576,6 +576,11 @@ export const SettingsPage: VFC<Props> = ({ onBack }) => {
             >
               ℹ
             </Focusable>
+          </div>
+          <div style={{ fontSize: "0.78em", color: "#aaa", marginBottom: "8px", lineHeight: 1.4 }}>
+            {newSourceType === "local" && "A folder on a physically connected drive — internal SSD, SD card, or USB. Each subdirectory becomes a game. Deckyfin writes a .deckyfin/config.json inside it."}
+            {newSourceType === "mount" && "A network drive already mounted on your filesystem (SSHFS, Samba/CIFS, or NFS). Mount it first, then point Deckyfin at the mount path. Use this instead of local for any network path."}
+            {newSourceType === "agent" && "A remote machine running the Deckyfin Agent — no filesystem mount needed. Not yet implemented; reserved for a future release."}
           </div>
           {newSourceType !== "agent" ? (
             <>
