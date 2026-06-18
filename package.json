@@ -2,6 +2,8 @@
   "name": "deckyfin",
   "version": "0.1.0",
   "description": "Deckyfin - Game Manager for Steam",
+  "license": "MIT",
+  "author": "Aviv Illoz",
   "type": "module",
   "scripts": {
     "build": "rollup -c",
