@@ -1,0 +1,60 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run tests
+        run: |
+          pip install pytest psutil
+          pytest tests/ -v
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Package plugin
+        run: |
+          mkdir -p package/deckyfin
+          # Core plugin files
+          cp main.py plugin.json package.json LICENSE package/deckyfin/
+          # Built frontend
+          cp -r dist package/deckyfin/
+          # Python modules
+          cp -r py_modules package/deckyfin/
+          # Plugin icon (plugin.json references src/assets/icon.svg)
+          mkdir -p package/deckyfin/src
+          cp -r src/assets package/deckyfin/src/
+          # Zip with the plugin folder at the root
+          cd package && zip -r ../deckyfin.zip deckyfin/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: deckyfin.zip
+          generate_release_notes: true
+          fail_on_unmatched_files: true
