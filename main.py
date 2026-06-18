@@ -952,6 +952,17 @@ class Plugin:
         set_app_config({"view_mode": mode if mode in ("card", "list") else "card"})
         return {"success": True}
 
+    async def get_art_enabled(self) -> dict:
+        """Return whether Deckyfin artwork loading is enabled."""
+        from deckyfin_config import get_app_config
+        return {"art_enabled": get_app_config().get("art_enabled", True)}
+
+    async def set_art_enabled(self, enabled: bool) -> dict:
+        """Persist artwork enabled/disabled setting to app config."""
+        from deckyfin_config import set_app_config
+        set_app_config({"art_enabled": bool(enabled)})
+        return {"success": True}
+
     # ── Games Folder ──────────────────────────────────────────────────────
 
     async def get_games_folder(self) -> Optional[str]:

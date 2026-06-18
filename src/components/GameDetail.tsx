@@ -1,4 +1,4 @@
-import { VFC, useState, useEffect, useRef } from "react";
+import { VFC, useState, useEffect, useRef, Fragment } from "react";
 import { callable } from "@decky/api";
 import { Navigation, Focusable } from "@decky/ui";
 import { GameConfig, MergedGame, GameSource, SourceCapabilities, AssetType } from "../types";
@@ -206,6 +206,7 @@ interface Props {
   onNavigateToSettings?: () => void;
   initialSourceId?: string | null;
   runningTaskCount?: number;
+  artEnabled?: boolean;
 }
 
 const LABEL_STYLE: React.CSSProperties = {
@@ -231,7 +232,7 @@ const fmtBytes = (b: number): string => {
   return `${(b / 1e3).toFixed(0)} KB`;
 };
 
-export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigateToSettings, initialSourceId, runningTaskCount = 0 }) => {
+export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigateToSettings, initialSourceId, runningTaskCount = 0, artEnabled = true }) => {
   // ── Refs ─────────────────────────────────────────────────────────────
   const rootRef = useRef<HTMLDivElement>(null);
   const backRef = useRef<HTMLDivElement>(null);
@@ -597,10 +598,11 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
   const { applyArtById, applyArtByType } = useArtwork();
   const [headerArtUri, setHeaderArtUri] = useState<string | null>(null);
   useEffect(() => {
+    if (!artEnabled) { setHeaderArtUri(null); return; }
     getGameCardArt(game.name)
       .then((r) => setHeaderArtUri(r.data_uri || null))
       .catch(() => setHeaderArtUri(null));
-  }, [game.name]);
+  }, [game.name, artEnabled]);
 
   // ── Load capabilities when source changes ─────────────────────────────────
   useEffect(() => {
@@ -1562,21 +1564,34 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
       )}
 
       {/* ── Art header ──────────────────────────────────────────────────────── */}
-      <div style={{ position: "relative", width: "100%", height: "110px", borderRadius: "6px", marginBottom: "8px", overflow: "hidden",
-        background: headerArtUri ? `center / cover no-repeat url("${headerArtUri}")` : "linear-gradient(135deg, #667eea, #764ba2)" }}>
-        {!headerArtUri && (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: "100%", fontSize: "40px" }}>🎮</div>
-        )}
-        {steamInfo && (
-          <div style={{ position: "absolute", bottom: "6px", right: "8px", display: "flex", alignItems: "center", gap: "4px",
-            background: "rgba(0,0,0,0.55)", borderRadius: "6px", padding: "3px 7px" }}>
-            <svg viewBox="0 0 24 24" width="12" height="12" fill="#c7d5e0">
+      {artEnabled ? (
+        <div style={{ position: "relative", width: "100%", height: "110px", borderRadius: "6px", marginBottom: "8px", overflow: "hidden",
+          background: headerArtUri ? `center / cover no-repeat url("${headerArtUri}")` : "linear-gradient(135deg, #667eea, #764ba2)" }}>
+          {!headerArtUri && (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: "100%", fontSize: "40px" }}>🎮</div>
+          )}
+          <div style={{ position: "absolute", bottom: "6px", left: "8px", background: "rgba(0,0,0,0.55)", borderRadius: "4px", padding: "2px 8px",
+            maxWidth: "calc(100% - 40px)" }}>
+            <span style={{ fontSize: name.length > 35 ? "0.72em" : name.length > 25 ? "0.82em" : "0.9em", fontWeight: 600, color: "#fff", display: "block",
+              whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</span>
+          </div>
+          {steamInfo && (
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="#c7d5e0"
+              style={{ position: "absolute", bottom: "7px", right: "8px", filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.8))" }}>
               <path d="M11.979 0C5.678 0 .511 4.86.022 11.037l6.432 2.658c.545-.371 1.203-.59 1.912-.59.063 0 .125.004.188.006l2.861-4.142V8.91c0-2.495 2.028-4.524 4.524-4.524 2.494 0 4.524 2.031 4.524 4.527s-2.03 4.525-4.524 4.525h-.105l-4.076 2.911c0 .052.004.105.004.159 0 1.875-1.515 3.396-3.39 3.396-1.635 0-3.016-1.173-3.331-2.727L.436 15.27C1.862 20.307 6.486 24 11.979 24c6.627 0 11.999-5.373 11.999-12S18.605 0 11.979 0zM7.54 18.21l-1.473-.61c.262.543.714.999 1.314 1.25 1.297.539 2.793-.076 3.332-1.375.263-.63.264-1.319.005-1.949s-.75-1.121-1.377-1.383c-.624-.26-1.29-.249-1.878-.03l1.523.63c.956.4 1.409 1.5 1.009 2.455-.397.957-1.497 1.41-2.455 1.012H7.54zm11.415-9.303c0-1.662-1.353-3.015-3.015-3.015-1.665 0-3.015 1.353-3.015 3.015 0 1.665 1.35 3.015 3.015 3.015 1.663 0 3.015-1.35 3.015-3.015zm-5.273-.005c0-1.252 1.013-2.266 2.265-2.266 1.249 0 2.266 1.014 2.266 2.266 0 1.251-1.017 2.265-2.266 2.265-1.252 0-2.265-1.014-2.265-2.265z"/>
             </svg>
-            <span style={{ fontSize: "10px", color: "#c7d5e0" }}>Steam</span>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      ) : (
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px", padding: "4px 2px" }}>
+          <h2 style={{ margin: 0, fontSize: name.length > 32 ? "0.78em" : name.length > 22 ? "0.9em" : "1.05em", fontWeight: 700, color: "#e0e0e0", flex: 1, minWidth: 0 }}>{name}</h2>
+          {steamInfo && (
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="#c7d5e0" style={{ flexShrink: 0 }}>
+              <path d="M11.979 0C5.678 0 .511 4.86.022 11.037l6.432 2.658c.545-.371 1.203-.59 1.912-.59.063 0 .125.004.188.006l2.861-4.142V8.91c0-2.495 2.028-4.524 4.524-4.524 2.494 0 4.524 2.031 4.524 4.527s-2.03 4.525-4.524 4.525h-.105l-4.076 2.911c0 .052.004.105.004.159 0 1.875-1.515 3.396-3.39 3.396-1.635 0-3.016-1.173-3.331-2.727L.436 15.27C1.862 20.307 6.486 24 11.979 24c6.627 0 11.999-5.373 11.999-12S18.605 0 11.979 0zM7.54 18.21l-1.473-.61c.262.543.714.999 1.314 1.25 1.297.539 2.793-.076 3.332-1.375.263-.63.264-1.319.005-1.949s-.75-1.121-1.377-1.383c-.624-.26-1.29-.249-1.878-.03l1.523.63c.956.4 1.409 1.5 1.009 2.455-.397.957-1.497 1.41-2.455 1.012H7.54zm11.415-9.303c0-1.662-1.353-3.015-3.015-3.015-1.665 0-3.015 1.353-3.015 3.015 0 1.665 1.35 3.015 3.015 3.015 1.663 0 3.015-1.35 3.015-3.015zm-5.273-.005c0-1.252 1.013-2.266 2.265-2.266 1.249 0 2.266 1.014 2.266 2.266 0 1.251-1.017 2.265-2.266 2.265-1.252 0-2.265-1.014-2.265-2.265z"/>
+            </svg>
+          )}
+        </div>
+      )}
 
       {/* ── Metadata ──────────────────────────────────────────────────────────── */}
       <div style={{ border: "1px solid #3a3a3a", borderRadius: "6px", marginBottom: "8px" }}>
@@ -1586,26 +1601,37 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
           <span style={{ fontSize: "0.78em", color: "#666" }}>{showMetadata ? "▲" : "▼"}</span>
         </Focusable>
         {showMetadata && (
-          <div style={{ padding: "8px 12px", borderTop: "1px solid #2a2a2a" }}>
-            {([
-              ["Name", name],
-              ["Executable", executable],
-              ["Start Dir", startDir || "—"],
-              ["Proton Version", protonVersion || "— (Steam default)"],
-              ["Dependencies", mergedDeps.length > 0 ? mergedDeps.join(", ") : "—"],
-              ["Collections", mergedCollections.length > 0 ? mergedCollections.join(", ") : "—"],
-              ["Save Paths", syncPaths.length > 0 ? syncPaths.join(", ") : "—"],
-              ["Steam App ID", steamAppId != null ? String(steamAppId) : "—"],
-              ["SteamGridDB ID", sgdbGameId != null ? String(sgdbGameId) : "—"],
-              ["Shortcut App ID", steamInfo ? String(steamInfo.unsigned_appid) : "—"],
-              ["On Steam", steamInfo ? "Yes" : "No"],
-              ["Source", `${selectedSource.source_name} (${selectedSource.source_type})`],
-            ] as [string, string][]).map(([label, value]) => (
-              <div key={label} style={{ display: "flex", gap: "8px", marginBottom: "5px", fontSize: "0.82em" }}>
-                <span style={{ color: "#666", minWidth: "110px", flexShrink: 0 }}>{label}</span>
-                <span style={{ color: "#c0c0c0", wordBreak: "break-all", flex: 1 }}>{value}</span>
-              </div>
-            ))}
+          <div style={{ borderTop: "1px solid #2a2a2a" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", fontSize: "0.78em" }}>
+              {([
+                ["Name", name],
+                ["Executable", executable],
+                ["Start Dir", startDir || "—"],
+                ["Proton Version", protonVersion || "—"],
+                ["Dependencies", mergedDeps.length > 0 ? mergedDeps.join(", ") : "—"],
+                ["Collections", mergedCollections.length > 0 ? mergedCollections.join(", ") : "—"],
+                ["Save Paths", syncPaths.length > 0 ? syncPaths.join(", ") : "—"],
+                ["Steam App ID", steamAppId != null ? String(steamAppId) : "—"],
+                ["SteamGridDB ID", sgdbGameId != null ? String(sgdbGameId) : "—"],
+                ["Shortcut App ID", steamInfo ? String(steamInfo.unsigned_appid) : "—"],
+                ["On Steam", steamInfo ? "Yes" : "No"],
+                ["Source", `${selectedSource.source_name} (${selectedSource.source_type})`],
+              ] as [string, string][]).map(([label, value], i, arr) => (
+                <Fragment key={label}>
+                  <span style={{
+                    color: "#666", whiteSpace: "nowrap",
+                    padding: "5px 10px 5px 12px",
+                    borderBottom: i < arr.length - 1 ? "1px solid #2a2a2a" : undefined,
+                    borderRight: "1px solid #2a2a2a",
+                  }}>{label}</span>
+                  <span style={{
+                    color: "#c0c0c0", wordBreak: "break-all",
+                    padding: "5px 12px 5px 10px",
+                    borderBottom: i < arr.length - 1 ? "1px solid #2a2a2a" : undefined,
+                  }}>{value}</span>
+                </Fragment>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -2292,7 +2318,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
               </div>
 
               {/* ── Deckyfin Art picker ── */}
-              <div style={{ borderTop: "1px solid #2a2a2a", paddingTop: "8px" }}>
+              {artEnabled && <div style={{ borderTop: "1px solid #2a2a2a", paddingTop: "8px" }}>
                 <div style={{ fontSize: "0.78em", color: "#aaa", marginBottom: "6px", fontWeight: 600 }}>Deckyfin Art</div>
                 {sgdbGameId == null ? (
                   <div style={{ fontSize: "0.78em", color: "#555", padding: "8px 0", marginBottom: "6px" }}>
@@ -2347,7 +2373,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
                   {loading === "deckyfin-art" ? "Applying…" : "Auto Apply Deckyfin Art"}
                 </Focusable>
                 </>}
-              </div>
+              </div>}
               {sgdbFeedback && (
                 <div style={{ fontSize: "0.82em", marginTop: "6px", color: sgdbFeedback.ok ? "#2ecc71" : "tomato", wordBreak: "break-word", overflowWrap: "break-word" }}>
                   {sgdbFeedback.msg}

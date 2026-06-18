@@ -65,6 +65,8 @@ const installProtontricks = callable<
 
 interface Props {
   onBack: () => void;
+  artEnabled?: boolean;
+  onArtEnabledChange?: (val: boolean) => void;
 }
 
 const BTN_STYLE: React.CSSProperties = {
@@ -77,7 +79,7 @@ const BTN_STYLE: React.CSSProperties = {
   color: "#e0e0e0",
 };
 
-export const SettingsPage: VFC<Props> = ({ onBack }) => {
+export const SettingsPage: VFC<Props> = ({ onBack, artEnabled = true, onArtEnabledChange }) => {
   const backRef = useRef<HTMLDivElement>(null);
 
   // ── Auto-focus Back button on mount so B-button works immediately ──
@@ -1207,6 +1209,34 @@ export const SettingsPage: VFC<Props> = ({ onBack }) => {
           </div>
         );
       })}
+
+      <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.12)", margin: "20px 0" }} />
+
+      {/* ── Deckyfin Settings ───────────────────────────────────────────── */}
+      <h4 style={{ margin: "0 0 10px 0" }}>Deckyfin Settings</h4>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+        <div>
+          <div style={{ fontSize: "0.85em", color: "#e0e0e0" }}>Artwork</div>
+          <div style={{ fontSize: "0.78em", color: "#888", marginTop: "2px" }}>
+            When off, skips loading art for smoother navigation. Does not remove downloaded art.
+          </div>
+        </div>
+        <Focusable
+          onActivate={() => onArtEnabledChange?.(!artEnabled)}
+          onClick={() => onArtEnabledChange?.(!artEnabled)}
+          focusClassName="is-focused"
+          style={{
+            ...BTN_STYLE,
+            marginLeft: "12px",
+            flexShrink: 0,
+            background: artEnabled ? "rgba(46,204,113,0.15)" : "rgba(255,255,255,0.05)",
+            borderColor: artEnabled ? "#2ecc71" : "#555",
+            color: artEnabled ? "#2ecc71" : "#888",
+          }}
+        >
+          {artEnabled ? "Enabled" : "Disabled"}
+        </Focusable>
+      </div>
 
       <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.12)", margin: "20px 0" }} />
 
