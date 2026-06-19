@@ -102,17 +102,35 @@ def _load_vdf_binary(path: Path):
 
 
 def _save_vdf_binary(data, path: Path):
-    """Save data to a binary VDF file."""
-    import vdf
-    with open(path, "wb") as f:
-        vdf.binary_dump(data, f)
+    """Save data to a binary VDF file (atomic write to prevent corruption on failure)."""
+    import vdf, os
+    tmp = path.with_suffix(".vdf.tmp")
+    try:
+        with open(tmp, "wb") as f:
+            vdf.binary_dump(data, f)
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+        raise
 
 
 def _save_vdf_text(data, path: Path):
-    """Save data to a text-format VDF file."""
-    import vdf
-    with open(path, "w", encoding="utf-8") as f:
-        vdf.dump(data, f)
+    """Save data to a text-format VDF file (atomic write to prevent corruption on failure)."""
+    import vdf, os
+    tmp = path.with_suffix(".vdf.tmp")
+    try:
+        with open(tmp, "w", encoding="utf-8") as f:
+            vdf.dump(data, f)
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+        raise
 
 
 def _get_localconfig_path(user_id: str) -> Path:
@@ -380,6 +398,183 @@ def list_steam_collections() -> list[str]:
     except Exception:
         logger.exception("Failed to list Steam collections")
         return []
+
+
+def create_steam_collection(name: str) -> dict:
+    """Create a new empty Steam collection with the given name.
+
+    Returns ``{"success": bool, "error": str | None}``.
+    """
+    try:
+        import base64
+        import json
+
+        name_stripped = name.strip()
+        if not name_stripped:
+            return {"success": False, "error": "Name cannot be empty"}
+
+        user_id = get_user_id()
+        steam_root = find_steam_root()
+        if not steam_root:
+            return {"success": False, "error": "Steam root not found"}
+
+        cloud_dir = steam_root / STEAM_USERDATA_FOLDER / user_id / "config" / "cloudstorage"
+        namespaces_path = cloud_dir / "cloud-storage-namespaces.json"
+        active_namespace = 1
+        if namespaces_path.exists():
+            try:
+                with open(namespaces_path, "r", encoding="utf-8") as f:
+                    namespaces = json.load(f)
+                sorted_ns = sorted(namespaces, key=lambda x: int(x[1]), reverse=True)
+                if sorted_ns and sorted_ns[0][1] != "0":
+                    active_namespace = sorted_ns[0][0]
+            except (json.JSONDecodeError, ValueError, IndexError, TypeError):
+                pass
+
+        cloud_path = cloud_dir / f"cloud-storage-namespace-{active_namespace}.json"
+        cloud_data = []
+        if cloud_path.exists():
+            try:
+                with open(cloud_path, "r", encoding="utf-8") as f:
+                    cloud_data = json.load(f)
+            except (json.JSONDecodeError, ValueError):
+                cloud_data = []
+
+        # Return early if already exists (case-insensitive)
+        for item in cloud_data:
+            if not isinstance(item, list) or len(item) < 2:
+                continue
+            key = item[0]
+            if not isinstance(key, str) or not key.startswith("user-collections."):
+                continue
+            entry = item[1]
+            if not isinstance(entry, dict) or entry.get("is_deleted"):
+                continue
+            try:
+                value = json.loads(entry.get("value", "{}"))
+                if value.get("name", "").lower() == name_stripped.lower():
+                    return {"success": True, "error": None}
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+        b64 = base64.b64encode(name_stripped.encode("utf-8")).decode("utf-8")
+        b64 = b64.replace("+", "-").replace("/", "_").replace("=", "")
+        cid = f"dfy-{b64}"
+        cloud_key = f"user-collections.{cid}"
+        timestamp = int(__import__("time").time())
+        value_json = json.dumps(
+            {"id": cid, "name": name_stripped, "added": [], "removed": []},
+            ensure_ascii=False,
+        )
+        cloud_data.append([
+            cloud_key,
+            {
+                "key": cloud_key,
+                "timestamp": timestamp,
+                "value": value_json,
+                "version": str(timestamp),
+                "conflictResolutionMethod": "custom",
+                "strMethodId": "union-collections",
+            },
+        ])
+
+        cloud_dir.mkdir(parents=True, exist_ok=True)
+        with open(cloud_path, "w", encoding="utf-8") as f:
+            json.dump(cloud_data, f, ensure_ascii=False)
+
+        logger.info("Created Steam collection: %s", name_stripped)
+        return {"success": True, "error": None}
+    except Exception as e:
+        logger.exception("Failed to create Steam collection: %s", name)
+        return {"success": False, "error": str(e)}
+
+
+def delete_steam_collection(name: str) -> dict:
+    """Delete a Steam collection by name.
+
+    Deckyfin-managed (``dfy-``) entries are removed from the file entirely.
+    Non-dfy entries are marked ``is_deleted`` so Steam sync propagates the removal.
+    Returns ``{"success": bool, "error": str | None}``.
+    """
+    try:
+        import json
+
+        name_stripped = name.strip()
+        if not name_stripped:
+            return {"success": False, "error": "Name cannot be empty"}
+
+        user_id = get_user_id()
+        steam_root = find_steam_root()
+        if not steam_root:
+            return {"success": False, "error": "Steam root not found"}
+
+        cloud_dir = steam_root / STEAM_USERDATA_FOLDER / user_id / "config" / "cloudstorage"
+        namespaces_path = cloud_dir / "cloud-storage-namespaces.json"
+        active_namespace = 1
+        if namespaces_path.exists():
+            try:
+                with open(namespaces_path, "r", encoding="utf-8") as f:
+                    namespaces = json.load(f)
+                sorted_ns = sorted(namespaces, key=lambda x: int(x[1]), reverse=True)
+                if sorted_ns and sorted_ns[0][1] != "0":
+                    active_namespace = sorted_ns[0][0]
+            except (json.JSONDecodeError, ValueError, IndexError, TypeError):
+                pass
+
+        cloud_path = cloud_dir / f"cloud-storage-namespace-{active_namespace}.json"
+        if not cloud_path.exists():
+            return {"success": False, "error": "Cloud storage not found"}
+
+        with open(cloud_path, "r", encoding="utf-8") as f:
+            cloud_data = json.load(f)
+
+        found = False
+        new_cloud = []
+        timestamp = int(__import__("time").time())
+
+        for item in cloud_data:
+            if not isinstance(item, list) or len(item) < 2:
+                new_cloud.append(item)
+                continue
+            key = item[0]
+            entry = item[1]
+            if not isinstance(key, str) or not key.startswith("user-collections."):
+                new_cloud.append(item)
+                continue
+            if not isinstance(entry, dict) or entry.get("is_deleted"):
+                new_cloud.append(item)
+                continue
+            try:
+                value = json.loads(entry.get("value", "{}"))
+            except (json.JSONDecodeError, TypeError):
+                new_cloud.append(item)
+                continue
+
+            if value.get("name", "").lower() == name_stripped.lower():
+                found = True
+                cid = key.replace("user-collections.", "", 1)
+                if not cid.startswith("dfy-"):
+                    # Non-dfy: mark deleted so Steam sync propagates removal
+                    updated = dict(entry)
+                    updated["is_deleted"] = True
+                    updated["timestamp"] = timestamp
+                    updated["version"] = str(timestamp)
+                    new_cloud.append([key, updated])
+                # dfy-: drop entirely (not appended)
+            else:
+                new_cloud.append(item)
+
+        if not found:
+            return {"success": False, "error": f"Collection '{name_stripped}' not found"}
+
+        with open(cloud_path, "w", encoding="utf-8") as f:
+            json.dump(new_cloud, f, ensure_ascii=False)
+
+        logger.info("Deleted Steam collection: %s", name_stripped)
+        return {"success": True, "error": None}
+    except Exception as e:
+        logger.exception("Failed to delete Steam collection: %s", name)
+        return {"success": False, "error": str(e)}
 
 
 def _parse_old_tags(shortcut: dict) -> Optional[list[str]]:

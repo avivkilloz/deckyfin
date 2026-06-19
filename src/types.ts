@@ -11,6 +11,7 @@ export interface GameConfig {
   proton_sync_paths?: string[];
   categories?: string[];
   launch_options?: string;
+  selected_launchers?: string[];
   collections?: string[];
   needs_restart_after_add?: boolean;
   needs_restart?: boolean;
@@ -18,6 +19,7 @@ export interface GameConfig {
   steam_snapshot?: string;
   /** Persisted snapshot of deps at last install time. */
   deps_snapshot?: string[];
+  steamgriddb_game_id?: number;
 }
 
 export interface GameFolder {
@@ -83,6 +85,42 @@ declare global {
   var SteamClient: SteamClient;
 }
 
+// ── Multi-source types ────────────────────────────────────────────────────────
+
+export type SourceType = "local" | "mount" | "agent";
+
+export interface Source {
+  id: string;
+  name: string;
+  type: SourceType;
+  path: string | null;
+  url: string | null;
+}
+
+export interface SourceCapabilities {
+  can_play: boolean;
+  can_write_config: boolean;
+  can_download_to: boolean;
+}
+
+export interface SourceDiskUsage {
+  used: number;   // bytes
+  total: number;
+  free: number;
+}
+
+export interface GameSource {
+  source_id: string;
+  source_name: string;
+  source_type: SourceType;
+  config: GameConfig;
+}
+
+export interface MergedGame {
+  name: string;
+  sources: GameSource[];
+}
+
 /** SteamGridDB art URLs response from backend. */
 export interface SteamGridArtUrls {
   success: boolean;
@@ -93,4 +131,15 @@ export interface SteamGridArtUrls {
   hero: string | null;
   logo: string | null;
   wide: string | null;
+}
+
+export interface TransferStatus {
+  transfer_id: string;
+  game_name: string;
+  from_source_id: string;
+  to_source_id: string;
+  status: "queued" | "running" | "done" | "failed";
+  bytes_copied: number;
+  total_bytes: number;
+  error: string | null;
 }

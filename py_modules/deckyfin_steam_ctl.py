@@ -189,23 +189,72 @@ def restart_steam() -> dict:
     time.sleep(2)
 
     import os, pwd, shlex, shutil
-    from steam_utils import _get_real_home
+    from steam_utils import _get_real_home, find_steam_root
 
-    real_username = _get_real_home().name if os.geteuid() == 0 else None
-    steam_cmd = ["steam"] + mode_flags  # resolved below per-attempt
+    is_root = os.geteuid() == 0
+    real_username = _get_real_home().name if is_root else None
 
-    launch_log = open("/tmp/deckyfin_steam_launch.log", "w")
+    # Resolve steam.sh full path so we don't depend on PATH
+    try:
+        steam_sh = str(find_steam_root() / "steam.sh")
+    except Exception:
+        steam_sh = shutil.which("steam") or "steam"
 
+    steam_cmd = [steam_sh] + mode_flags
+
+    import tempfile
+    try:
+        launch_log = open("/tmp/deckyfin_steam_launch.log", "w")
+    except PermissionError:
+        launch_log = tempfile.NamedTemporaryFile(
+            mode="w", prefix="deckyfin_steam_", suffix=".log", delete=False
+        )
+        logger.info("Steam launch log: %s", launch_log.name)
     launched = False
 
-    # ── Attempt 1: machinectl shell (runs inside the user's login session) ──
-    # Use a clean env so machinectl uses system libs, not the PyInstaller bundle's LD_LIBRARY_PATH.
+    # ── Already running as deck: launch steam.sh directly ────────────────────
+    # Start with a clean env (no PyInstaller LD_LIBRARY_PATH etc.) and layer
+    # in only what steam.sh needs.
+    if not launched and not is_root:
+        import pwd as _pwd
+        try:
+            pw = _pwd.getpwnam(os.environ.get("USER", "deck"))
+            _home = pw.pw_dir
+            _user = pw.pw_name
+        except Exception:
+            _home = os.environ.get("HOME", "/home/deck")
+            _user = os.environ.get("USER", "deck")
+        launch_env = {
+            "PATH": "/usr/bin:/usr/sbin:/bin:/sbin:/usr/local/bin:/home/deck/.local/bin",
+            "HOME": _home,
+            "USER": _user,
+            "LOGNAME": _user,
+        }
+        launch_env.update(display_env)
+        logger.info("Steam relaunch env keys: %s", list(launch_env.keys()))
+        try:
+            subprocess.Popen(
+                steam_cmd,
+                env=launch_env,
+                stdout=launch_log,
+                stderr=launch_log,
+                start_new_session=True,
+            )
+            launched = True
+            result["message"] = "Steam restarted"
+            logger.info("Steam relaunch: direct deck (steam_sh=%s flags=%s)", steam_sh, mode_flags)
+        except Exception as e:
+            logger.warning("Direct steam launch failed: %s", e)
+
+    # ── Running as root: switch to the desktop user ───────────────────────────
     _clean_env = {"PATH": "/usr/bin:/usr/sbin:/bin:/sbin:/usr/local/bin"}
+
+    # Attempt 1: machinectl shell (runs inside the user's login session)
     if not launched and real_username and shutil.which("machinectl"):
         try:
             setenv_flags = [f"--setenv={k}={v}" for k, v in display_env.items()]
             subprocess.Popen(
-                ["machinectl", "shell"] + setenv_flags + [f"{real_username}@", "/usr/bin/steam"] + mode_flags,
+                ["machinectl", "shell"] + setenv_flags + [f"{real_username}@", steam_sh] + mode_flags,
                 env=_clean_env,
                 stdout=launch_log,
                 stderr=launch_log,
@@ -217,7 +266,7 @@ def restart_steam() -> dict:
         except Exception as e:
             logger.warning("machinectl shell attempt failed: %s", e)
 
-    # ── Attempt 2: su -c with env vars embedded in shell command ────────────
+    # Attempt 2: su -c with env vars embedded in shell command
     if not launched and real_username:
         try:
             env_prefix = " ".join(
@@ -238,25 +287,24 @@ def restart_steam() -> dict:
         except Exception as e:
             logger.warning("su attempt failed: %s", e)
 
-    # ── Attempt 3: preexec_fn setuid (last resort) ───────────────────────────
-    if not launched:
+    # Attempt 3: preexec_fn setuid (last resort when root)
+    if not launched and real_username:
         launch_env = os.environ.copy()
         launch_env.update(display_env)
         preexec_fn = None
-        if real_username and real_username != "root":
-            try:
-                pw = pwd.getpwnam(real_username)
-                uid, gid = pw.pw_uid, pw.pw_gid
-                launch_env.update({"HOME": pw.pw_dir, "USER": real_username, "LOGNAME": real_username})
-                def preexec_fn():
-                    try:
-                        os.initgroups(real_username, gid)
-                    except Exception:
-                        pass
-                    os.setgid(gid)
-                    os.setuid(uid)
-            except KeyError as e:
-                logger.warning("preexec_fn setup failed: %s", e)
+        try:
+            pw = pwd.getpwnam(real_username)
+            uid, gid = pw.pw_uid, pw.pw_gid
+            launch_env.update({"HOME": pw.pw_dir, "USER": real_username, "LOGNAME": real_username})
+            def preexec_fn():
+                try:
+                    os.initgroups(real_username, gid)
+                except Exception:
+                    pass
+                os.setgid(gid)
+                os.setuid(uid)
+        except KeyError as e:
+            logger.warning("preexec_fn setup failed: %s", e)
         try:
             subprocess.Popen(
                 steam_cmd,

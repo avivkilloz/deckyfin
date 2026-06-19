@@ -1,8 +1,10 @@
 """Proton version detection, discovery, and download utilities."""
 
 import os
+import ssl
 import tarfile
 import tempfile
+import threading as _threading
 import logging
 from pathlib import Path
 from typing import Optional
@@ -19,6 +21,24 @@ from deckyfin_consts import (
 )
 
 logger = logging.getLogger(LOGGER_PROTON)
+
+
+def _ssl_context() -> ssl.SSLContext:
+    """SSL context with system CA certs — Decky's bundled Python often can't find them."""
+    for p in (
+        "/etc/ssl/certs/ca-certificates.crt",
+        "/etc/ca-certificates/extracted/tls-ca-bundle.pem",
+        "/etc/pki/tls/certs/ca-bundle.crt",
+        "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem",
+    ):
+        if Path(p).exists():
+            return ssl.create_default_context(cafile=p)
+    try:
+        import certifi
+        return ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        pass
+    return ssl.create_default_context()
 
 
 def list_available_proton() -> list[str]:
@@ -154,17 +174,18 @@ def download_proton_ge(proton_name: str) -> dict:
 
     tmp_path = None
     try:
-        import requests
+        import urllib.request
 
         logger.info("Downloading %s from %s", proton_name, download_url)
-        response = requests.get(download_url, stream=True, timeout=300)
-        response.raise_for_status()
+        response = urllib.request.urlopen(download_url, timeout=300, context=_ssl_context())
 
         with tempfile.NamedTemporaryFile(delete=False, suffix=".tar.gz") as tmp_file:
             tmp_path = tmp_file.name
-            for chunk in response.iter_content(chunk_size=8192):
-                if chunk:
-                    tmp_file.write(chunk)
+            while True:
+                chunk = response.read(8192)
+                if not chunk:
+                    break
+                tmp_file.write(chunk)
 
         logger.info("Extracting %s to %s", proton_name, compat_dir)
         with tarfile.open(tmp_path, "r:gz") as tar:
@@ -252,3 +273,268 @@ def ensure_proton_available(proton_name: str) -> None:
         f"Proton version '{proton_name}' not found. "
         f"Available: {', '.join(available)}"
     )
+
+
+# ── Multi-source Proton release catalogue + background install ─────────────────
+
+PROTON_SOURCES = [
+    {"id": "steam",   "name": "Steam Proton",   "type": "steam"},
+    {"id": "ge",      "name": "GE-Proton",       "type": "github", "repo": "GloriousEggroll/proton-ge-custom"},
+    {"id": "cachyos", "name": "CachyOS Proton",  "type": "github", "repo": "CachyOS/proton-cachyos"},
+]
+
+_releases_cache: dict = {}   # repo → {"pages": {page: [...]}, "ts": float}
+_CACHE_TTL = 3600
+
+_proton_install_registry: dict = {}   # install_name → {status, bytes_downloaded, total_bytes, error}
+_proton_cancel_events: dict = {}      # install_name → threading.Event
+
+
+def list_proton_sources() -> list[dict]:
+    """Return the list of supported Proton source types."""
+    return list(PROTON_SOURCES)
+
+
+def _list_steam_proton_releases() -> list[dict]:
+    """Return Proton versions installed by Steam from steamapps/common/."""
+    steam_root = find_steam_root()
+    common_dir = steam_root / STEAM_STEAMAPPS_FOLDER / STEAM_COMMON_FOLDER
+    releases = []
+    if common_dir.exists():
+        for d in sorted(common_dir.iterdir(), reverse=True):
+            if d.is_dir() and "proton" in d.name.lower():
+                releases.append({
+                    "tag_name": d.name,
+                    "install_name": d.name,
+                    "size_bytes": 0,
+                    "download_url": None,
+                    "installed": True,
+                })
+    return releases
+
+
+def _pick_asset(assets: list) -> dict | None:
+    """Pick the preferred tarball asset from a GitHub release's assets list."""
+    for ext in (".tar.gz", ".tar.zst", ".tar.xz"):
+        for a in assets:
+            name = a.get("name", "")
+            if name.endswith(ext) and not name.endswith(".sha512sum"):
+                return a
+    return None
+
+
+def fetch_proton_releases(source_id: str, page: int = 1, per_page: int = 10) -> dict:
+    """Fetch one page of releases for a Proton source, annotated with installed status.
+
+    Returns ``{source_id, releases: [{tag_name, install_name, size_bytes, download_url, installed}], has_more}``.
+    Pages are cached per-repo for one hour; stale cache served on network error.
+    """
+    import time
+    import urllib.request
+    import urllib.parse
+    import json as _json
+
+    source = next((s for s in PROTON_SOURCES if s["id"] == source_id), None)
+    if source is None:
+        return {"source_id": source_id, "releases": [], "has_more": False}
+
+    if source.get("type") == "steam":
+        return {"source_id": source_id, "releases": _list_steam_proton_releases(), "has_more": False}
+
+    repo = source["repo"]
+    now = time.time()
+    cache = _releases_cache.setdefault(repo, {"pages": {}, "ts": 0.0})
+
+    if page not in cache["pages"] or now - cache["ts"] > _CACHE_TTL:
+        try:
+            params = urllib.parse.urlencode({"per_page": per_page, "page": page})
+            req = urllib.request.Request(
+                f"https://api.github.com/repos/{repo}/releases?{params}",
+                headers={"Accept": "application/vnd.github.v3+json"},
+            )
+            with urllib.request.urlopen(req, timeout=15, context=_ssl_context()) as resp:
+                raw_data = _json.loads(resp.read())
+            raw_releases = []
+            for release in raw_data:
+                if release.get("draft") or release.get("prerelease"):
+                    continue
+                asset = _pick_asset(release.get("assets", []))
+                if asset is None:
+                    continue
+                asset_name = asset["name"]
+                # strip common archive extensions to get the install directory name
+                for ext in (".tar.gz", ".tar.zst", ".tar.xz"):
+                    if asset_name.endswith(ext):
+                        install_name = asset_name[: -len(ext)]
+                        break
+                else:
+                    install_name = release["tag_name"]
+                raw_releases.append({
+                    "tag_name": release["tag_name"],
+                    "install_name": install_name,
+                    "size_bytes": asset.get("size", 0),
+                    "download_url": asset["browser_download_url"],
+                })
+            cache["pages"][page] = raw_releases
+            cache["ts"] = now
+        except Exception as exc:
+            logger.warning("Failed to fetch %s releases page %s: %s", repo, page, exc)
+            raw_releases = cache["pages"].get(page, [])
+    else:
+        raw_releases = cache["pages"][page]
+
+    installed = set(list_available_proton())
+    releases = [
+        {**r, "installed": r["install_name"] in installed}
+        for r in raw_releases
+    ]
+    has_more = len(raw_releases) == per_page  # heuristic — if full page, likely more
+    return {"source_id": source_id, "releases": releases, "has_more": has_more}
+
+
+def start_proton_install(install_name: str, download_url: str) -> dict:
+    """Start a background download + install of any Proton release.
+
+    ``install_name`` is the directory name to create in ``compatibilitytools.d/``.
+    ``download_url`` is the direct asset download URL (from :func:`fetch_proton_releases`).
+    Poll :func:`get_proton_install_statuses` for progress.
+    """
+    if not install_name or not download_url:
+        return {"success": False, "error": "install_name and download_url are required"}
+
+    existing = _proton_install_registry.get(install_name, {})
+    if existing.get("status") in ("downloading", "extracting"):
+        return {"success": False, "error": "Already installing"}
+
+    if install_name in list_available_proton():
+        return {"success": False, "error": "Already installed"}
+
+    cancel_event = _threading.Event()
+    _proton_cancel_events[install_name] = cancel_event
+    _proton_install_registry[install_name] = {
+        "status": "downloading",
+        "bytes_downloaded": 0,
+        "total_bytes": 0,
+        "error": None,
+    }
+
+    def _run() -> None:
+        import shutil
+        import subprocess as _sp
+        import urllib.request
+
+        entry = _proton_install_registry[install_name]
+        steam_root = find_steam_root()
+        compat_dir = steam_root / STEAM_COMPATTOOLS_FOLDER
+        compat_dir.mkdir(parents=True, exist_ok=True)
+
+        suffix = ".tar.gz"
+        for ext in (".tar.gz", ".tar.zst", ".tar.xz"):
+            if download_url.endswith(ext):
+                suffix = ext
+                break
+
+        tmp_path = None
+        try:
+            resp = urllib.request.urlopen(download_url, timeout=300, context=_ssl_context())
+            entry["total_bytes"] = int(resp.headers.get("Content-Length") or 0)
+
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                tmp_path = tmp.name
+                downloaded = 0
+                while True:
+                    if cancel_event.is_set():
+                        entry["status"] = "cancelled"
+                        return
+                    chunk = resp.read(65536)
+                    if not chunk:
+                        break
+                    tmp.write(chunk)
+                    downloaded += len(chunk)
+                    entry["bytes_downloaded"] = downloaded
+
+            if cancel_event.is_set():
+                entry["status"] = "cancelled"
+                return
+
+            entry["status"] = "extracting"
+
+            with tempfile.TemporaryDirectory() as extract_tmp:
+                if download_url.endswith(".tar.zst"):
+                    # Python tarfile doesn't support zstd — use system tar
+                    result = _sp.run(
+                        ["tar", "-xf", tmp_path, "-C", extract_tmp],
+                        check=False, timeout=600,
+                        capture_output=True, text=True,
+                    )
+                    if result.returncode != 0:
+                        raise RuntimeError(
+                            f"tar exited {result.returncode}: {result.stderr.strip() or result.stdout.strip()}"
+                        )
+                else:
+                    # gz and xz are handled natively by Python's tarfile (no xz binary needed)
+                    with tarfile.open(tmp_path, "r:*") as tar:
+                        tar.extractall(extract_tmp)
+
+                # Find the directory containing a proton script
+                extracted_dir = None
+                for root, dirs, files in os.walk(extract_tmp):
+                    if PROTON_SCRIPT_NAME in files or "toolmanifest.vdf" in files:
+                        extracted_dir = Path(root)
+                        break
+                if extracted_dir is None:
+                    raise RuntimeError("Could not find Proton directory in archive")
+
+                final_dir = compat_dir / install_name
+                if final_dir.exists():
+                    shutil.rmtree(final_dir)
+                shutil.move(str(extracted_dir), str(final_dir))
+
+            entry["status"] = "done"
+            logger.info("Installed Proton version: %s", install_name)
+
+        except Exception as exc:
+            if not cancel_event.is_set():
+                entry["status"] = "failed"
+                entry["error"] = str(exc)
+                logger.error("Failed to install %s: %s", install_name, exc)
+        finally:
+            if tmp_path and os.path.exists(tmp_path):
+                try:
+                    os.unlink(tmp_path)
+                except Exception:
+                    pass
+            _proton_cancel_events.pop(install_name, None)
+
+    _threading.Thread(target=_run, daemon=True).start()
+    return {"success": True, "error": None}
+
+
+def cancel_proton_install(install_name: str) -> dict:
+    """Cancel an in-progress Proton download."""
+    event = _proton_cancel_events.get(install_name)
+    if event:
+        event.set()
+        _proton_install_registry.pop(install_name, None)
+        return {"success": True, "error": None}
+    return {"success": False, "error": "No active install for this version"}
+
+
+def delete_proton_version(install_name: str) -> dict:
+    """Delete an installed Proton version from compatibilitytools.d."""
+    import shutil
+    steam_root = find_steam_root()
+    proton_dir = steam_root / STEAM_COMPATTOOLS_FOLDER / install_name
+    if not proton_dir.exists():
+        return {"success": False, "error": f"'{install_name}' not found in compatibilitytools.d"}
+    try:
+        shutil.rmtree(proton_dir)
+        logger.info("Deleted Proton version: %s", install_name)
+        return {"success": True, "error": None}
+    except Exception as exc:
+        return {"success": False, "error": str(exc)}
+
+
+def get_proton_install_statuses() -> dict:
+    """Return a snapshot of all tracked install operations."""
+    return {k: dict(v) for k, v in _proton_install_registry.items()}

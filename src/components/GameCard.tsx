@@ -11,10 +11,11 @@ const getGameCardArt = callable<
 interface Props {
   game: GameConfig;
   isInSteam?: boolean;
+  sourceCount?: number;
   onClick: () => void;
 }
 
-export const GameCard: VFC<Props> = ({ game, isInSteam, onClick }) => {
+export const GameCard: VFC<Props> = ({ game, isInSteam, sourceCount, onClick }) => {
   const [artUri, setArtUri] = useState<string | null>(null);
 
   useEffect(() => {
@@ -88,10 +89,10 @@ export const GameCard: VFC<Props> = ({ game, isInSteam, onClick }) => {
       )}
 
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "auto" }}>
-        {game.proton_version && (
-          <p style={{ margin: 0, fontSize: "11px", color: "#aaa" }}>
-            Proton: {game.proton_version}
-          </p>
+        {sourceCount !== undefined && sourceCount > 1 && (
+          <span style={{ fontSize: "10px", padding: "2px 6px", borderRadius: "4px", background: "rgba(0,120,212,0.25)", color: "#74b9ff" }}>
+            {sourceCount} sources
+          </span>
         )}
         {isInSteam && (
           <div
@@ -100,6 +101,7 @@ export const GameCard: VFC<Props> = ({ game, isInSteam, onClick }) => {
               display: "flex",
               alignItems: "center",
               gap: "4px",
+              marginLeft: "auto",
             }}
           >
             <svg viewBox="0 0 24 24" width="12" height="12" fill="#c7d5e0">

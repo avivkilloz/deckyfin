@@ -18,6 +18,7 @@ DEFAULT_CORS_ORIGIN = f"http://localhost:{DEFAULT_CORS_PORT}"
 # File and Folder Names
 APP_FOLDER = f".{APP_NAME}"
 CONFIG_FILE = "config.json"
+SOURCES_FILE = "sources.json"
 SAVES_FOLDER = "saves"
 COMPATDATA_FOLDER = "compatdata"
 SHORTCUTS_VDF = "shortcuts.vdf"

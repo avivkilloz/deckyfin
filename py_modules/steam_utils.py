@@ -15,6 +15,13 @@ logger = logging.getLogger(LOGGER_STEAM)
 def _get_real_home() -> Path:
     """Get the real user's home dir. Decky Loader runs as root, so Path.home() returns /root."""
     import os
+    # Decky Loader v3+ sets DECKY_USER_HOME directly
+    decky_user_home = os.environ.get("DECKY_USER_HOME")
+    if decky_user_home:
+        home = Path(decky_user_home)
+        if home.exists():
+            return home
+    # Older Decky used UNPRIVILEGED_PATH (a path whose parent is the home dir)
     unprivileged = os.environ.get("UNPRIVILEGED_PATH")
     if unprivileged:
         home = Path(unprivileged).parent
@@ -23,6 +30,12 @@ def _get_real_home() -> Path:
     sudo_user = os.environ.get("SUDO_USER")
     if sudo_user:
         home = Path("/home") / sudo_user
+        if home.exists():
+            return home
+    # DECKY_USER is also set by Decky v3+
+    decky_user = os.environ.get("DECKY_USER")
+    if decky_user:
+        home = Path("/home") / decky_user
         if home.exists():
             return home
     return Path.home()
