@@ -191,6 +191,10 @@ def _get_session_env() -> dict:
     display = _detect_display()
     if display:
         env["DISPLAY"] = display
+    # Without XAUTHORITY, Wine gets "Authorization required" even with DISPLAY
+    xauth = _detect_xauthority()
+    if xauth:
+        env["XAUTHORITY"] = xauth
     return env
 
 
@@ -227,6 +231,67 @@ def _detect_display() -> Optional[str]:
     return ":0"
 
 
+def _detect_xauthority() -> Optional[str]:
+    """Find the XAUTHORITY file needed for X11 authentication.
+
+    Without this, Wine subprocesses fail with 'Authorization required,
+    but no authorization protocol specified' even when DISPLAY is set.
+
+    Probe order:
+      1. XAUTHORITY env var (already set by the desktop session)
+      2. ~/.Xauthority (X11 and most KDE Wayland setups)
+      3. XDG_RUNTIME_DIR / /run/user/{uid} for XWayland compositor auth files
+         (GNOME on Wayland stores these as .mutter-Xwaylandauth.*)
+      4. /home/*/.Xauthority (fallback when running as root)
+    """
+    existing = os.environ.get("XAUTHORITY")
+    if existing and Path(existing).exists():
+        return existing
+
+    try:
+        default_auth = Path.home() / ".Xauthority"
+        if default_auth.exists():
+            return str(default_auth)
+    except Exception:
+        pass
+
+    # Scan XDG_RUNTIME_DIR and /run/user/{uid} for XWayland auth files.
+    # Probe /run/user/{uid} directly too — Decky's service env may lack
+    # XDG_RUNTIME_DIR even when the user's runtime dir exists on disk.
+    try:
+        candidates = []
+        xdg_env = os.environ.get("XDG_RUNTIME_DIR")
+        if xdg_env:
+            candidates.append(xdg_env)
+        run_user = f"/run/user/{os.geteuid()}"
+        if run_user not in candidates:
+            candidates.append(run_user)
+
+        for xdg in candidates:
+            xdg_path = Path(xdg)
+            if not xdg_path.is_dir():
+                continue
+            for f in sorted(xdg_path.iterdir()):
+                if (f.name.startswith(".mutter-Xwaylandauth")
+                        or f.name.startswith(".xauth")) and f.is_file():
+                    return str(f)
+    except Exception:
+        pass
+
+    # Running as root: scan /home for the real user's .Xauthority
+    try:
+        if os.geteuid() == 0:
+            for home_dir in sorted(Path("/home").iterdir()):
+                if home_dir.is_dir():
+                    xauth = home_dir / ".Xauthority"
+                    if xauth.exists():
+                        return str(xauth)
+    except Exception:
+        pass
+
+    return None
+
+
 def _runuser_cmd(cmd: list[str], username: str,
                  extra_env: Optional[dict[str, str]] = None) -> list[str]:
     """Wrap a command to run as a specific user via runuser.
@@ -251,6 +316,10 @@ def _runuser_cmd(cmd: list[str], username: str,
     display = _detect_display()
     if display:
         env_vars["DISPLAY"] = display
+    # Without XAUTHORITY, Wine gets "Authorization required" even with DISPLAY
+    xauth = _detect_xauthority()
+    if xauth:
+        env_vars["XAUTHORITY"] = xauth
 
     wrapper: list[str] = ["runuser", "-u", username, "--"]
 
@@ -582,7 +651,14 @@ def _build_methods(pfxid, dep, pfx_path, proton_wine, steam_root):
             if steam_root:
                 extra_env["STEAM_DIR"] = str(steam_root)
 
-            cmd: list[str] = [native, "--no-bwrap", pfxid, "--unattended", dep]
+            base_cmd: list[str] = [native, "--no-bwrap", pfxid, "--unattended", dep]
+
+            # Wrap with xvfb-run so Wine subprocesses (e.g. vc_redist.*.exe /q)
+            # can connect to a virtual display — the Decky service environment
+            # lacks the desktop session's XAUTHORITY, causing Wine to fail with
+            # "Authorization required" even when DISPLAY is correctly set.
+            xvfb = shutil.which("xvfb-run")
+            cmd = ([xvfb, "--auto-servernum"] + base_cmd) if xvfb else base_cmd
 
             real_user = _get_real_user()
             if real_user:
@@ -603,17 +679,36 @@ def _build_methods(pfxid, dep, pfx_path, proton_wine, steam_root):
         fp = _ensure_flatpak_protontricks()
         if fp:
             def _flatpak(t):
-                cmd = [
+                xvfb = shutil.which("xvfb-run")
+
+                flatpak_cmd = [
                     "flatpak", "run",
                     "--filesystem=host",
                     "--socket=session-bus",
+                    "--socket=x11",  # exposes X11 socket; flatpak sets DISPLAY inside sandbox
                 ]
                 if steam_root:
-                    cmd.append(f"--env=STEAM_DIR={str(steam_root)}")
-                cmd.extend([
+                    flatpak_cmd.append(f"--env=STEAM_DIR={str(steam_root)}")
+                # Without xvfb-run, try to detect and inject the real session's
+                # display auth. With xvfb-run, skip this — --socket=x11 picks up
+                # xvfb-run's DISPLAY and manages auth inside the sandbox automatically.
+                if not xvfb:
+                    _display = _detect_display()
+                    if _display:
+                        flatpak_cmd.append(f"--env=DISPLAY={_display}")
+                    _xauth = _detect_xauthority()
+                    if _xauth:
+                        flatpak_cmd.append(f"--env=XAUTHORITY={_xauth}")
+                flatpak_cmd.extend([
                     PROTONTRICKS_FLATPAK,
                     "--no-bwrap", pfxid, "--", "--force", "--unattended", dep,
                 ])
+
+                # Wrap with xvfb-run so Wine inside the sandbox gets a virtual
+                # display — avoids "Authorization required" from the sandboxed
+                # vc_redist.*.exe installer when the real X session auth is unavailable.
+                cmd = ([xvfb, "--auto-servernum", "--"] + flatpak_cmd) if xvfb else flatpak_cmd
+
                 real_user = _get_real_user()
                 if real_user:
                     full_cmd = _runuser_cmd(cmd, real_user)
@@ -625,12 +720,20 @@ def _build_methods(pfxid, dep, pfx_path, proton_wine, steam_root):
                         cmd, extra_env=_get_session_env() or None,
                         capture_output=True, text=True, timeout=t,
                     )
+                combined = (result.stderr or "") + "\n" + (result.stdout or "")
                 # Flatpak emits F:/W: deprecation warnings on stderr even on
                 # success — override returncode when no real error is present
-                if result.returncode != 0 and not _flatpak_has_real_error(
-                    (result.stderr or "") + "\n" + (result.stdout or "")
-                ):
+                if result.returncode != 0 and not _flatpak_has_real_error(combined):
                     result.returncode = 0
+                # Detect false-success: the Windows installer (vc_redist.*.exe)
+                # exits 0 without writing registry keys when Wine can't connect
+                # to the X display — DLLs land on disk but game still complains.
+                elif result.returncode == 0 and "Authorization required" in combined:
+                    logger.info(
+                        "flatpak protontricks: installer exited 0 but X auth failed "
+                        "— registry keys likely missing, forcing retry"
+                    )
+                    result.returncode = 1
                 return result
             methods.append(("flatpak protontricks", _flatpak))
 
