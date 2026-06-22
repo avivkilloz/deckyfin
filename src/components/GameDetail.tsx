@@ -563,6 +563,12 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
 
   // ── Prefix file browser ───────────────────────────────────────────────────
   const [showPrefixBrowser, setShowPrefixBrowser] = useState(false);
+  // ── Save path browser ─────────────────────────────────────────────────────
+  const [showSavePathBrowser, setShowSavePathBrowser] = useState(false);
+  const [savePathBrowserPath, setSavePathBrowserPath] = useState("");
+  const [savePathBrowserDirs, setSavePathBrowserDirs] = useState<string[]>([]);
+  const [savePathBrowserLoading, setSavePathBrowserLoading] = useState(false);
+  const [savePathBrowserFeedback, setSavePathBrowserFeedback] = useState<string | null>(null);
   const [showLaunchOptions, setShowLaunchOptions] = useState(false);
   const [showCollections, setShowCollections] = useState(false);
   const [showDependencies, setShowDependencies] = useState(false);
@@ -1008,6 +1014,62 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
 
   const handlePfxBrowserEnter = (dir: string) => {
     pfxBrowseTo(`${pfxBrowserPath}/${dir}`);
+  };
+
+  // ── Save path browser ─────────────────────────────────────────────────────
+  const savePathBrowseTo = async (path: string) => {
+    setSavePathBrowserLoading(true);
+    try {
+      const res = await listDirContents(path);
+      setSavePathBrowserPath(path);
+      setSavePathBrowserDirs(res.dirs);
+    } catch {}
+    setSavePathBrowserLoading(false);
+  };
+
+  const handleToggleSavePathBrowser = async () => {
+    if (showSavePathBrowser) {
+      setShowSavePathBrowser(false);
+      setSavePathBrowserFeedback(null);
+      return;
+    }
+    if (!steamInfo) {
+      setSavePathBrowserFeedback("Add game to Steam first.");
+      return;
+    }
+    let root = prefixRoot;
+    if (!root) {
+      root = await getGamePrefixPath(steamInfo.unsigned_appid).catch(() => null);
+      if (root) setPrefixRoot(root);
+    }
+    if (!root) {
+      setSavePathBrowserFeedback("Prefix not initialized — run Init Prefix first.");
+      return;
+    }
+    setSavePathBrowserFeedback(null);
+    await savePathBrowseTo(root);
+    setShowSavePathBrowser(true);
+  };
+
+  const handleSavePathBrowserUp = () => {
+    if (!prefixRoot || savePathBrowserPath === prefixRoot) return;
+    const parent = savePathBrowserPath.substring(0, savePathBrowserPath.lastIndexOf("/")) || prefixRoot;
+    savePathBrowseTo(parent.startsWith(prefixRoot) ? parent : prefixRoot);
+  };
+
+  const handleSavePathBrowserEnter = (dir: string) => {
+    savePathBrowseTo(`${savePathBrowserPath}/${dir}`);
+  };
+
+  const handleSavePathBrowserSelect = () => {
+    if (!prefixRoot) return;
+    const rel = savePathBrowserPath.startsWith(prefixRoot)
+      ? savePathBrowserPath.substring(prefixRoot.length).replace(/^\//, "")
+      : savePathBrowserPath;
+    setSelectedPfx("Browse");
+    setSyncSuffix(rel);
+    setShowSavePathBrowser(false);
+    setSavePathBrowserFeedback(null);
   };
 
   // ── SGDB game picker ───────────────────────────────────────────────────
@@ -1645,7 +1707,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
                 ["Steam App ID", steamAppId != null ? String(steamAppId) : "—"],
                 ["SteamGridDB ID", sgdbGameId != null ? String(sgdbGameId) : "—"],
                 ["Shortcut App ID", steamInfo ? String(steamInfo.unsigned_appid) : "—"],
-                ["On Steam", steamInfo ? "Yes" : "No"],
+                ["In Steam", steamInfo ? "Yes" : "No"],
                 ["Source", `${selectedSource.source_name} (${selectedSource.source_type})`],
               ] as [string, string][]).map(([label, value], i, arr) => (
                 <Fragment key={label}>
@@ -1809,12 +1871,12 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
               {onNavigateToSettings && <>{" "}To add more popular options, go to{" "}<Focusable onActivate={onNavigateToSettings} onClick={onNavigateToSettings} focusClassName="is-focused" style={{ display: "inline", color: "#5dade2", cursor: "pointer", background: "transparent", border: "none", padding: 0, fontSize: "inherit" }}>Settings → Popular Launcher Options</Focusable>.</>}
             </p>
             {popularLaunchers.length > 0 && (
-              <Focusable focusClassName="" style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "8px" }}>
+              <Focusable focusClassName="" style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "8px" }}>
                 {popularLaunchers.map((pl) => {
                   const active = checkedLaunchers.includes(pl.label);
                   return (
                     <Focusable key={pl.label} onActivate={() => toggleCheckedLauncher(pl.label)} onClick={() => toggleCheckedLauncher(pl.label)} focusClassName="is-focused"
-                      style={{ margin: "0 2px", padding: "4px 10px", borderRadius: "12px", fontSize: "0.82em", cursor: "pointer",
+                      style={{ padding: "4px 8px", borderRadius: "12px", fontSize: "0.82em", cursor: "pointer",
                         border: active ? "1px solid #0078d4" : "1px solid #555", background: active ? "#0078d4" : "transparent", color: active ? "white" : "#ccc" }}>
                       {pl.label}
                     </Focusable>
@@ -1843,12 +1905,12 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
               {onNavigateToSettings && <>{" "}To create or delete collections, go to{" "}<Focusable onActivate={onNavigateToSettings} onClick={onNavigateToSettings} focusClassName="is-focused" style={{ display: "inline", color: "#5dade2", cursor: "pointer", textDecoration: "underline" }}>Settings → Steam Collections</Focusable>.</>}
             </p>
             {steamCollections.length > 0 && (
-              <Focusable focusClassName="" style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "10px" }}>
+              <Focusable focusClassName="" style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "10px" }}>
                 {steamCollections.map((col) => {
                   const selected = checkedCollections.includes(col);
                   return (
                     <Focusable key={col} onActivate={() => toggleCheckedCollection(col)} onClick={() => toggleCheckedCollection(col)} focusClassName="is-focused"
-                      style={{ padding: "4px 12px", fontSize: "0.82em", borderRadius: "14px", cursor: "pointer",
+                      style={{ padding: "4px 8px", fontSize: "0.82em", borderRadius: "14px", cursor: "pointer",
                         border: selected ? "1px solid #0078d4" : "1px solid #555", background: selected ? "#0078d4" : "transparent", color: selected ? "white" : "#ccc" }}>
                       {col}
                     </Focusable>
@@ -1923,12 +1985,12 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
               </Focusable>.
               {onNavigateToSettings && <>{" "}To add more popular dependency chips, go to{" "}<Focusable onActivate={onNavigateToSettings} onClick={onNavigateToSettings} focusClassName="is-focused" style={{ display: "inline", color: "#5dade2", cursor: "pointer", background: "transparent", border: "none", padding: 0, fontSize: "inherit" }}>Settings → Popular Dependencies</Focusable>.</>}
             </p>
-            <Focusable focusClassName="" style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "10px" }}>
+            <Focusable focusClassName="" style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "10px" }}>
               {popularDeps.map((dep) => {
                 const selected = checkedDeps.includes(dep);
                 return (
                   <Focusable key={dep} onActivate={() => toggleCheckedDep(dep)} onClick={() => toggleCheckedDep(dep)} focusClassName="is-focused"
-                    style={{ padding: "4px 12px", fontSize: "0.82em", borderRadius: "14px", cursor: "pointer",
+                    style={{ padding: "4px 8px", fontSize: "0.82em", borderRadius: "14px", cursor: "pointer",
                       border: selected ? "1px solid #0078d4" : "1px solid #555", background: selected ? "#0078d4" : "transparent", color: selected ? "white" : "#ccc" }}>
                     {dep}
                   </Focusable>
@@ -1979,26 +2041,34 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
               { label: "Roaming", path: "drive_c/users/steamuser/AppData/Roaming" },
               { label: "LocalLow", path: "drive_c/users/steamuser/AppData/LocalLow" },
               { label: "Local", path: "drive_c/users/steamuser/AppData/Local" },
-              { label: "My Documents", path: "drive_c/users/steamuser/My Documents" },
-              { label: "My Games", path: "drive_c/users/steamuser/My Documents/My Games" },
+              { label: "Documents", path: "drive_c/users/Public/Documents" },
               { label: "Saved Games", path: "drive_c/users/steamuser/Saved Games" },
               { label: "Game Folder", path: "game://" },
-              { label: "Userdata", path: "userdata://" },
-              ...customSavePrefixes.filter((cp) => !["Roaming","LocalLow","Local","My Documents","My Games","Saved Games","Game Folder","Userdata","Custom"].includes(cp.label)),
+              ...customSavePrefixes.filter((cp) => !["Roaming","LocalLow","Local","Documents","Saved Games","Game Folder","Custom","Browse"].includes(cp.label)),
               { label: "Custom", path: "" },
+              { label: "Browse", path: "" },
             ];
             const activePfx = PREFIXES.find((p) => p.label === selectedPfx) ?? PREFIXES[0];
-            const isScheme = activePfx.path === "game://" || activePfx.path === "userdata://";
+            const isScheme = activePfx.path.endsWith("://");
             const fullPath = isScheme ? `${activePfx.path}${syncSuffix.trim()}` : activePfx.path ? `${activePfx.path}/${syncSuffix.trim()}`.replace(/\/$/, "") : syncSuffix.trim();
             const canAdd = syncSuffix.trim().length > 0;
             const handleAdd = () => { if (canAdd) { setSyncPaths((prev) => [...prev, fullPath]); setSyncSuffix(""); } };
+            const handlePfxChipClick = (pfx: { label: string; path: string }) => {
+              if (pfx.label === "Browse") {
+                setSelectedPfx("Browse");
+                handleToggleSavePathBrowser();
+              } else {
+                setSelectedPfx(pfx.label);
+                if (showSavePathBrowser) { setShowSavePathBrowser(false); setSavePathBrowserFeedback(null); }
+              }
+            };
             return (
               <>
                 <Focusable focusClassName="" style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "6px" }}>
                   {PREFIXES.map((pfx) => {
                     const active = selectedPfx === pfx.label;
                     return (
-                      <Focusable key={pfx.label} onActivate={() => setSelectedPfx(pfx.label)} onClick={() => setSelectedPfx(pfx.label)} focusClassName="is-focused"
+                      <Focusable key={pfx.label} onActivate={() => handlePfxChipClick(pfx)} onClick={() => handlePfxChipClick(pfx)} focusClassName="is-focused"
                         style={{ padding: "3px 9px", fontSize: "0.75em", borderRadius: "10px", cursor: "pointer",
                           border: active ? "1px solid #0078d4" : "1px solid #555", background: active ? "rgba(0,120,212,0.2)" : "transparent", color: active ? "#5dade2" : "#aaa" }}>
                         {pfx.label}
@@ -2008,13 +2078,47 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
                 </Focusable>
                 {activePfx.path && (
                   <div style={{ fontSize: "0.72em", color: "#555", marginBottom: "4px", fontFamily: "monospace", wordBreak: "break-all" }}>
-                    {activePfx.path === "game://" ? "[game folder]/" : activePfx.path === "userdata://" ? "[steam userdata]/" : `${activePfx.path}/`}
+                    {activePfx.path === "game://" ? "[game folder]/" : `${activePfx.path}/`}
                   </div>
+                )}
+                {savePathBrowserFeedback && (
+                  <div style={{ fontSize: "0.82em", color: "#e67e22", marginBottom: "4px" }}>{savePathBrowserFeedback}</div>
+                )}
+                {showSavePathBrowser && (
+                  <>
+                    <Focusable focusClassName="" style={{ display: "flex", gap: "6px", alignItems: "center", padding: "5px 8px", border: "1px solid #2a2a2a", borderRadius: "4px 4px 0 0", background: "#1a1a1a", marginBottom: "0" }}>
+                      <Focusable onActivate={handleSavePathBrowserUp} onClick={handleSavePathBrowserUp} focusClassName="is-focused"
+                        style={{ ...BTN_STYLE, padding: "2px 8px", fontSize: "0.78em", opacity: savePathBrowserPath === prefixRoot ? 0.3 : 1 }}>
+                        ← Up
+                      </Focusable>
+                      <span style={{ flex: 1, fontSize: "0.72em", color: "#666", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", direction: "rtl", textAlign: "left" as const }}>
+                        {prefixRoot ? (savePathBrowserPath.substring(prefixRoot.length) || "/") : savePathBrowserPath}
+                      </span>
+                      <Focusable onActivate={handleSavePathBrowserSelect} onClick={handleSavePathBrowserSelect} focusClassName="is-focused"
+                        style={{ ...BTN_STYLE, padding: "2px 8px", fontSize: "0.78em", border: "1px solid #27ae60", color: "#2ecc71" }}>
+                        Select
+                      </Focusable>
+                    </Focusable>
+                    <Focusable focusClassName="" style={{ maxHeight: "160px", overflowY: "auto", padding: "2px 0", border: "1px solid #2a2a2a", borderTop: "none", borderRadius: "0 0 4px 4px", marginBottom: "6px" }}>
+                      {savePathBrowserLoading && <p style={{ padding: "8px", margin: 0, fontSize: "0.82em", color: "#888" }}>Loading…</p>}
+                      {!savePathBrowserLoading && savePathBrowserDirs.length === 0 && (
+                        <p style={{ padding: "8px", margin: 0, fontSize: "0.82em", color: "#555" }}>Empty folder</p>
+                      )}
+                      {!savePathBrowserLoading && savePathBrowserDirs.map((dir) => (
+                        <Focusable key={dir} onActivate={() => handleSavePathBrowserEnter(dir)} onClick={() => handleSavePathBrowserEnter(dir)} focusClassName="is-focused"
+                          style={{ margin: "0 2px", padding: "4px 10px", fontSize: "0.82em", cursor: "pointer", borderBottom: "1px solid #2a2a2a" }}
+                          onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.06)")}
+                          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+                          📁 {dir}
+                        </Focusable>
+                      ))}
+                    </Focusable>
+                  </>
                 )}
                 <Focusable focusClassName="" style={{ display: "flex", gap: "6px" }}>
                   <div style={{ flex: 1 }}>
                     <CompactTextField value={syncSuffix} onChange={(e) => setSyncSuffix(e.target.value)}
-                      placeholder={activePfx.path === "game://" ? "CULTIC_Data/Saves" : activePfx.path === "userdata://" ? "<app_id>/remote" : activePfx.path ? "GameName/saves" : "drive_c/users/steamuser/..."}
+                      placeholder={activePfx.path === "game://" ? "CULTIC_Data/Saves" : activePfx.path ? "GameName/saves" : selectedPfx === "Browse" ? "Browse above to select a folder…" : "drive_c/users/steamuser/..."}
                       style={{ width: "100%" }} />
                   </div>
                   <Focusable onActivate={handleAdd} onClick={handleAdd} focusClassName="is-focused"

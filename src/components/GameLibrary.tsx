@@ -4,6 +4,7 @@ import { Focusable } from "@decky/ui";
 import { MergedGame, Source, TransferStatus } from "../types";
 import { useArtwork } from "../hooks/useArtwork";
 import { GameCard } from "../components/GameCard";
+import { GameArtRow } from "../components/GameArtRow";
 import { SettingsPage } from "../components/SettingsPage";
 import { GameDetail } from "../components/GameDetail";
 import { CompactTextField } from "../components/CompactTextField";
@@ -61,14 +62,14 @@ const BTN: React.CSSProperties = {
 };
 
 const CHIP = (active: boolean): React.CSSProperties => ({
-  padding: "3px 10px",
+  padding: "3px 8px",
   borderRadius: "12px",
   fontSize: "0.8em",
   cursor: "pointer",
   border: active ? "1px solid #27ae60" : "1px solid #555",
   color: active ? "#2ecc71" : "#aaa",
   background: active ? "#1a3a1a" : "transparent",
-  margin: "0 2px",
+  margin: "0",
 });
 
 // Module-level: survives component unmount so art apply progress is visible after reopening the panel.
@@ -88,7 +89,7 @@ export const GameLibrary: VFC = () => {
   const [restarting, setRestarting] = useState(false);
   const [needsRestart, setNeedsRestartState] = useState(false);
   const [isRestoring, setIsRestoring] = useState(true);
-  const [viewMode, setViewMode] = useState<"card" | "list">("card");
+  const [viewMode, setViewMode] = useState<"card" | "art" | "list">("card");
   const [artEnabled, setArtEnabled] = useState(true);
   const shouldRestoreState = useRef(true);
 
@@ -330,7 +331,7 @@ export const GameLibrary: VFC = () => {
       setArtEnabled(artOn);
       if (!artOn) {
         setViewMode("list");
-      } else if (viewModeRes.status === "fulfilled" && (viewModeRes.value === "card" || viewModeRes.value === "list")) {
+      } else if (viewModeRes.status === "fulfilled" && (viewModeRes.value === "card" || viewModeRes.value === "art" || viewModeRes.value === "list")) {
         setViewMode(viewModeRes.value);
       }
       if (uiStateRes.status === "fulfilled") {
@@ -1248,13 +1249,17 @@ export const GameLibrary: VFC = () => {
         )}
         {artEnabled && (
           <Focusable
-            onActivate={() => setViewMode((m) => { const next = m === "card" ? "list" : "card"; setViewModeBackend(next).catch(() => {}); return next; })}
-            onClick={() => setViewMode((m) => { const next = m === "card" ? "list" : "card"; setViewModeBackend(next).catch(() => {}); return next; })}
+            onActivate={() => setViewMode((m) => { const next = m === "card" ? "art" : m === "art" ? "list" : "card"; setViewModeBackend(next).catch(() => {}); return next; })}
+            onClick={() => setViewMode((m) => { const next = m === "card" ? "art" : m === "art" ? "list" : "card"; setViewModeBackend(next).catch(() => {}); return next; })}
             focusClassName="is-focused"
-            title={viewMode === "card" ? "Switch to list view" : "Switch to card view"}
+            title={viewMode === "card" ? "Switch to art view" : viewMode === "art" ? "Switch to list view" : "Switch to card view"}
             style={{ ...BTN, padding: "6px 9px", display: "flex", alignItems: "center", justifyContent: "center" }}
           >
             {viewMode === "card" ? (
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style={{ display: "block" }}>
+                <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" />
+              </svg>
+            ) : viewMode === "art" ? (
               <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style={{ display: "block" }}>
                 <path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zm0-10v2h14V7H7z" />
               </svg>
@@ -1278,7 +1283,7 @@ export const GameLibrary: VFC = () => {
               </div>
               <Focusable
                 focusClassName=""
-                style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "12px" }}
+                style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "12px" }}
               >
                 {allSources.map((src) => (
                   <Focusable
@@ -1303,7 +1308,7 @@ export const GameLibrary: VFC = () => {
               </div>
               <Focusable
                 focusClassName=""
-                style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "12px" }}
+                style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "12px" }}
               >
                 {allCollections.map((col) => (
                   <Focusable
@@ -1324,7 +1329,7 @@ export const GameLibrary: VFC = () => {
           <div style={{ fontSize: "0.75em", color: "#888", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.05em" }}>
             Steam Status
           </div>
-          <Focusable focusClassName="" style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "12px" }}>
+          <Focusable focusClassName="" style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "12px" }}>
             {(["all", "in-steam", "not-in-steam"] as const).map((opt) => (
               <Focusable
                 key={opt}
@@ -1333,7 +1338,7 @@ export const GameLibrary: VFC = () => {
                 focusClassName="is-focused"
                 style={CHIP(filterSteamStatus === opt)}
               >
-                {opt === "all" ? "— All —" : opt === "in-steam" ? "In Steam" : "Not in Steam"}
+                {opt === "all" ? "All" : opt === "in-steam" ? "In Steam" : "Not in Steam"}
               </Focusable>
             ))}
           </Focusable>
@@ -1377,7 +1382,18 @@ export const GameLibrary: VFC = () => {
           )}
         </div>
       )}
-      {viewMode === "card" ? (
+      {viewMode === "art" ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+          {filteredGames.map((game) => (
+            <GameArtRow
+              key={game.id}
+              game={game}
+              isInSteam={steamNames.has(game.name)}
+              onClick={() => openGame(game)}
+            />
+          ))}
+        </div>
+      ) : viewMode === "card" ? (
         <div
           style={{
             display: "grid",
@@ -1416,18 +1432,20 @@ export const GameLibrary: VFC = () => {
               onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.05)")}
               onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.boxShadow = "none"; }}
             >
-              <div style={{ fontSize: "13px", fontWeight: 600, marginBottom: "4px" }}>{game.name}</div>
               <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                {game.sources.length > 1 && (
-                  <span style={{ fontSize: "10px", padding: "2px 6px", borderRadius: "4px", background: "rgba(0,120,212,0.25)", color: "#74b9ff" }}>
-                    {game.sources.length} sources
-                  </span>
-                )}
-                {steamNames.has(game.name) && (
-                  <svg viewBox="0 0 24 24" width="13" height="13" fill="#c7d5e0">
-                    <path d="M11.979 0C5.678 0 .511 4.86.022 11.037l6.432 2.658c.545-.371 1.203-.59 1.912-.59.063 0 .125.004.188.006l2.861-4.142V8.91c0-2.495 2.028-4.524 4.524-4.524 2.494 0 4.524 2.031 4.524 4.527s-2.03 4.525-4.524 4.525h-.105l-4.076 2.911c0 .052.004.105.004.159 0 1.875-1.515 3.396-3.39 3.396-1.635 0-3.016-1.173-3.331-2.727L.436 15.27C1.862 20.307 6.486 24 11.979 24c6.627 0 11.999-5.373 11.999-12S18.605 0 11.979 0zM7.54 18.21l-1.473-.61c.262.543.714.999 1.314 1.25 1.297.539 2.793-.076 3.332-1.375.263-.63.264-1.319.005-1.949s-.75-1.121-1.377-1.383c-.624-.26-1.29-.249-1.878-.03l1.523.63c.956.4 1.409 1.5 1.009 2.455-.397.957-1.497 1.41-2.455 1.012H7.54zm11.415-9.303c0-1.662-1.353-3.015-3.015-3.015-1.665 0-3.015 1.353-3.015 3.015 0 1.665 1.35 3.015 3.015 3.015 1.663 0 3.015-1.35 3.015-3.015zm-5.273-.005c0-1.252 1.013-2.266 2.265-2.266 1.249 0 2.266 1.014 2.266 2.266 0 1.251-1.017 2.265-2.266 2.265-1.252 0-2.265-1.014-2.265-2.265z"/>
-                  </svg>
-                )}
+                <span style={{ fontSize: "13px", fontWeight: 600, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{game.name}</span>
+                <div style={{ display: "flex", alignItems: "center", gap: "4px", flexShrink: 0 }}>
+                  {game.sources.length > 1 && (
+                    <span style={{ fontSize: "10px", fontWeight: 700, padding: "1px 5px", borderRadius: "4px", background: "rgba(0,120,212,0.25)", color: "#74b9ff" }}>
+                      {game.sources.length}
+                    </span>
+                  )}
+                  {steamNames.has(game.name) && (
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="#c7d5e0">
+                      <path d="M11.979 0C5.678 0 .511 4.86.022 11.037l6.432 2.658c.545-.371 1.203-.59 1.912-.59.063 0 .125.004.188.006l2.861-4.142V8.91c0-2.495 2.028-4.524 4.524-4.524 2.494 0 4.524 2.031 4.524 4.527s-2.03 4.525-4.524 4.525h-.105l-4.076 2.911c0 .052.004.105.004.159 0 1.875-1.515 3.396-3.39 3.396-1.635 0-3.016-1.173-3.331-2.727L.436 15.27C1.862 20.307 6.486 24 11.979 24c6.627 0 11.999-5.373 11.999-12S18.605 0 11.979 0zM7.54 18.21l-1.473-.61c.262.543.714.999 1.314 1.25 1.297.539 2.793-.076 3.332-1.375.263-.63.264-1.319.005-1.949s-.75-1.121-1.377-1.383c-.624-.26-1.29-.249-1.878-.03l1.523.63c.956.4 1.409 1.5 1.009 2.455-.397.957-1.497 1.41-2.455 1.012H7.54zm11.415-9.303c0-1.662-1.353-3.015-3.015-3.015-1.665 0-3.015 1.353-3.015 3.015 0 1.665 1.35 3.015 3.015 3.015 1.663 0 3.015-1.35 3.015-3.015zm-5.273-.005c0-1.252 1.013-2.266 2.265-2.266 1.249 0 2.266 1.014 2.266 2.266 0 1.251-1.017 2.265-2.266 2.265-1.252 0-2.265-1.014-2.265-2.265z"/>
+                    </svg>
+                  )}
+                </div>
               </div>
             </Focusable>
           ))}

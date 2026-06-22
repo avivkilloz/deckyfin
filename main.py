@@ -974,7 +974,7 @@ class Plugin:
     async def set_view_mode(self, mode: str) -> dict:
         """Persist library view mode across sidebar closes and Steam restarts."""
         from deckyfin_config import set_app_config
-        set_app_config({"view_mode": mode if mode in ("card", "list") else "card"})
+        set_app_config({"view_mode": mode if mode in ("card", "list", "art") else "card"})
         return {"success": True}
 
     async def get_art_enabled(self) -> dict:

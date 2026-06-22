@@ -30,6 +30,7 @@ const fetchArtUrls = callable<
     hero?: string;
     logo?: string;
     wide?: string;
+    icon?: string;
   }
 >("fetch_steamgrid_art_urls");
 
@@ -44,6 +45,7 @@ const fetchArtUrlsById = callable<
     hero?: string;
     logo?: string;
     wide?: string;
+    icon?: string;
   }
 >("fetch_steamgrid_art_urls_by_id");
 
@@ -191,6 +193,7 @@ export function useArtwork() {
         { key: "hero", type: AssetType.HERO, url: urls.hero },
         { key: "logo", type: AssetType.LOGO, url: urls.logo },
         { key: "wide", type: AssetType.GRID_L, url: urls.wide },
+        { key: "icon", type: AssetType.ICON, url: urls.icon },
       ];
 
       for (const { key, type, url } of typeMap) {
@@ -249,6 +252,7 @@ export function useArtwork() {
         { key: "hero", type: AssetType.HERO, url: urls.hero },
         { key: "logo", type: AssetType.LOGO, url: urls.logo },
         { key: "wide", type: AssetType.GRID_L, url: urls.wide },
+        { key: "icon", type: AssetType.ICON, url: urls.icon },
       ];
 
       for (const { key, type, url } of typeMap) {

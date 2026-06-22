@@ -184,6 +184,7 @@ def _fetch_art_urls_for_game_id(game_id: int, game_name: str | None = None) -> d
         "hero": None,
         "logo": None,
         "wide": None,
+        "icon": None,
     }
 
     # Get SGDB game data for the name info
@@ -229,7 +230,12 @@ def _fetch_art_urls_for_game_id(game_id: int, game_name: str | None = None) -> d
     if logo_data and logo_data.get("success"):
         result["logo"] = _pick_first_image(logo_data.get("data", []))
 
-    result["success"] = bool(result["grid_p"] or result["hero"] or result["logo"] or result["wide"])
+    # Icon (eAssetType 4)
+    icon_data = _api_get(f"/icons/game/{game_id}")
+    if icon_data and icon_data.get("success"):
+        result["icon"] = _pick_first_image(icon_data.get("data", []))
+
+    result["success"] = bool(result["grid_p"] or result["hero"] or result["logo"] or result["wide"] or result["icon"])
     if not result["success"]:
         result["error"] = f"No art found for game ID {game_id} on SteamGridDB"
 
