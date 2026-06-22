@@ -37,6 +37,12 @@ jobs:
       - name: Build frontend
         run: npm run build
 
+      - name: Stamp version into plugin.json
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          jq --arg v "$VERSION" '.version = $v' plugin.json > plugin.json.tmp
+          mv plugin.json.tmp plugin.json
+
       - name: Package plugin
         run: |
           mkdir -p package/deckyfin
