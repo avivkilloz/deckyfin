@@ -73,7 +73,8 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStartPre=/bin/mkdir -p /home/deck/homeserver/drive
+ExecStartPre=/usr/bin/rm -rf /home/deck/homeserver/drive
+ExecStartPre=/usr/bin/mkdir -p /home/deck/homeserver/drive
 ExecStart=/usr/bin/sshfs youruser@192.168.1.x:/path/to/games \
     /home/deck/homeserver/drive \
     -f \
@@ -81,16 +82,25 @@ ExecStart=/usr/bin/sshfs youruser@192.168.1.x:/path/to/games \
     -o reconnect \
     -o ServerAliveInterval=15 \
     -o ServerAliveCountMax=3 \
-    -o _netdev \
     -o uid=1000 \
-    -o gid=1000
-ExecStop=/usr/bin/fusermount -u /home/deck/homeserver/drive
+    -o gid=1000 \
+    -o intr \
+    -o connection_timeout=15
+ExecStop=/usr/bin/pkill -f "sshfs.*homeserver/drive" || true
+ExecStop=/usr/bin/fusermount -uz /home/deck/homeserver/drive || true
+TimeoutStartSec=30
+TimeoutStopSec=10
+KillMode=mixed
 Restart=on-failure
 RestartSec=10
 
 [Install]
 WantedBy=default.target
 ```
+
+The two critical options for offline resilience:
+- **`-o intr`** — allows the kernel to interrupt filesystem operations when the SSH connection drops. Without this, any process that touches the mount point (file managers, Deckyfin, shell) enters an uninterruptible sleep (D-state) and freezes until the server comes back.
+- **`-o connection_timeout=15`** — limits how long to wait for the initial SSH handshake. Prevents the service from hanging at boot when the server is unreachable.
 
 Enable and start:
 
@@ -380,6 +390,27 @@ Deckyfin will detect your game folders and create config entries for each one.
 ---
 
 ## Troubleshooting
+
+**Deckyfin / Dolphin freezes when the server is offline:**
+
+This happens when SSHFS is mounted without `-o intr`. Any process that opens a file or lists a directory on the mount point blocks in the kernel until the server returns — there is no timeout.
+
+Fix it by editing your service to add `-o intr` and `-o connection_timeout=15` (see the service template above), then restart:
+
+```bash
+systemctl --user daemon-reload
+systemctl --user restart home-deck-homeserver-drive.service
+```
+
+If a process is already frozen (D-state), you cannot kill it with `kill -9` — only the kernel can release it once the mount is cleaned up. Force-unmount to unblock everything:
+
+```bash
+fusermount -uz /home/deck/homeserver/drive
+```
+
+That releases all waiting processes immediately. The service will restart and reconnect when the server comes back.
+
+---
 
 **Mount not appearing after reboot:**
 - For user services (SSHFS): run `systemctl --user status home-deck-homeserver-drive.service`
