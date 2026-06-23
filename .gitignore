@@ -27,13 +27,4 @@ tests/fixtures/generated/
 .claude/
 
 
-pr_description.md# Source Enable/Disable — SDD Progress
-
-Plan: docs/superpowers/plans/2026-06-23-source-enable-disable.md
-
-## Tasks
-- [ ] Task 1: Backend — set_source_enabled in deckyfin_sources.py
-- [ ] Task 2: RPC — expose set_source_enabled in main.py
-- [ ] Task 3: TypeScript — add enabled to Source interface
-- [ ] Task 4: Settings UI — Disable/Enable button on source card
-- [ ] Task 5: Game Library — filter games from disabled sources
+pr_description.md
