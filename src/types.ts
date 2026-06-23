@@ -96,6 +96,7 @@ export interface Source {
   type: SourceType;
   path: string | null;
   url: string | null;
+  enabled: boolean;
 }
 
 export interface SourceCapabilities {
