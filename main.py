@@ -437,6 +437,8 @@ class Plugin:
         source = _get_source_by_id(source_id)
         if not source:
             return {"can_play": False, "can_write_config": False, "can_download_to": False}
+        if not source.get("enabled", True):
+            return {"can_play": False, "can_write_config": False, "can_download_to": False}
         caps = _detect_capabilities(source)
         # os.access() from root returns False for FUSE mounts (kernel blocks root) and NFS
         # with root_squash (root → nobody). But our update_game_config subprocess fallback
@@ -748,6 +750,8 @@ class Plugin:
         source = _get_source_by_id(source_id)
         if not source:
             return {"used": None, "total": None, "free": None}
+        if not source.get("enabled", True):
+            return {"used": None, "total": None, "free": None}
         path = source.get("path", "")
         current_uid = os.getuid()
         owner_uid, owner_gid = _owner_creds_for(path) if path else (0, 0)
@@ -1020,6 +1024,8 @@ class Plugin:
         merged: dict[str, dict] = {}
         current_uid = os.getuid()
         for source in sources:
+            if not source.get("enabled", True):
+                continue
             games = []
             try:
                 games = _load_source_games(source)
@@ -1626,6 +1632,8 @@ class Plugin:
         seen_ids: set = set()
         eligible = []
         for source in _list_sources():
+            if not source.get("enabled", True):
+                continue
             try:
                 games = _load_source_games(source)
             except Exception:
