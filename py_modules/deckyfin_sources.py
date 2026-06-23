@@ -68,8 +68,9 @@ def _validate_local_path(path: str) -> None:
 # ── Source CRUD ───────────────────────────────────────────────────────────────
 
 def list_sources() -> list:
-    """Return all configured sources."""
-    return get_app_config().get("sources", [])
+    """Return all configured sources, normalizing missing enabled field to True."""
+    sources = get_app_config().get("sources", [])
+    return [{**s, "enabled": s.get("enabled", True)} for s in sources]
 
 
 def get_source_by_id(source_id: str) -> Optional[dict]:
@@ -87,6 +88,7 @@ def add_source(name: str, type_: str, path: Optional[str], url: Optional[str]) -
         "type": type_,
         "path": path,
         "url": url,
+        "enabled": True,
     }
     sources = list_sources()
     sources.append(source)
@@ -118,6 +120,18 @@ def reorder_source(source_id: str, direction: str) -> bool:
         return False
     set_app_config({"sources": sources})
     return True
+
+
+def set_source_enabled(source_id: str, enabled: bool) -> bool:
+    """Set the enabled flag on a source. Returns True if found, False if not."""
+    config = get_app_config()
+    sources = config.get("sources", [])
+    for s in sources:
+        if s["id"] == source_id:
+            s["enabled"] = enabled
+            set_app_config({"sources": sources})
+            return True
+    return False
 
 
 # ── Migration ─────────────────────────────────────────────────────────────────

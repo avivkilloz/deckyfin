@@ -293,3 +293,55 @@ def test_add_source_mount_skips_validation(tmp_path, monkeypatch):
     # Even a non-existent path is fine for mount type
     source = mod.add_source("NAS", "mount", "/home/deck/nonexistent-mount", None)
     assert source["type"] == "mount"
+
+
+def test_add_source_has_enabled_true(tmp_path, monkeypatch):
+    """add_source always includes enabled=True."""
+    _make_app_config(tmp_path, {})
+    monkeypatch.setenv("HOME", str(tmp_path))
+    import importlib, deckyfin_config, deckyfin_sources
+    importlib.reload(deckyfin_config)
+    importlib.reload(deckyfin_sources)
+    from deckyfin_sources import add_source
+    source = add_source("Games", "local", str(tmp_path), None)
+    assert source["enabled"] is True
+
+
+def test_list_sources_defaults_enabled(tmp_path, monkeypatch):
+    """list_sources returns enabled=True for entries without the field."""
+    _make_app_config(tmp_path, {
+        "sources": [{"id": "abc", "name": "Old", "type": "local", "path": "/games", "url": None}]
+    })
+    monkeypatch.setenv("HOME", str(tmp_path))
+    import importlib, deckyfin_config, deckyfin_sources
+    importlib.reload(deckyfin_config)
+    importlib.reload(deckyfin_sources)
+    from deckyfin_sources import list_sources
+    sources = list_sources()
+    assert sources[0]["enabled"] is True
+
+
+def test_set_source_enabled(tmp_path, monkeypatch):
+    """set_source_enabled persists the enabled flag."""
+    _make_app_config(tmp_path, {})
+    monkeypatch.setenv("HOME", str(tmp_path))
+    import importlib, deckyfin_config, deckyfin_sources
+    importlib.reload(deckyfin_config)
+    importlib.reload(deckyfin_sources)
+    from deckyfin_sources import add_source, set_source_enabled, list_sources
+    source = add_source("Games", "local", str(tmp_path), None)
+    assert set_source_enabled(source["id"], False) is True
+    assert list_sources()[0]["enabled"] is False
+    assert set_source_enabled(source["id"], True) is True
+    assert list_sources()[0]["enabled"] is True
+
+
+def test_set_source_enabled_not_found(tmp_path, monkeypatch):
+    """set_source_enabled returns False for unknown id."""
+    _make_app_config(tmp_path, {})
+    monkeypatch.setenv("HOME", str(tmp_path))
+    import importlib, deckyfin_config, deckyfin_sources
+    importlib.reload(deckyfin_config)
+    importlib.reload(deckyfin_sources)
+    from deckyfin_sources import set_source_enabled
+    assert set_source_enabled("nonexistent", False) is False
