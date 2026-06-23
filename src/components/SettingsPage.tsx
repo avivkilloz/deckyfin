@@ -19,6 +19,7 @@ const addSource = callable<
 >("add_source");
 const removeSource = callable<[source_id: string], { success: boolean }>("remove_source");
 const reorderSource = callable<[source_id: string, direction: string], { success: boolean }>("reorder_source");
+const setSourceEnabled = callable<[source_id: string, enabled: boolean], { success: boolean }>("set_source_enabled");
 const getSourceDiskUsage = callable<[source_id: string], { used: number | null; total: number | null; free: number | null }>("get_source_disk_usage");
 const initializeSource = callable<[source_id: string], { success: boolean; message?: string }>("initialize_source");
 const listActiveTransfers = callable<
@@ -449,6 +450,13 @@ export const SettingsPage: VFC<Props> = ({ onBack, artEnabled = true, onArtEnabl
     } catch {}
   };
 
+  const handleToggleSource = async (source_id: string, enabled: boolean) => {
+    try {
+      await setSourceEnabled(source_id, enabled);
+      await loadSources();
+    } catch {}
+  };
+
   // ── SteamGridDB key ──────────────────────────────────────────────────
   const [sgKey, setSgKey] = useState("");
   const [sgHasOverride, setSgHasOverride] = useState(false);
@@ -662,7 +670,7 @@ export const SettingsPage: VFC<Props> = ({ onBack, artEnabled = true, onArtEnabl
         const offline = !usage?.total && usage?.total !== undefined;
         const xfer = activeTransfers.find((t) => t.to_source_id === src.id && t.status === "running");
         return (
-          <div key={src.id} style={{ border: "1px solid #3a3a3a", borderRadius: "6px", marginBottom: "8px", opacity: offline ? 0.7 : 1 }}>
+          <div key={src.id} style={{ border: "1px solid #3a3a3a", borderRadius: "6px", marginBottom: "8px", opacity: (offline || src.enabled === false) ? 0.5 : 1 }}>
             {/* Header */}
             <Focusable focusClassName="" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "#1e1e1e", borderRadius: "6px 6px 0 0" }}>
               <span style={{ fontWeight: 600, fontSize: "0.9em", color: "#e0e0e0" }}>
@@ -691,6 +699,10 @@ export const SettingsPage: VFC<Props> = ({ onBack, artEnabled = true, onArtEnabl
                   <Focusable onActivate={() => handleRescanSource(src.id)} onClick={() => handleRescanSource(src.id)} focusClassName="is-focused"
                     style={{ ...BTN_STYLE, fontSize: "0.75em", padding: "2px 8px" }}>
                     {sourceMessage?.id === src.id ? sourceMessage.msg : "Rescan"}
+                  </Focusable>
+                  <Focusable onActivate={() => handleToggleSource(src.id, src.enabled === false)} onClick={() => handleToggleSource(src.id, src.enabled === false)} focusClassName="is-focused"
+                    style={{ ...BTN_STYLE, fontSize: "0.75em", padding: "2px 8px", borderColor: src.enabled === false ? "#27ae60" : "#888", color: src.enabled === false ? "#2ecc71" : "#aaa" }}>
+                    {src.enabled === false ? "Enable" : "Disable"}
                   </Focusable>
                   <Focusable onActivate={() => handleRemoveSource(src.id)} onClick={() => handleRemoveSource(src.id)} focusClassName="is-focused"
                     style={{ ...BTN_STYLE, fontSize: "0.75em", padding: "2px 8px", borderColor: "#c0392b", color: "#e74c3c" }}>
