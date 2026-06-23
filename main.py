@@ -2307,13 +2307,20 @@ class Plugin:
                     grid_folder = steam_root / STEAM_USERDATA_FOLDER / uid / "config" / "grid"
                     appid_str = str(unsigned_appid)
                     candidates = [
+                        # SetCustomArtworkForApp writes portrait as {appid}p.png (no underscore)
+                        grid_folder / f"{appid_str}p.png",
+                        grid_folder / f"{appid_str}p.jpg",
+                        # Landscape/wide — type 3
                         grid_folder / f"{appid_str}.png",
                         grid_folder / f"{appid_str}.jpg",
-                        grid_folder / f"{appid_str}_p.png",
-                        grid_folder / f"{appid_str}_p.jpg",
+                        # Hero — type 1
                         grid_folder / f"{appid_str}_hero.png",
                         grid_folder / f"{appid_str}_hero.jpg",
+                        # Logo — type 2
                         grid_folder / f"{appid_str}_logo.png",
+                        # Legacy underscore naming (older Deckyfin writes or manual placement)
+                        grid_folder / f"{appid_str}_p.png",
+                        grid_folder / f"{appid_str}_p.jpg",
                     ]
                     for path in candidates:
                         if path.exists():

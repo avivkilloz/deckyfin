@@ -1,4 +1,5 @@
 {
+  "id": "deckyfin",
   "name": "Deckyfin",
   "version": "0.1.0",
   "description": "Manage game and application libraries on Steam Deck / Linux",
@@ -7,8 +8,9 @@
   "api_version": 1,
   "flags": [],
   "publish": {
-    "tags": ["Gaming", "Utilities", "Library"],
+    "tags": ["Gaming", "Utilities", "Library", "Proton", "Wine", "Shortcuts"],
     "description": "Manage game and application libraries from the Decky panel. Add games to Steam as shortcuts, configure Proton versions, install dependencies (vcrun, DirectX, etc.), set up Proton prefixes, and apply SteamGridDB artwork — all without leaving Gaming Mode.",
+    "image": "https://raw.githubusercontent.com/avivkilloz/deckyfin/main/docs/deckyfin_home.png",
     "website": "https://github.com/avivkilloz/deckyfin",
     "support_url": "https://github.com/avivkilloz/deckyfin/issues"
   }

@@ -1120,6 +1120,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
       const { applied, errors } = await applyArtById(sgdbGameId, steamInfo!.unsigned_appid, artName);
       if (applied.length > 0) {
         setSteamArtFeedback({ ok: true, msg: `Applied ${applied.join(", ")} art` });
+        invalidateArtCache(game.id);
+        getGameCardArt(game.name, game.id).then((r) => { const uri = r.data_uri || null; setCachedArt(game.id, uri); }).catch(() => {});
       } else {
         setSteamArtFeedback({ ok: false, msg: errors.join("; ") || "No art found" });
       }
@@ -1164,6 +1166,10 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
       setSteamArtFeedback(ok
         ? { ok: true, msg: `Applied ${steamArtTab} art to Steam` }
         : { ok: false, msg: `Failed to apply ${steamArtTab} art` });
+      if (ok) {
+        invalidateArtCache(game.id);
+        getGameCardArt(game.name, game.id).then((r) => { const uri = r.data_uri || null; setCachedArt(game.id, uri); }).catch(() => {});
+      }
     } catch (err: any) {
       setSteamArtFeedback({ ok: false, msg: err?.message || "Error" });
     }

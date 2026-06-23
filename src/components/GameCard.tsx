@@ -5,7 +5,7 @@ import { GameConfig } from "../types";
 import { getCachedArt, setCachedArt } from "../artCache";
 
 const getGameCardArt = callable<
-  [game_name: string],
+  [game_name: string, game_id?: string],
   { data_uri: string | null }
 >("get_game_card_art");
 
@@ -20,14 +20,15 @@ interface Props {
 export const GameCard: VFC<Props> = ({ game, isInSteam, sourceCount, onClick, artEnabled = true }) => {
   const [artUri, setArtUri] = useState<string | null>(null);
 
+  const cacheKey = game.id ?? game.name;
   useEffect(() => {
     if (!artEnabled) { setArtUri(null); return; }
-    const cached = getCachedArt(game.name);
+    const cached = getCachedArt(cacheKey);
     if (cached !== undefined) { setArtUri(cached); return; }
-    getGameCardArt(game.name)
-      .then((res) => { const uri = res.data_uri || null; setCachedArt(game.name, uri); setArtUri(uri); })
-      .catch(() => { setCachedArt(game.name, null); setArtUri(null); });
-  }, [game.name, artEnabled]);
+    getGameCardArt(game.name, game.id)
+      .then((res) => { const uri = res.data_uri || null; setCachedArt(cacheKey, uri); setArtUri(uri); })
+      .catch(() => { setCachedArt(cacheKey, null); setArtUri(null); });
+  }, [cacheKey, artEnabled]);
 
   return (
     <Focusable
