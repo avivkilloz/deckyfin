@@ -124,8 +124,7 @@ def reorder_source(source_id: str, direction: str) -> bool:
 
 def set_source_enabled(source_id: str, enabled: bool) -> bool:
     """Set the enabled flag on a source. Returns True if found, False if not."""
-    config = get_app_config()
-    sources = config.get("sources", [])
+    sources = list_sources()
     for s in sources:
         if s["id"] == source_id:
             s["enabled"] = enabled
