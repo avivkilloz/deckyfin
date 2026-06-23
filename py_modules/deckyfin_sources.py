@@ -146,6 +146,7 @@ def migrate_games_folder_to_source() -> bool:
         "type": "local",
         "path": config["games_folder"],
         "url": None,
+        "enabled": True,
     }
     set_app_config({"sources": [source]})
     return True

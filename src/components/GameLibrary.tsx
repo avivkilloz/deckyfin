@@ -462,8 +462,8 @@ export const GameLibrary: VFC = () => {
     setView("game-detail");
   };
 
+  const disabledIds = new Set(xferSources.filter((s) => s.enabled === false).map((s) => s.id));
   const filteredGames = games.filter((g) => {
-    const disabledIds = new Set(xferSources.filter((s) => s.enabled === false).map((s) => s.id));
     if (disabledIds.size > 0 && g.sources.every((s) => disabledIds.has(s.source_id)))
       return false;
     if (searchQuery && !g.name.toLowerCase().includes(searchQuery.toLowerCase()))
