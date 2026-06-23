@@ -450,11 +450,18 @@ export const SettingsPage: VFC<Props> = ({ onBack, artEnabled = true, onArtEnabl
     } catch {}
   };
 
+  const [togglingSourceIds, setTogglingSourceIds] = useState<Set<string>>(new Set());
+
   const handleToggleSource = async (source_id: string, enabled: boolean) => {
+    setTogglingSourceIds((prev) => new Set([...prev, source_id]));
     try {
       await setSourceEnabled(source_id, enabled);
       await loadSources();
-    } catch {}
+    } catch {
+      await loadSources();
+    } finally {
+      setTogglingSourceIds((prev) => { const next = new Set(prev); next.delete(source_id); return next; });
+    }
   };
 
   // ── SteamGridDB key ──────────────────────────────────────────────────
@@ -700,8 +707,8 @@ export const SettingsPage: VFC<Props> = ({ onBack, artEnabled = true, onArtEnabl
                     style={{ ...BTN_STYLE, fontSize: "0.75em", padding: "2px 8px" }}>
                     {sourceMessage?.id === src.id ? sourceMessage.msg : "Rescan"}
                   </Focusable>
-                  <Focusable onActivate={() => handleToggleSource(src.id, src.enabled === false)} onClick={() => handleToggleSource(src.id, src.enabled === false)} focusClassName="is-focused"
-                    style={{ ...BTN_STYLE, fontSize: "0.75em", padding: "2px 8px", borderColor: src.enabled === false ? "#27ae60" : "#888", color: src.enabled === false ? "#2ecc71" : "#aaa" }}>
+                  <Focusable onActivate={() => !togglingSourceIds.has(src.id) && handleToggleSource(src.id, src.enabled === false)} onClick={() => !togglingSourceIds.has(src.id) && handleToggleSource(src.id, src.enabled === false)} focusClassName="is-focused"
+                    style={{ ...BTN_STYLE, fontSize: "0.75em", padding: "2px 8px", borderColor: src.enabled === false ? "#27ae60" : "#888", color: src.enabled === false ? "#2ecc71" : "#aaa", opacity: togglingSourceIds.has(src.id) ? 0.5 : 1 }}>
                     {src.enabled === false ? "Enable" : "Disable"}
                   </Focusable>
                   <Focusable onActivate={() => handleRemoveSource(src.id)} onClick={() => handleRemoveSource(src.id)} focusClassName="is-focused"
