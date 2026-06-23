@@ -674,7 +674,7 @@ export const SettingsPage: VFC<Props> = ({ onBack, artEnabled = true, onArtEnabl
         const usedPct = usage?.total ? Math.round((usage.used! / usage.total) * 100) : null;
         const typeColor = src.type === "local" ? "#27ae60" : src.type === "mount" ? "#e67e22" : "#0984e3";
         const typeBg = src.type === "local" ? "#1a3a1a" : src.type === "mount" ? "#2a2a1a" : "#1a1a3a";
-        const offline = !usage?.total && usage?.total !== undefined;
+        const offline = src.enabled !== false && !usage?.total && usage?.total !== undefined;
         const xfer = activeTransfers.find((t) => t.to_source_id === src.id && t.status === "running");
         return (
           <div key={src.id} style={{ border: "1px solid #3a3a3a", borderRadius: "6px", marginBottom: "8px", opacity: (offline || src.enabled === false) ? 0.5 : 1 }}>
