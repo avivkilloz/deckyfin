@@ -1,3 +1,3 @@
 #!/bin/bash
 
-cat /home/avivilloz/homebrew/logs/deckyfin/*.log
+cat /home/deck/homebrew/logs/deckyfin/*.log

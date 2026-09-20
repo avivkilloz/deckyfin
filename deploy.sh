@@ -1,7 +1,7 @@
 #!/bin/bash
 
-DECKYFIN_REPO_PATH=/home/avivilloz/git/avivkilloz/deckyfin
-DECKIFIN_PLUGIN_PATH=/home/avivilloz/homebrew/plugins/deckyfin
+DECKYFIN_REPO_PATH=/home/deck/git/github/avivkilloz/deckyfin
+DECKIFIN_PLUGIN_PATH=/home/deck/homebrew/plugins/deckyfin
 
 cd $DECKYFIN_REPO_PATH
 # git pull
