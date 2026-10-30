@@ -2,7 +2,7 @@ import { VFC, useState, useEffect, useRef, Fragment } from "react";
 import { callable } from "@decky/api";
 import { Navigation, Focusable } from "@decky/ui";
 import { GameConfig, MergedGame, GameSource, SourceCapabilities, AssetType } from "../types";
-import { sourceTypeLabel, sourceTypeColors } from "../sourceStyle";
+import { sourceTypeLabel, sourceTypeColors, isBuiltinSourceType } from "../sourceStyle";
 import { useArtwork } from "../hooks/useArtwork";
 import { CompactTextField } from "../components/CompactTextField";
 import {
@@ -87,6 +87,7 @@ const getSourceCapabilities = callable<[source_id: string], SourceCapabilities>(
 );
 const restartSteam = callable<[], { success: boolean; message?: string }>("restart_steam");
 const listSteamCollections = callable<[], string[]>("list_steam_collections");
+const syncAppCollections = callable<[app_id: number, collections: string[], old_collections: string[]], { success: boolean; error?: string }>("sync_app_collections");
 const listAllSources = callable<[], import("../types").Source[]>("list_sources");
 const copyGameConfig = callable<
   [game_name: string, from_source_id: string, to_source_id: string],
@@ -288,6 +289,10 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
   const selectedSource: GameSource = game.sources[selectedSourceIdx] ?? game.sources[0];
   const currentConfig: GameConfig = selectedSource?.config ?? game.sources[0]?.config ?? { name: game.name, executable: "" };
   const isShortcutSource = selectedSource?.source_type === "steam_shortcuts";
+  const isLibrarySource = selectedSource?.source_type === "steam_library";
+  const isBuiltinSource = isShortcutSource || isLibrarySource;
+  // Store games: prefix-dependent actions only once a prefix exists or Proton is forced
+  const hasPrefix = !isLibrarySource || !!currentConfig.has_prefix;
 
   // ── Editable config fields ──────────────────────────────────────────────
   const [name, setName] = useState(currentConfig.name);
@@ -685,12 +690,13 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
     // Populate from cache immediately, then fetch only what's missing
     const initial = Object.fromEntries(game.sources.map((s) => {
       if (s.source_type === "steam_shortcuts") return [s.source_id, 0]; // no game folder to measure
+      if (s.source_type === "steam_library") return [s.source_id, s.config.size_on_disk || 0];
       const cached = getCachedGameSize(`${game.name}:${s.source_id}`);
       return [s.source_id, cached !== undefined ? cached : null];
     }));
     setSourceSizes(initial);
     game.sources.forEach((src) => {
-      if (src.source_type === "steam_shortcuts") return;
+      if (src.source_type === "steam_shortcuts" || src.source_type === "steam_library") return;
       if (getCachedGameSize(`${game.name}:${src.source_id}`) !== undefined) return;
       getGameSize(game.name, src.source_id)
         .then((res) => {
@@ -739,8 +745,13 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
   }, [transferId]);
 
   useEffect(() => {
+    if (isLibrarySource) {
+      const id = Number(currentConfig.steam_app_id);
+      setSteamInfo(id ? { app_id: id, unsigned_appid: id } : null);
+      return;
+    }
     const cached = getCachedSteamInfo(game.name);
-    if (cached !== undefined) { if (cached) setSteamInfo(cached); return; }
+    if (cached !== undefined) { setSteamInfo(cached); return; }
     getSteamShortcut(game.name)
       .then((res) => {
         if (res.success && res.app_id && res.unsigned_appid) {
@@ -749,10 +760,11 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
           setSteamInfo(info);
         } else {
           setCachedSteamInfo(game.name, null);
+          setSteamInfo(null);
         }
       })
       .catch(() => {});
-  }, [game.name]);
+  }, [game.name, selectedSource?.source_id]);
 
   // ── Fetch existing Steam collections on mount ───────────────────────────
   useEffect(() => {
@@ -898,7 +910,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
   ];
   // Config copies need a real source folder on both ends.
   const copyConfigDests = game.sources.filter(
-    (s) => s.source_id !== selectedSource?.source_id && s.source_type !== "steam_shortcuts",
+    (s) => s.source_id !== selectedSource?.source_id && !isBuiltinSourceType(s.source_type),
   );
 
   // Save sync status — shown under Backup/Restore, or under Copy Saves for copies.
@@ -1400,6 +1412,30 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
     setLoading(null);
   };
 
+  const handleApplyToSteamLibrary = async () => {
+    if (!steamInfo) return;
+    setLoading("update");
+    setFeedback(null);
+    const appid = steamInfo.unsigned_appid;
+    const snapshot = { name, launch_options: finalLaunchOptions || null, proton_version: protonVersion || null, collections: mergedCollections };
+    try {
+      SteamClient.Apps.SpecifyCompatTool(appid, protonVersion || "");
+      SteamClient.Apps.SetAppLaunchOptions(appid, finalLaunchOptions || "");
+      const prevCollections: string[] = lastSyncedSnapshot?.collections ?? [];
+      if (JSON.stringify(prevCollections) !== JSON.stringify(mergedCollections)) {
+        const res = await syncAppCollections(appid, mergedCollections, prevCollections);
+        if (!res.success) throw new Error(res.error || "Failed to update collections");
+        onNeedsRestart?.();
+      }
+      setLastSyncedSnapshot(snapshot);
+      updateGameConfig(storedName, { steam_snapshot: JSON.stringify(snapshot) }, selectedSource.source_id).catch(() => {});
+      setFeedback({ ok: true, msg: "Applied to Steam" });
+    } catch (err: any) {
+      setFeedback({ ok: false, msg: err?.message || "Failed to apply to Steam" });
+    }
+    setLoading(null);
+  };
+
   const handleRemoveSteam = async () => {
     setLoading("remove");
     setFeedback(null);
@@ -1480,6 +1516,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
   };
 
   const handleInstallDeps = async () => {
+    if (!hasPrefix) return;
     if (needsRestartAfterAdd || !steamInfo || mergedDeps.length === 0) return;
     if (depInstall?.status === "installing") return;
     pendingDepsRef.current = mergedDeps;
@@ -1549,14 +1586,23 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
       configSnapshot.launch_options || "",
     );
     const a = lastSyncedSnapshot;
-    const b = {
-      name: configSnapshot.name,
-      executable: configSnapshot.executable,
-      start_dir: configSnapshot.start_dir,
-      launch_options: assembledLaunchOpts || null,
-      proton_version: configSnapshot.proton_version,
-      collections: configSnapshot.collections,
-    };
+    // Store games' snapshot has no executable/start_dir keys at all (there's no shortcut
+    // file to carry them) — omit them here too so an unchanged game compares equal.
+    const b = isLibrarySource
+      ? {
+          name: configSnapshot.name,
+          launch_options: assembledLaunchOpts || null,
+          proton_version: configSnapshot.proton_version,
+          collections: configSnapshot.collections,
+        }
+      : {
+          name: configSnapshot.name,
+          executable: configSnapshot.executable,
+          start_dir: configSnapshot.start_dir,
+          launch_options: assembledLaunchOpts || null,
+          proton_version: configSnapshot.proton_version,
+          collections: configSnapshot.collections,
+        };
     return JSON.stringify(a) !== JSON.stringify(b);
   })();
 
@@ -1766,6 +1812,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
                 ["Executable", executable],
                 ["Start Dir", startDir || "—"],
                 ["Proton Version", protonVersion || "—"],
+                ...(isLibrarySource ? [["Install Folder", currentConfig.install_dir || "—"], ["Library", currentConfig.library_path || "—"]] : []),
                 ["Dependencies", mergedDeps.length > 0 ? mergedDeps.join(", ") : "—"],
                 ["Collections", mergedCollections.length > 0 ? mergedCollections.join(", ") : "—"],
                 ["Save Paths", syncPaths.length > 0 ? syncPaths.join(", ") : "—"],
@@ -1805,38 +1852,42 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
           <div style={{ padding: "8px 12px", borderTop: "1px solid #2a2a2a" }}>
             {/* Name */}
             <label style={{ fontSize: "0.78em", color: "#888", display: "block", marginBottom: "2px" }}>Name</label>
-            {isShortcutSource ? (
+            {isBuiltinSource ? (
               <div style={{ fontSize: "0.9em", color: "#ccc", padding: "6px 0", marginBottom: "8px" }}>{name}</div>
             ) : (
               <CompactTextField value={name} onChange={(e) => setName(e.target.value)} style={{ width: "100%", marginBottom: "8px" }} />
             )}
-            {/* Executable */}
-            <label style={{ fontSize: "0.78em", color: "#888", display: "block", marginBottom: "2px" }}>Executable</label>
-            <Focusable focusClassName="" style={{ display: "flex", gap: "6px", alignItems: "center", marginBottom: showExePicker ? "6px" : "8px" }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <CompactTextField value={executable} onChange={(e) => setExecutable(e.target.value)} style={{ width: "100%" }} />
-              </div>
-              <Focusable onActivate={handleOpenExePicker} onClick={handleOpenExePicker} focusClassName="is-focused" style={{ ...BTN_STYLE, alignSelf: "center", padding: "4px 12px",
-                opacity: !showExePicker && isShortcutSource && isExeDirUnsafeToScan(currentConfig.executable || "") ? 0.4 : 1 }}>
-                {showExePicker ? "✕" : "Browse"}
-              </Focusable>
-            </Focusable>
-            {showExePicker && (
-              <Focusable style={{ border: "1px solid #555", borderRadius: "4px", maxHeight: "180px", overflowY: "auto", padding: "2px 0", marginBottom: "8px" }}>
-                {exeOptions.length === 0 && <p style={{ padding: "8px", margin: 0, fontSize: "0.85em", color: "#888" }}>No executables found in {startDir}</p>}
-                {exeOptions.map((exe) => (
-                  <Focusable key={exe} onActivate={() => handleSelectExe(exe)} onClick={() => handleSelectExe(exe)} focusClassName="is-focused"
-                    style={{ margin: "0 2px", padding: "4px 10px", cursor: "pointer", fontSize: "0.85em", borderBottom: "1px solid #333" }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
-                    {exe}
+            {!isLibrarySource && (
+              <>
+                {/* Executable */}
+                <label style={{ fontSize: "0.78em", color: "#888", display: "block", marginBottom: "2px" }}>Executable</label>
+                <Focusable focusClassName="" style={{ display: "flex", gap: "6px", alignItems: "center", marginBottom: showExePicker ? "6px" : "8px" }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <CompactTextField value={executable} onChange={(e) => setExecutable(e.target.value)} style={{ width: "100%" }} />
+                  </div>
+                  <Focusable onActivate={handleOpenExePicker} onClick={handleOpenExePicker} focusClassName="is-focused" style={{ ...BTN_STYLE, alignSelf: "center", padding: "4px 12px",
+                    opacity: !showExePicker && isShortcutSource && isExeDirUnsafeToScan(currentConfig.executable || "") ? 0.4 : 1 }}>
+                    {showExePicker ? "✕" : "Browse"}
                   </Focusable>
-                ))}
-              </Focusable>
+                </Focusable>
+                {showExePicker && (
+                  <Focusable style={{ border: "1px solid #555", borderRadius: "4px", maxHeight: "180px", overflowY: "auto", padding: "2px 0", marginBottom: "8px" }}>
+                    {exeOptions.length === 0 && <p style={{ padding: "8px", margin: 0, fontSize: "0.85em", color: "#888" }}>No executables found in {startDir}</p>}
+                    {exeOptions.map((exe) => (
+                      <Focusable key={exe} onActivate={() => handleSelectExe(exe)} onClick={() => handleSelectExe(exe)} focusClassName="is-focused"
+                        style={{ margin: "0 2px", padding: "4px 10px", cursor: "pointer", fontSize: "0.85em", borderBottom: "1px solid #333" }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+                        {exe}
+                      </Focusable>
+                    ))}
+                  </Focusable>
+                )}
+                {/* Start Dir */}
+                <label style={{ fontSize: "0.78em", color: "#888", display: "block", marginBottom: "2px" }}>Start Dir</label>
+                <CompactTextField value={startDir} onChange={(e) => setStartDir(e.target.value)} style={{ width: "100%", marginBottom: "8px" }} />
+              </>
             )}
-            {/* Start Dir */}
-            <label style={{ fontSize: "0.78em", color: "#888", display: "block", marginBottom: "2px" }}>Start Dir</label>
-            <CompactTextField value={startDir} onChange={(e) => setStartDir(e.target.value)} style={{ width: "100%", marginBottom: "8px" }} />
             {/* Steam App ID */}
             <Focusable focusClassName="" style={{ display: "flex", alignItems: "center", gap: "5px", marginBottom: "2px" }}>
               <span style={{ fontSize: "0.78em", color: "#888" }}>Steam App ID</span>
@@ -2077,7 +2128,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
       </div>
 
       {/* Save Paths */}
-      {(
+      {hasPrefix && (
       <div style={{ border: "1px solid #3a3a3a", borderRadius: "6px", marginBottom: "8px" }}>
         <Focusable onActivate={() => setShowSavePaths((v) => !v)} onClick={() => setShowSavePaths((v) => !v)} focusClassName="is-focused"
           style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", cursor: "pointer", background: "#1e1e1e", borderRadius: showSavePaths ? "6px 6px 0 0" : "6px" }}>
@@ -2222,7 +2273,9 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
         {showSteamActions && (
           <div style={{ padding: "8px" }}>
             <p style={{ fontSize: "0.78em", color: "#888", margin: "0 0 8px 0", lineHeight: 1.5 }}>
-              Sync this game's settings to Steam and restart Steam to apply changes. Add the game as a non-Steam shortcut so it appears in your library, or update an existing shortcut after editing its settings.
+              {isLibrarySource
+                ? "Apply Proton version and launch options to Steam instantly. Collection changes need a Steam restart."
+                : "Sync this game's settings to Steam and restart Steam to apply changes. Add the game as a non-Steam shortcut so it appears in your library, or update an existing shortcut after editing its settings."}
             </p>
             {needsRestartAfterAdd && (
               <div style={{ padding: "8px 12px", marginBottom: "8px", borderRadius: "4px", background: "rgba(230,126,34,0.15)", border: "1px solid rgba(230,126,34,0.3)", fontSize: "0.82em", color: "#e67e22" }}>
@@ -2234,16 +2287,29 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
                 🔒 Steam actions unavailable — games on {selectedSource.source_type} sources can't be launched by Steam
               </div>
             )}
-            <Focusable
-              onActivate={capabilities.can_play && !(isShortcutSource && !steamInfo) ? (steamInfo ? handleUpdateSteam : handleAddToSteam) : undefined}
-              onClick={capabilities.can_play && !(isShortcutSource && !steamInfo) ? (steamInfo ? handleUpdateSteam : handleAddToSteam) : undefined}
-              focusClassName="is-focused"
-              style={{ ...BTN_STYLE, display: "block", width: "100%", boxSizing: "border-box" as const, textAlign: "center" as const, marginBottom: "6px",
-                opacity: !capabilities.can_play || loading === "add" || loading === "update" || (isShortcutSource && !steamInfo) ? 0.4 : 1,
-                border: capabilities.can_play && steamNeedsSync ? "1px solid #27ae60" : "1px solid #555",
-                color: capabilities.can_play && steamNeedsSync ? "#2ecc71" : "#e0e0e0" }}>
-              {loading === "add" ? "Adding…" : loading === "update" ? "Updating…" : steamInfo ? "Update Steam Game" : "Add to Steam"}
-            </Focusable>
+            {isLibrarySource ? (
+              <Focusable
+                onActivate={capabilities.can_play ? handleApplyToSteamLibrary : undefined}
+                onClick={capabilities.can_play ? handleApplyToSteamLibrary : undefined}
+                focusClassName="is-focused"
+                style={{ ...BTN_STYLE, display: "block", width: "100%", boxSizing: "border-box" as const, textAlign: "center" as const, marginBottom: "6px",
+                  opacity: !capabilities.can_play || loading === "update" ? 0.4 : 1,
+                  border: capabilities.can_play && steamNeedsSync ? "1px solid #27ae60" : "1px solid #555",
+                  color: capabilities.can_play && steamNeedsSync ? "#2ecc71" : "#e0e0e0" }}>
+                {loading === "update" ? "Applying…" : "Apply to Steam"}
+              </Focusable>
+            ) : (
+              <Focusable
+                onActivate={capabilities.can_play && !(isShortcutSource && !steamInfo) ? (steamInfo ? handleUpdateSteam : handleAddToSteam) : undefined}
+                onClick={capabilities.can_play && !(isShortcutSource && !steamInfo) ? (steamInfo ? handleUpdateSteam : handleAddToSteam) : undefined}
+                focusClassName="is-focused"
+                style={{ ...BTN_STYLE, display: "block", width: "100%", boxSizing: "border-box" as const, textAlign: "center" as const, marginBottom: "6px",
+                  opacity: !capabilities.can_play || loading === "add" || loading === "update" || (isShortcutSource && !steamInfo) ? 0.4 : 1,
+                  border: capabilities.can_play && steamNeedsSync ? "1px solid #27ae60" : "1px solid #555",
+                  color: capabilities.can_play && steamNeedsSync ? "#2ecc71" : "#e0e0e0" }}>
+                {loading === "add" ? "Adding…" : loading === "update" ? "Updating…" : steamInfo ? "Update Steam Game" : "Add to Steam"}
+              </Focusable>
+            )}
             <Focusable
               onActivate={runningTaskCount > 0 ? undefined : handleRestartSteam}
               onClick={runningTaskCount > 0 ? undefined : handleRestartSteam}
@@ -2277,9 +2343,14 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
             <p style={{ fontSize: "0.78em", color: "#888", margin: "0 0 8px 0", lineHeight: 1.5 }}>
               Manage the Wine/Proton prefix for this game. Initialize it to create a fresh Windows environment, install required dependencies, or browse the prefix filesystem to inspect or locate files.
             </p>
-            {!steamInfo && !needsRestartAfterAdd && capabilities.can_play && (
+            {!isLibrarySource && !steamInfo && !needsRestartAfterAdd && capabilities.can_play && (
               <div style={{ padding: "8px 10px", borderRadius: "4px", background: "rgba(52,73,94,0.3)", border: "1px solid #2c3e50", fontSize: "0.78em", color: "#7f8c8d", marginBottom: "8px" }}>
                 🔒 Add game to Steam first
+              </div>
+            )}
+            {isLibrarySource && !hasPrefix && (
+              <div style={{ padding: "8px 10px", borderRadius: "4px", background: "rgba(52,73,94,0.3)", border: "1px solid #2c3e50", fontSize: "0.78em", color: "#7f8c8d", marginBottom: "8px" }}>
+                No Proton prefix yet — pick a Proton version and launch once from Steam.
               </div>
             )}
             {needsRestartAfterAdd && (
@@ -2293,30 +2364,34 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
               </div>
             )}
             {/* Init Prefix */}
-            <Focusable
-              onActivate={capabilities.can_play ? handleInitPrefixClick : undefined}
-              onClick={capabilities.can_play ? handleInitPrefixClick : undefined}
-              focusClassName="is-focused"
-              style={{ ...BTN_STYLE, display: "block", width: "100%", boxSizing: "border-box" as const, textAlign: "center" as const, marginBottom: showReinitConfirm ? "4px" : "6px",
-                opacity: !capabilities.can_play || !steamInfo || needsRestartAfterAdd || prefixInit?.status === "running" ? 0.4 : 1 }}>
-              {prefixInit?.status === "running" ? "Initing…" : "Init Prefix"}
-            </Focusable>
-            {showReinitConfirm && (
-              <div style={{ fontSize: "0.82em", color: "#ccc", marginBottom: "6px", padding: "6px 8px", background: "#1a1a1a", borderRadius: "4px", border: "1px solid #444" }}>
-                <div style={{ marginBottom: "6px" }}>Prefix already exists. Re-initialize? This will wipe the current prefix.</div>
-                <Focusable focusClassName="" style={{ display: "flex", gap: "6px" }}>
-                  <Focusable onActivate={() => setShowReinitConfirm(false)} onClick={() => setShowReinitConfirm(false)} focusClassName="is-focused" style={{ ...BTN_STYLE, padding: "2px 8px", fontSize: "0.82em" }}>Cancel</Focusable>
-                  <Focusable onActivate={() => handleInitPrefix(true)} onClick={() => handleInitPrefix(true)} focusClassName="is-focused" style={{ ...BTN_STYLE, padding: "2px 8px", fontSize: "0.82em", border: "1px solid #e74c3c", color: "#e74c3c" }}>Yes, Re-initialize</Focusable>
+            {!isLibrarySource && (
+              <>
+                <Focusable
+                  onActivate={capabilities.can_play ? handleInitPrefixClick : undefined}
+                  onClick={capabilities.can_play ? handleInitPrefixClick : undefined}
+                  focusClassName="is-focused"
+                  style={{ ...BTN_STYLE, display: "block", width: "100%", boxSizing: "border-box" as const, textAlign: "center" as const, marginBottom: showReinitConfirm ? "4px" : "6px",
+                    opacity: !capabilities.can_play || !steamInfo || needsRestartAfterAdd || prefixInit?.status === "running" ? 0.4 : 1 }}>
+                  {prefixInit?.status === "running" ? "Initing…" : "Init Prefix"}
                 </Focusable>
-              </div>
+                {showReinitConfirm && (
+                  <div style={{ fontSize: "0.82em", color: "#ccc", marginBottom: "6px", padding: "6px 8px", background: "#1a1a1a", borderRadius: "4px", border: "1px solid #444" }}>
+                    <div style={{ marginBottom: "6px" }}>Prefix already exists. Re-initialize? This will wipe the current prefix.</div>
+                    <Focusable focusClassName="" style={{ display: "flex", gap: "6px" }}>
+                      <Focusable onActivate={() => setShowReinitConfirm(false)} onClick={() => setShowReinitConfirm(false)} focusClassName="is-focused" style={{ ...BTN_STYLE, padding: "2px 8px", fontSize: "0.82em" }}>Cancel</Focusable>
+                      <Focusable onActivate={() => handleInitPrefix(true)} onClick={() => handleInitPrefix(true)} focusClassName="is-focused" style={{ ...BTN_STYLE, padding: "2px 8px", fontSize: "0.82em", border: "1px solid #e74c3c", color: "#e74c3c" }}>Yes, Re-initialize</Focusable>
+                    </Focusable>
+                  </div>
+                )}
+              </>
             )}
             {/* Install Dependencies */}
             <Focusable
-              onActivate={capabilities.can_play ? handleInstallDeps : undefined}
-              onClick={capabilities.can_play ? handleInstallDeps : undefined}
+              onActivate={capabilities.can_play && hasPrefix ? handleInstallDeps : undefined}
+              onClick={capabilities.can_play && hasPrefix ? handleInstallDeps : undefined}
               focusClassName="is-focused"
               style={{ ...BTN_STYLE, display: "block", width: "100%", boxSizing: "border-box" as const, textAlign: "center" as const, marginBottom: "6px",
-                opacity: !capabilities.can_play || !steamInfo || needsRestartAfterAdd || mergedDeps.length === 0 || depInstall?.status === "installing" ? 0.4 : 1,
+                opacity: !capabilities.can_play || !hasPrefix || !steamInfo || needsRestartAfterAdd || mergedDeps.length === 0 || depInstall?.status === "installing" ? 0.4 : 1,
                 border: capabilities.can_play && depsNeedsInstall ? "1px solid #27ae60" : "1px solid #555",
                 color: capabilities.can_play && depsNeedsInstall ? "#2ecc71" : "#e0e0e0" }}>
               {depInstall?.status === "installing" ? "Installing…" : "Install Dependencies"}
@@ -2599,14 +2674,14 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
         </div>
 
       {/* ── Transfer Actions ──────────────────────────────────────────────── */}
-      {((!isShortcutSource && (copyConfigDests.length > 0 ||
+      {((!isBuiltinSource && (copyConfigDests.length > 0 ||
         allSources.some(
           (s) =>
             s.type !== "agent" &&
             !s.builtin &&
             !game.sources.some((gs) => gs.source_id === s.id),
         ))) ||
-        (copySavesDests.length > 0 && syncPaths.length > 0)) && (
+        (hasPrefix && copySavesDests.length > 0 && syncPaths.length > 0)) && (
         <div style={{ border: "1px solid #3a3a3a", borderRadius: "6px", marginBottom: "8px" }}>
           <Focusable
             onActivate={() => setShowTransferActions((v) => !v)}
@@ -2623,7 +2698,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
             Copy this game or its settings between sources. Copy Game transfers the game files to another location, Copy Config replicates its Deckyfin configuration to another source, and Copy Saves moves save data between sources.
           </p>
           {/* Copy game block */}
-          {!isShortcutSource && allSources.some((s) => s.type !== "agent" && !s.builtin && !game.sources.some((gs) => gs.source_id === s.id)) && (
+          {!isBuiltinSource && allSources.some((s) => s.type !== "agent" && !s.builtin && !game.sources.some((gs) => gs.source_id === s.id)) && (
             <div style={{ marginBottom: "6px" }}>
               <Focusable
                 onActivate={() => {
@@ -2684,7 +2759,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
           )}
 
           {/* Copy config block */}
-          {!isShortcutSource && copyConfigDests.length > 0 && (
+          {!isBuiltinSource && copyConfigDests.length > 0 && (
             <div style={{ marginBottom: "6px" }}>
               <Focusable
                 onActivate={() => {
@@ -2744,7 +2819,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
           )}
 
           {/* Copy saves block */}
-          {copySavesDests.length > 0 && syncPaths.length > 0 && (
+          {hasPrefix && copySavesDests.length > 0 && syncPaths.length > 0 && (
             <div style={{ marginBottom: "6px" }}>
               <Focusable
                 onActivate={() => { setShowCopySavesPicker((v) => !v); setCopySavesDest(null); setCopySavesConfirming(false); }}
@@ -2938,7 +3013,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
       )}
 
       {/* ── Save Actions ───────────────────────────────────────────────────── */}
-      {syncPaths.length > 0 && (capabilities.can_write_config || !!steamInfo) && (
+      {hasPrefix && syncPaths.length > 0 && (capabilities.can_write_config || !!steamInfo) && (
         <div style={{ border: "1px solid #3a3a3a", borderRadius: "6px", marginBottom: "8px" }}>
           <Focusable onActivate={() => setShowSaveActions((v) => !v)} onClick={() => setShowSaveActions((v) => !v)} focusClassName="is-focused"
             style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", cursor: "pointer", background: "#1e1e1e", borderRadius: showSaveActions ? "6px 6px 0 0" : "6px" }}>
@@ -2984,7 +3059,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
         {showDangerZone && (
           <div style={{ padding: "8px 12px", borderTop: "1px solid #2a2a2a" }}>
 
-      {steamInfo && (
+      {!isLibrarySource && steamInfo && (
         <div>
           {confirming === "steam" ? (
             <div
@@ -3049,7 +3124,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
       )}
 
       {/* ── Purge All Steam Data ────────────────────────────────────────── */}
-      {steamInfo && (
+      {!isLibrarySource && steamInfo && (
         <div>
           {confirming === "purge" ? (
             <div
@@ -3116,7 +3191,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
         </div>
       )}
 
-      {!isShortcutSource && (confirming === "deckyfin" ? (
+      {!isBuiltinSource && (confirming === "deckyfin" ? (
         <div
           style={{
             border: "1px solid #c0392b",
