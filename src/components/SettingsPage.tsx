@@ -4,6 +4,7 @@ import { Navigation, Focusable } from "@decky/ui";
 import { Source } from "../types";
 import { sourceTypeLabel, sourceTypeColors } from "../sourceStyle";
 import { CompactTextField } from "../components/CompactTextField";
+import { readOwnedApps } from "../steamOwned";
 
 const GUIDES_BASE = "https://github.com/avivkilloz/deckyfin/blob/main/guides";
 const SOURCE_GUIDE_URLS: Record<string, string> = {
@@ -21,6 +22,7 @@ const addSource = callable<
 const removeSource = callable<[source_id: string], { success: boolean }>("remove_source");
 const reorderSource = callable<[source_id: string, direction: string], { success: boolean }>("reorder_source");
 const setSourceEnabled = callable<[source_id: string, enabled: boolean], { success: boolean }>("set_source_enabled");
+const setSourceOption = callable<[source_id: string, key: string, value: boolean], { success: boolean }>("set_source_option");
 const getBuiltinSourceSummary = callable<[source_id: string], { count: number }>("get_builtin_source_summary");
 const getSourceDiskUsage = callable<[source_id: string], { used: number | null; total: number | null; free: number | null }>("get_source_disk_usage");
 const initializeSource = callable<[source_id: string], { success: boolean; message?: string }>("initialize_source");
@@ -486,6 +488,20 @@ export const SettingsPage: VFC<Props> = ({ onBack, artEnabled = true, onArtEnabl
     }
   };
 
+  const [togglingShowUninstalledIds, setTogglingShowUninstalledIds] = useState<Set<string>>(new Set());
+
+  const handleToggleShowUninstalled = async (source_id: string, value: boolean) => {
+    setTogglingShowUninstalledIds((prev) => new Set([...prev, source_id]));
+    try {
+      await setSourceOption(source_id, "show_uninstalled", value);
+      await loadSources();
+    } catch {
+      await loadSources();
+    } finally {
+      setTogglingShowUninstalledIds((prev) => { const next = new Set(prev); next.delete(source_id); return next; });
+    }
+  };
+
   // ── SteamGridDB key ──────────────────────────────────────────────────
   const [sgKey, setSgKey] = useState("");
   const [sgHasOverride, setSgHasOverride] = useState(false);
@@ -699,6 +715,14 @@ export const SettingsPage: VFC<Props> = ({ onBack, artEnabled = true, onArtEnabl
         const xfer = activeTransfers.find((t) => t.to_source_id === src.id && t.status === "running");
         const dimOpacity = (offline || src.enabled === false) ? 0.5 : 1;
         const srcBtn: React.CSSProperties = { ...BTN_STYLE, fontSize: "0.75em", padding: "2px 8px", whiteSpace: "nowrap", color: "#aaa", borderColor: "#888" };
+        const steamLibraryCountSuffix = src.type === "steam_library" && src.show_uninstalled
+          ? (() => {
+              const owned = readOwnedApps();
+              if (owned === null) return " · owned library unavailable";
+              const m = owned.filter((a) => !a.installed).length;
+              return ` · ${m} not installed`;
+            })()
+          : "";
         return (
           <div key={src.id} style={{ border: "1px solid #3a3a3a", borderRadius: "6px", marginBottom: "8px" }}>
             {/* Header */}
@@ -736,6 +760,12 @@ export const SettingsPage: VFC<Props> = ({ onBack, artEnabled = true, onArtEnabl
                     style={{ ...srcBtn, borderColor: src.enabled === false ? "#27ae60" : "#888", color: src.enabled === false ? "#2ecc71" : "#aaa", opacity: togglingSourceIds.has(src.id) ? 0.5 : 1 }}>
                     {src.enabled === false ? "Enable" : "Disable"}
                   </Focusable>
+                  {src.type === "steam_library" && src.enabled !== false && (
+                    <Focusable onActivate={() => !togglingShowUninstalledIds.has(src.id) && handleToggleShowUninstalled(src.id, !src.show_uninstalled)} onClick={() => !togglingShowUninstalledIds.has(src.id) && handleToggleShowUninstalled(src.id, !src.show_uninstalled)} focusClassName="is-focused"
+                      style={{ ...srcBtn, opacity: togglingShowUninstalledIds.has(src.id) ? 0.5 : 1 }}>
+                      {src.show_uninstalled ? "Hide not-installed" : "Show not-installed"}
+                    </Focusable>
+                  )}
                   {!src.builtin && (
                     <Focusable onActivate={() => handleRemoveSource(src.id)} onClick={() => handleRemoveSource(src.id)} focusClassName="is-focused"
                       style={{ ...srcBtn, borderColor: "#c0392b", color: "#e74c3c" }}>
@@ -753,7 +783,7 @@ export const SettingsPage: VFC<Props> = ({ onBack, artEnabled = true, onArtEnabl
                       : builtinCounts[src.id] === undefined
                         ? "Counting…"
                         : (src.type === "steam_library"
-                          ? `${builtinCounts[src.id]} installed game${builtinCounts[src.id] === 1 ? "" : "s"}`
+                          ? `${builtinCounts[src.id]} installed game${builtinCounts[src.id] === 1 ? "" : "s"}${steamLibraryCountSuffix}`
                           : `${builtinCounts[src.id]} orphan shortcut${builtinCounts[src.id] === 1 ? "" : "s"}`))
                   : (src.path || src.url)}
               </div>

@@ -143,6 +143,7 @@ export interface Source {
   url: string | null;
   enabled: boolean;
   builtin?: boolean;
+  show_uninstalled?: boolean;
 }
 
 export interface SourceCapabilities {
