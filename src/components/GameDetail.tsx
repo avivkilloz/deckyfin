@@ -1246,14 +1246,29 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
   };
 
   // ── Executable picker ───────────────────────────────────────────────────
+  // Orphan shortcuts have no known "game folder" — their exe can live anywhere
+  // (including directly in the user's home dir or filesystem root). Scanning
+  // from such a broad root is slow and dumps unrelated files, so we refuse to
+  // scan when the exe's directory is unknown or too broad.
+  const isExeDirUnsafeToScan = (exePath: string): boolean => {
+    const lastSlash = exePath.lastIndexOf("/");
+    if (lastSlash <= 0) return true; // no "/" at all, or exe sits directly at "/"
+    const dir = exePath.substring(0, lastSlash);
+    return dir === "/" || /^\/home\/[^/]+$/.test(dir) || dir === "/root";
+  };
+
   const handleOpenExePicker = async () => {
     if (showExePicker) {
       setShowExePicker(false);
       return;
     }
     const exePath = currentConfig.executable || "";
+    if (isShortcutSource && isExeDirUnsafeToScan(exePath)) {
+      setFeedback({ ok: false, msg: "Can't browse from this folder — edit the executable path directly" });
+      return;
+    }
     const root = isShortcutSource
-      ? exePath.substring(0, Math.max(exePath.lastIndexOf("/"), 1))
+      ? exePath.substring(0, exePath.lastIndexOf("/"))
       : currentConfig.path || game.name;
     try {
       const exes = await scanExes(root, selectedSource.source_id);
@@ -1763,7 +1778,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
               <div style={{ flex: 1, minWidth: 0 }}>
                 <CompactTextField value={executable} onChange={(e) => setExecutable(e.target.value)} style={{ width: "100%" }} />
               </div>
-              <Focusable onActivate={handleOpenExePicker} onClick={handleOpenExePicker} focusClassName="is-focused" style={{ ...BTN_STYLE, alignSelf: "center", padding: "4px 12px" }}>
+              <Focusable onActivate={handleOpenExePicker} onClick={handleOpenExePicker} focusClassName="is-focused" style={{ ...BTN_STYLE, alignSelf: "center", padding: "4px 12px",
+                opacity: !showExePicker && isShortcutSource && isExeDirUnsafeToScan(currentConfig.executable || "") ? 0.4 : 1 }}>
                 {showExePicker ? "✕" : "Browse"}
               </Focusable>
             </Focusable>
@@ -1886,7 +1902,10 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
               </Focusable>{" "}for community launch flag recommendations.
               {onNavigateToSettings && <>{" "}To add more popular options, go to{" "}<Focusable onActivate={onNavigateToSettings} onClick={onNavigateToSettings} focusClassName="is-focused" style={{ display: "inline", color: "#5dade2", cursor: "pointer", background: "transparent", border: "none", padding: 0, fontSize: "inherit" }}>Settings → Popular Launcher Options</Focusable>.</>}
             </p>
-            {popularLaunchers.length > 0 && (
+            {/* Orphan shortcuts' launch_options is the raw VDF string, which already
+                contains any launcher prefix — re-ticking a chip here would prepend
+                it a second time, so these are hidden for shortcut-source games. */}
+            {!isShortcutSource && popularLaunchers.length > 0 && (
               <Focusable focusClassName="" style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "8px" }}>
                 {popularLaunchers.map((pl) => {
                   const active = checkedLaunchers.includes(pl.label);
@@ -2182,7 +2201,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
               onClick={capabilities.can_play && !(isShortcutSource && !steamInfo) ? (steamInfo ? handleUpdateSteam : handleAddToSteam) : undefined}
               focusClassName="is-focused"
               style={{ ...BTN_STYLE, display: "block", width: "100%", boxSizing: "border-box" as const, textAlign: "center" as const, marginBottom: "6px",
-                opacity: !capabilities.can_play || loading === "add" || loading === "update" ? 0.4 : 1,
+                opacity: !capabilities.can_play || loading === "add" || loading === "update" || (isShortcutSource && !steamInfo) ? 0.4 : 1,
                 border: capabilities.can_play && steamNeedsSync ? "1px solid #27ae60" : "1px solid #555",
                 color: capabilities.can_play && steamNeedsSync ? "#2ecc71" : "#e0e0e0" }}>
               {loading === "add" ? "Adding…" : loading === "update" ? "Updating…" : steamInfo ? "Update Steam Game" : "Add to Steam"}
@@ -2546,6 +2565,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
         allSources.some(
           (s) =>
             s.type !== "agent" &&
+            !s.builtin &&
             !game.sources.some((gs) => gs.source_id === s.id),
         ) ||
         (game.sources.length >= 2 && syncPaths.length > 0)) && (
@@ -2565,7 +2585,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
             Copy this game or its settings between sources. Copy Game transfers the game files to another location, Copy Config replicates its Deckyfin configuration to another source, and Copy Saves moves save data between sources.
           </p>
           {/* Copy game block */}
-          {allSources.some((s) => s.type !== "agent" && !game.sources.some((gs) => gs.source_id === s.id)) && (
+          {allSources.some((s) => s.type !== "agent" && !s.builtin && !game.sources.some((gs) => gs.source_id === s.id)) && (
             <div style={{ marginBottom: "6px" }}>
               <Focusable
                 onActivate={() => {
@@ -2589,7 +2609,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
               {showCopyGamePicker && !copyGameConfirming && (
                 <div style={{ border: "1px solid #555", borderRadius: "4px", padding: "2px 0", marginTop: "4px" }}>
                   {allSources
-                    .filter((s) => s.type !== "agent" && !game.sources.some((gs) => gs.source_id === s.id))
+                    .filter((s) => s.type !== "agent" && !s.builtin && !game.sources.some((gs) => gs.source_id === s.id))
                     .map((src) => (
                       <Focusable
                         key={src.id}

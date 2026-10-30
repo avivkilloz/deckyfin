@@ -463,6 +463,9 @@ export const GameLibrary: VFC = () => {
   };
 
   const disabledIds = new Set(xferSources.filter((s) => s.enabled === false).map((s) => s.id));
+  // Built-in sources (Steam Shortcuts) always exist, so they must not count toward
+  // "user configured a source" for onboarding/empty-state messaging.
+  const configuredSourceCount = xferSources.filter((s) => !s.builtin).length;
   const filteredGames = games.filter((g) => {
     if (disabledIds.size > 0 && g.sources.every((s) => disabledIds.has(s.source_id)))
       return false;
@@ -1352,7 +1355,7 @@ export const GameLibrary: VFC = () => {
       {error && <p style={{ color: "red" }}>{error}</p>}
       {!loading && !error && games.length === 0 && (
         <div style={{ padding: "24px 16px", textAlign: "center", color: "#aaa" }}>
-          {xferSources.length === 0 ? (
+          {configuredSourceCount === 0 ? (
             <>
               <div style={{ fontSize: "2em", marginBottom: "8px" }}>🎮</div>
               <div style={{ fontWeight: "bold", color: "#eee", marginBottom: "6px" }}>Welcome to Deckyfin</div>
@@ -1379,7 +1382,7 @@ export const GameLibrary: VFC = () => {
               <div style={{ fontSize: "1.6em", marginBottom: "8px" }}>📂</div>
               <div style={{ fontWeight: "bold", color: "#eee", marginBottom: "6px" }}>No games found</div>
               <div style={{ fontSize: "0.82em", lineHeight: 1.5 }}>
-                You have {xferSources.length} source{xferSources.length !== 1 ? "s" : ""} configured. Open <strong>Settings → Sources</strong> and tap <strong>Rescan</strong> on each source to detect games.
+                You have {configuredSourceCount} source{configuredSourceCount !== 1 ? "s" : ""} configured. Open <strong>Settings → Sources</strong> and tap <strong>Rescan</strong> on each source to detect games.
               </div>
             </>
           )}

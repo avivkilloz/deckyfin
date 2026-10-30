@@ -467,6 +467,14 @@ export const SettingsPage: VFC<Props> = ({ onBack, artEnabled = true, onArtEnabl
 
   const handleToggleSource = async (source_id: string, enabled: boolean) => {
     setTogglingSourceIds((prev) => new Set([...prev, source_id]));
+    if (sources.find((s) => s.id === source_id)?.builtin) {
+      // Drop the stale count so the card shows "Counting…" again instead of the
+      // last-known number while re-enabling re-fetches it.
+      setBuiltinCounts((prev) => {
+        const { [source_id]: _dropped, ...rest } = prev;
+        return rest;
+      });
+    }
     try {
       await setSourceEnabled(source_id, enabled);
       await loadSources();
@@ -679,7 +687,7 @@ export const SettingsPage: VFC<Props> = ({ onBack, artEnabled = true, onArtEnabl
       )}
 
       {/* Source list */}
-      {sources.length === 0 && !showAddForm && (
+      {sources.filter((s) => !s.builtin).length === 0 && !showAddForm && (
         <p style={{ fontSize: "0.85em", color: "#888" }}>No sources configured. Add one above.</p>
       )}
       {sources.map((src, srcIdx) => {
