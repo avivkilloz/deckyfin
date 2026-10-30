@@ -2,6 +2,7 @@ import { VFC, useState, useEffect, useRef, Fragment } from "react";
 import { callable } from "@decky/api";
 import { Navigation, Focusable } from "@decky/ui";
 import { GameConfig, MergedGame, GameSource, SourceCapabilities, AssetType } from "../types";
+import { sourceTypeLabel, sourceTypeColors } from "../sourceStyle";
 import { useArtwork } from "../hooks/useArtwork";
 import { CompactTextField } from "../components/CompactTextField";
 import {
@@ -683,11 +684,13 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
   useEffect(() => {
     // Populate from cache immediately, then fetch only what's missing
     const initial = Object.fromEntries(game.sources.map((s) => {
+      if (s.source_type === "steam_shortcuts") return [s.source_id, 0]; // no game folder to measure
       const cached = getCachedGameSize(`${game.name}:${s.source_id}`);
       return [s.source_id, cached !== undefined ? cached : null];
     }));
     setSourceSizes(initial);
     game.sources.forEach((src) => {
+      if (src.source_type === "steam_shortcuts") return;
       if (getCachedGameSize(`${game.name}:${src.source_id}`) !== undefined) return;
       getGameSize(game.name, src.source_id)
         .then((res) => {
@@ -1626,19 +1629,16 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
         </Focusable>
 
         {game.sources.length > 0 && (() => {
-          const typeColor = selectedSource.source_type === "local" ? "#27ae60"
-            : selectedSource.source_type === "mount" ? "#e67e22" : "#0984e3";
-          const typeBg = selectedSource.source_type === "local" ? "#1a3a1a"
-            : selectedSource.source_type === "mount" ? "#2a2a1a" : "#1a1a3a";
+          const { color: typeColor, bg: typeBg } = sourceTypeColors(selectedSource.source_type);
           return (
             <Focusable
               onActivate={() => setShowSourcePicker((p) => !p)}
               onClick={() => setShowSourcePicker((p) => !p)}
               focusClassName="is-focused"
-              style={{ ...BTN_STYLE, padding: "4px 12px", borderColor: typeColor, color: typeColor, display: "flex", alignItems: "center", gap: "6px" }}
+              style={{ ...BTN_STYLE, padding: "4px 12px", borderColor: typeColor, color: typeColor, display: "flex", alignItems: "center", gap: "6px", whiteSpace: "nowrap" }}
             >
               <span style={{ padding: "1px 5px", fontSize: "0.75em", borderRadius: "8px", background: typeBg, border: `1px solid ${typeColor}` }}>
-                {selectedSource.source_type}
+                {sourceTypeLabel(selectedSource.source_type)}
               </span>
               {selectedSource.source_name}
               {(() => {
@@ -1676,7 +1676,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
                   <span style={{ marginLeft: "5px", fontSize: "0.82em", color: "#888" }}>{fmtBytes(sz)}</span>
                 ) : null;
               })()}
-              <span style={{ marginLeft: "6px", fontSize: "0.78em", color: "#666" }}>({src.source_type})</span>
+              <span style={{ marginLeft: "6px", fontSize: "0.78em", color: "#666" }}>({sourceTypeLabel(src.source_type)})</span>
             </Focusable>
           ))}
         </Focusable>
@@ -1735,7 +1735,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
                 ["SteamGridDB ID", sgdbGameId != null ? String(sgdbGameId) : "—"],
                 ["Shortcut App ID", steamInfo ? String(steamInfo.unsigned_appid) : "—"],
                 ["In Steam", steamInfo ? "Yes" : "No"],
-                ["Source", `${selectedSource.source_name} (${selectedSource.source_type})`],
+                ["Source", `${selectedSource.source_name} (${sourceTypeLabel(selectedSource.source_type)})`],
               ] as [string, string][]).map(([label, value], i, arr) => (
                 <Fragment key={label}>
                   <span style={{
@@ -2621,7 +2621,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
                         onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                       >
                         {src.name}
-                        <span style={{ marginLeft: "6px", fontSize: "0.78em", color: "#666" }}>({src.type})</span>
+                        <span style={{ marginLeft: "6px", fontSize: "0.78em", color: "#666" }}>({sourceTypeLabel(src.type)})</span>
                       </Focusable>
                     ))}
                 </div>
@@ -2682,7 +2682,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
                         onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                       >
                         {src.source_name}
-                        <span style={{ marginLeft: "6px", fontSize: "0.78em", color: "#666" }}>({src.source_type})</span>
+                        <span style={{ marginLeft: "6px", fontSize: "0.78em", color: "#666" }}>({sourceTypeLabel(src.source_type)})</span>
                       </Focusable>
                     ))}
                 </div>
@@ -2727,7 +2727,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
                       onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
                       onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
                       {src.source_name}
-                      <span style={{ marginLeft: "6px", fontSize: "0.78em", color: "#666" }}>({src.source_type})</span>
+                      <span style={{ marginLeft: "6px", fontSize: "0.78em", color: "#666" }}>({sourceTypeLabel(src.source_type)})</span>
                     </Focusable>
                   ))}
                 </div>

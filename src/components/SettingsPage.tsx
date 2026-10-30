@@ -2,6 +2,7 @@ import { VFC, useState, useEffect, useRef, useCallback } from "react";
 import { callable } from "@decky/api";
 import { Navigation, Focusable } from "@decky/ui";
 import { Source } from "../types";
+import { sourceTypeLabel, sourceTypeColors } from "../sourceStyle";
 import { CompactTextField } from "../components/CompactTextField";
 
 const GUIDES_BASE = "https://github.com/avivkilloz/deckyfin/blob/main/guides";
@@ -693,8 +694,7 @@ export const SettingsPage: VFC<Props> = ({ onBack, artEnabled = true, onArtEnabl
       {sources.map((src, srcIdx) => {
         const usage = diskUsages[src.id];
         const usedPct = usage?.total ? Math.round((usage.used! / usage.total) * 100) : null;
-        const typeColor = src.builtin ? "#66c0f4" : src.type === "local" ? "#27ae60" : src.type === "mount" ? "#e67e22" : "#0984e3";
-        const typeBg = src.builtin ? "#1a2a3a" : src.type === "local" ? "#1a3a1a" : src.type === "mount" ? "#2a2a1a" : "#1a1a3a";
+        const { color: typeColor, bg: typeBg } = sourceTypeColors(src.type);
         const offline = !src.builtin && src.enabled !== false && !usage?.total && usage?.total !== undefined;
         const xfer = activeTransfers.find((t) => t.to_source_id === src.id && t.status === "running");
         const dimOpacity = (offline || src.enabled === false) ? 0.5 : 1;
@@ -723,7 +723,7 @@ export const SettingsPage: VFC<Props> = ({ onBack, artEnabled = true, onArtEnabl
               {/* Type pill + action buttons */}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
                 <span style={{ padding: "2px 7px", fontSize: "0.75em", borderRadius: "10px", background: typeBg, color: typeColor, border: `1px solid ${typeColor}`, whiteSpace: "nowrap", opacity: dimOpacity }}>
-                  {src.builtin ? "steam" : src.type}
+                  {sourceTypeLabel(src.type)}
                 </span>
                 <Focusable focusClassName="" style={{ display: "flex", alignItems: "center", gap: "4px" }}>
                   {!src.builtin && (
