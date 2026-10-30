@@ -68,10 +68,12 @@ from deckyfin_sources import (
     get_disk_usage as _get_disk_usage,
     migrate_games_folder_to_source as _migrate_games_folder_to_source,
     load_source_games as _load_source_games,
+    ensure_builtin_sources as _ensure_builtin_sources,
 )
 from steam_utils import get_user_id, list_steam_users
 from steam_games import convert_appid_to_unsigned_32bit
-from deckyfin_consts import APP_NAME, APP_VERSION
+from deckyfin_steam_shortcuts import upsert_store_entry as _upsert_shortcut_store_entry
+from deckyfin_consts import APP_NAME, APP_VERSION, STEAM_SHORTCUTS_SOURCE_TYPE
 
 DEBUG_LOG = Path(os.environ.get("DECKY_PLUGIN_RUNTIME_DIR", str(Path(__file__).parent))) / "debug.log"
 
@@ -389,6 +391,12 @@ class Plugin:
                 _debug("_main: migrated games_folder to sources list")
         except Exception as e:
             _debug(f"_main: migration error: {e}")
+        # Ensure built-in sources (Steam Shortcuts) exist
+        try:
+            if _ensure_builtin_sources():
+                _debug("_main: added built-in sources")
+        except Exception as e:
+            _debug(f"_main: ensure_builtin_sources error: {e}")
 
     async def _unload(self):
         _debug("_unload called")
@@ -422,6 +430,9 @@ class Plugin:
             return {"success": False, "error": str(e)}
 
     async def remove_source(self, source_id: str) -> dict:
+        src = _get_source_by_id(source_id)
+        if src and src.get("builtin"):
+            return {"success": False, "error": "Built-in sources can't be removed"}
         removed = _remove_source(source_id)
         return {"success": removed, "error": None if removed else f"Source '{source_id}' not found"}
 
@@ -777,6 +788,17 @@ class Plugin:
                 _debug(f"get_source_disk_usage: subprocess failed: {e!r}")
         return _get_disk_usage(source)
 
+    async def get_builtin_source_summary(self, source_id: str) -> dict:
+        """Game count for a built-in source card in Settings."""
+        source = _get_source_by_id(source_id)
+        if not source or not source.get("builtin") or not source.get("enabled", True):
+            return {"count": 0}
+        try:
+            return {"count": len(_load_source_games(source))}
+        except Exception as e:
+            _debug(f"get_builtin_source_summary: {e!r}")
+            return {"count": 0}
+
     async def initialize_source(self, source_id: str) -> dict:
         """Re-scan a source for new game folders and create config entries."""
         source = _get_source_by_id(source_id)
@@ -1052,6 +1074,9 @@ class Plugin:
                 name = game.get("name", game_id)
                 # Overlay ephemeral state from central store (state takes precedence over config)
                 state = get_game_state(source["id"], name)
+                if state and source.get("type") == STEAM_SHORTCUTS_SOURCE_TYPE:
+                    # shortcuts.vdf is the source of truth for orphans' Steam fields
+                    state = {k: v for k, v in state.items() if k != "steam_snapshot"}
                 if state:
                     game = {**game, **state}
                 if game_id not in merged:
@@ -1068,6 +1093,12 @@ class Plugin:
         source = _get_source_by_id(source_id) if source_id else (_list_sources() or [None])[0]
         if not source:
             return {"success": False, "error": "No source configured"}
+        if source.get("type") == STEAM_SHORTCUTS_SOURCE_TYPE:
+            game = next((g for g in _load_source_games(source) if g.get("name") == name), None)
+            if not game:
+                return {"success": False, "error": f"Game '{name}' not found"}
+            state = {k: v for k, v in get_game_state(source["id"], name).items() if k != "steam_snapshot"}
+            return {"success": True, "game": {**game, **state}}
         path = source.get("path")
         try:
             game = get_game_config(name, Path(path) if path else None)
@@ -1104,6 +1135,19 @@ class Plugin:
         # Split into permanent config and ephemeral state
         config_updates = {k: v for k, v in updates.items() if k not in STATE_FIELDS}
         state_updates = {k: v for k, v in updates.items() if k in STATE_FIELDS}
+        if source.get("type") == STEAM_SHORTCUTS_SOURCE_TYPE:
+            try:
+                if config_updates:
+                    _upsert_shortcut_store_entry(name, config_updates)
+                if state_updates:
+                    update_game_state(source["id"], name, state_updates)
+            except Exception as e:
+                return {"success": False, "error": str(e)}
+            game = next((g for g in _load_source_games(source) if g.get("name") == name), None)
+            if game:
+                st = {k: v for k, v in get_game_state(source["id"], name).items() if k != "steam_snapshot"}
+                game = {**game, **st}
+            return {"success": True, "game": game}
         owner_uid, owner_gid = _owner_creds_for(path or "") if path else (0, 0)
         # Only use subprocess for mounted sources (FUSE/network). Root can read
         # and write local sources directly; using subprocess there is unnecessary
@@ -1268,7 +1312,8 @@ class Plugin:
         import functools
         if source_id:
             src = _get_source_by_id(source_id)
-            games_path = src.get("path") if src else None
+            # Orphan shortcuts have no source folder; frontend passes an absolute dir.
+            games_path = "/" if src and src.get("type") == STEAM_SHORTCUTS_SOURCE_TYPE else (src.get("path") if src else None)
         else:
             folder = get_games_folder()
             games_path = str(folder) if folder else None
