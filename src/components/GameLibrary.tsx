@@ -171,11 +171,11 @@ export const GameLibrary: VFC = () => {
 
   // Derive unique sources from loaded games
   const allSources = useMemo(() => {
-    const seen = new Map<string, { id: string; name: string; type: string }>();
+    const seen = new Map<string, { id: string; name: string; type: string; builtin: boolean }>();
     games.forEach((g) =>
       g.sources.forEach((s) => {
         if (!seen.has(s.source_id))
-          seen.set(s.source_id, { id: s.source_id, name: s.source_name, type: s.source_type });
+          seen.set(s.source_id, { id: s.source_id, name: s.source_name, type: s.source_type, builtin: s.source_type === "steam_shortcuts" });
       })
     );
     return Array.from(seen.values());
@@ -981,11 +981,11 @@ export const GameLibrary: VFC = () => {
                 <div style={{ fontSize: "0.78em", color: "#888", marginBottom: "6px" }}>
                   Select destination source for save backups:
                 </div>
-                {allSources.length === 0 ? (
+                {allSources.filter((s) => !s.builtin).length === 0 ? (
                   <div style={{ fontSize: "0.8em", color: "#666" }}>No sources found.</div>
                 ) : (
                   <Focusable style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
-                    {allSources.map((src) => (
+                    {allSources.filter((s) => !s.builtin).map((src) => (
                       <Focusable
                         key={src.id}
                         onActivate={() => setBackupAllSourceId((v) => v === src.id ? null : src.id)}
@@ -1085,11 +1085,11 @@ export const GameLibrary: VFC = () => {
                 <div style={{ fontSize: "0.78em", color: "#888", marginBottom: "6px" }}>
                   Select source to add games to Steam from:
                 </div>
-                {allSources.filter((s) => s.type !== "mount").length === 0 ? (
+                {allSources.filter((s) => s.type !== "mount" && !s.builtin).length === 0 ? (
                   <div style={{ fontSize: "0.8em", color: "#666" }}>No sources found.</div>
                 ) : (
                   <Focusable style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
-                    {allSources.filter((s) => s.type !== "mount").map((src) => (
+                    {allSources.filter((s) => s.type !== "mount" && !s.builtin).map((src) => (
                       <Focusable
                         key={src.id}
                         onActivate={() => setAddToSteamSourceId((v) => v === src.id ? null : src.id)}

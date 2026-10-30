@@ -286,6 +286,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
 
   const selectedSource: GameSource = game.sources[selectedSourceIdx] ?? game.sources[0];
   const currentConfig: GameConfig = selectedSource?.config ?? game.sources[0]?.config ?? { name: game.name, executable: "" };
+  const isShortcutSource = selectedSource?.source_type === "steam_shortcuts";
 
   // ── Editable config fields ──────────────────────────────────────────────
   const [name, setName] = useState(currentConfig.name);
@@ -1250,7 +1251,10 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
       setShowExePicker(false);
       return;
     }
-    const root = currentConfig.path || game.name;
+    const exePath = currentConfig.executable || "";
+    const root = isShortcutSource
+      ? exePath.substring(0, Math.max(exePath.lastIndexOf("/"), 1))
+      : currentConfig.path || game.name;
     try {
       const exes = await scanExes(root, selectedSource.source_id);
       setExeOptions(exes);
@@ -1350,6 +1354,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
         setSteamInfo(null);
         setFeedback({ ok: true, msg: "Removed from Steam — restart Steam to apply" });
         onNeedsRestart?.();
+        if (isShortcutSource) onBack();
       } else {
         setFeedback({ ok: false, msg: res.error || "Not found in Steam shortcuts" });
       }
@@ -1369,6 +1374,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
         setSteamInfo(null);
         setFeedback({ ok: true, msg: "All Steam data purged — restart Steam to apply" });
         onNeedsRestart?.();
+        if (isShortcutSource) onBack();
       } else {
         const detail = res.errors?.length ? res.errors.join("; ") : "Not found";
         setFeedback({ ok: false, msg: `Purge failed: ${detail}` });
@@ -1746,7 +1752,11 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
           <div style={{ padding: "8px 12px", borderTop: "1px solid #2a2a2a" }}>
             {/* Name */}
             <label style={{ fontSize: "0.78em", color: "#888", display: "block", marginBottom: "2px" }}>Name</label>
-            <CompactTextField value={name} onChange={(e) => setName(e.target.value)} style={{ width: "100%", marginBottom: "8px" }} />
+            {isShortcutSource ? (
+              <div style={{ fontSize: "0.9em", color: "#ccc", padding: "6px 0", marginBottom: "8px" }}>{name}</div>
+            ) : (
+              <CompactTextField value={name} onChange={(e) => setName(e.target.value)} style={{ width: "100%", marginBottom: "8px" }} />
+            )}
             {/* Executable */}
             <label style={{ fontSize: "0.78em", color: "#888", display: "block", marginBottom: "2px" }}>Executable</label>
             <Focusable focusClassName="" style={{ display: "flex", gap: "6px", alignItems: "center", marginBottom: showExePicker ? "6px" : "8px" }}>
@@ -2010,6 +2020,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
       </div>
 
       {/* Save Paths */}
+      {!isShortcutSource && (
       <div style={{ border: "1px solid #3a3a3a", borderRadius: "6px", marginBottom: "8px" }}>
         <Focusable onActivate={() => setShowSavePaths((v) => !v)} onClick={() => setShowSavePaths((v) => !v)} focusClassName="is-focused"
           style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", cursor: "pointer", background: "#1e1e1e", borderRadius: showSavePaths ? "6px 6px 0 0" : "6px" }}>
@@ -2137,6 +2148,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
           })()}
         </div>}
       </div>
+      )}
 
       {/* ── Steam Actions ──────────────────────────────────────────────────── */}
       <div style={{ border: "1px solid #3a3a3a", borderRadius: "6px", marginBottom: "8px" }}>
@@ -2166,8 +2178,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
               </div>
             )}
             <Focusable
-              onActivate={capabilities.can_play ? (steamInfo ? handleUpdateSteam : handleAddToSteam) : undefined}
-              onClick={capabilities.can_play ? (steamInfo ? handleUpdateSteam : handleAddToSteam) : undefined}
+              onActivate={capabilities.can_play && !(isShortcutSource && !steamInfo) ? (steamInfo ? handleUpdateSteam : handleAddToSteam) : undefined}
+              onClick={capabilities.can_play && !(isShortcutSource && !steamInfo) ? (steamInfo ? handleUpdateSteam : handleAddToSteam) : undefined}
               focusClassName="is-focused"
               style={{ ...BTN_STYLE, display: "block", width: "100%", boxSizing: "border-box" as const, textAlign: "center" as const, marginBottom: "6px",
                 opacity: !capabilities.can_play || loading === "add" || loading === "update" ? 0.4 : 1,
@@ -2530,7 +2542,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
         </div>
 
       {/* ── Transfer Actions ──────────────────────────────────────────────── */}
-      {(game.sources.length >= 2 ||
+      {!isShortcutSource && (game.sources.length >= 2 ||
         allSources.some(
           (s) =>
             s.type !== "agent" &&
@@ -2866,7 +2878,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
       )}
 
       {/* ── Save Actions ───────────────────────────────────────────────────── */}
-      {syncPaths.length > 0 && (capabilities.can_write_config || !!steamInfo) && (
+      {!isShortcutSource && syncPaths.length > 0 && (capabilities.can_write_config || !!steamInfo) && (
         <div style={{ border: "1px solid #3a3a3a", borderRadius: "6px", marginBottom: "8px" }}>
           <Focusable onActivate={() => setShowSaveActions((v) => !v)} onClick={() => setShowSaveActions((v) => !v)} focusClassName="is-focused"
             style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", cursor: "pointer", background: "#1e1e1e", borderRadius: showSaveActions ? "6px 6px 0 0" : "6px" }}>
@@ -3065,7 +3077,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
         </div>
       )}
 
-      {confirming === "deckyfin" ? (
+      {!isShortcutSource && (confirming === "deckyfin" ? (
         <div
           style={{
             border: "1px solid #c0392b",
@@ -3120,7 +3132,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
         >
           Remove Game from Source
         </Focusable>
-      )}
+      ))}
 
           </div>
         )}
