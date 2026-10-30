@@ -425,3 +425,36 @@ def test_steam_library_config_root_caps_disk(tmp_path, monkeypatch):
     assert mod.source_config_root(lib) == tmp_path / ".config" / "deckyfin" / "steam_library"
     assert mod.detect_capabilities(lib) == {"can_play": True, "can_write_config": True, "can_download_to": False}
     assert mod.get_disk_usage(lib) == {"used": None, "total": None, "free": None}
+
+
+# ── show_uninstalled source option ────────────────────────────────────────────
+
+def test_steam_library_show_uninstalled_defaults_false(tmp_path, monkeypatch):
+    _make_app_config(tmp_path, {})
+    mod = _reload_sources(tmp_path, monkeypatch)
+    mod.ensure_builtin_sources()
+    lib = next(s for s in mod.list_sources() if s["id"] == "steam-library")
+    assert lib["show_uninstalled"] is False
+    shortcuts = next(s for s in mod.list_sources() if s["id"] == "steam-shortcuts")
+    assert "show_uninstalled" not in shortcuts
+
+
+def test_set_source_option_persists_show_uninstalled(tmp_path, monkeypatch):
+    _make_app_config(tmp_path, {})
+    mod = _reload_sources(tmp_path, monkeypatch)
+    mod.ensure_builtin_sources()
+    assert mod.set_source_option("steam-library", "show_uninstalled", True) is True
+    lib = next(s for s in mod.list_sources() if s["id"] == "steam-library")
+    assert lib["show_uninstalled"] is True
+
+
+def test_set_source_option_rejects_invalid(tmp_path, monkeypatch):
+    _make_app_config(tmp_path, {})
+    mod = _reload_sources(tmp_path, monkeypatch)
+    mod.ensure_builtin_sources()
+    local = mod.add_source("Games", "local", str(tmp_path), None)
+    assert mod.set_source_option("nope", "show_uninstalled", True) is False
+    assert mod.set_source_option("steam-library", "other", True) is False
+    assert mod.set_source_option("steam-library", "show_uninstalled", "yes") is False
+    assert mod.set_source_option("steam-shortcuts", "show_uninstalled", True) is False
+    assert mod.set_source_option(local["id"], "show_uninstalled", True) is False

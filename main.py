@@ -63,6 +63,7 @@ from deckyfin_sources import (
     remove_source as _remove_source,
     reorder_source as _reorder_source,
     set_source_enabled as _set_source_enabled,
+    set_source_option as _set_source_option,
     get_source_by_id as _get_source_by_id,
     detect_capabilities as _detect_capabilities,
     get_disk_usage as _get_disk_usage,
@@ -457,6 +458,9 @@ class Plugin:
     async def set_source_enabled(self, source_id: str, enabled: bool) -> dict:
         found = _set_source_enabled(source_id, enabled)
         return {"success": found, "error": None if found else f"Source '{source_id}' not found"}
+
+    async def set_source_option(self, source_id: str, key: str, value) -> dict:
+        return {"success": _set_source_option(source_id, key, value)}
 
     async def get_source_capabilities(self, source_id: str) -> dict:
         source = _get_source_by_id(source_id)

@@ -70,10 +70,13 @@ def _validate_local_path(path: str) -> None:
 def list_sources() -> list:
     """Return all configured sources, normalizing missing enabled/builtin fields."""
     sources = get_app_config().get("sources", [])
-    return [
-        {**s, "enabled": s.get("enabled", True), "builtin": s.get("builtin", False)}
-        for s in sources
-    ]
+    out = []
+    for s in sources:
+        s = {**s, "enabled": s.get("enabled", True), "builtin": s.get("builtin", False)}
+        if s.get("type") == STEAM_LIBRARY_SOURCE_TYPE:
+            s["show_uninstalled"] = s.get("show_uninstalled", False)
+        out.append(s)
+    return out
 
 
 def get_source_by_id(source_id: str) -> Optional[dict]:
@@ -135,6 +138,25 @@ def set_source_enabled(source_id: str, enabled: bool) -> bool:
             s["enabled"] = enabled
             set_app_config({"sources": sources})
             return True
+    return False
+
+
+# Per-source options that the frontend may change, by source type → {key: type}
+_SOURCE_OPTIONS = {STEAM_LIBRARY_SOURCE_TYPE: {"show_uninstalled": bool}}
+
+
+def set_source_option(source_id: str, key: str, value) -> bool:
+    """Set an allowed option on a source. Returns False for unknown source/key or wrong type."""
+    sources = list_sources()
+    for s in sources:
+        if s["id"] != source_id:
+            continue
+        expected = _SOURCE_OPTIONS.get(s.get("type"), {}).get(key)
+        if expected is None or not isinstance(value, expected):
+            return False
+        s[key] = value
+        set_app_config({"sources": sources})
+        return True
     return False
 
 
