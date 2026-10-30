@@ -901,6 +901,31 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
     (s) => s.source_id !== selectedSource?.source_id && s.source_type !== "steam_shortcuts",
   );
 
+  // Save sync status — shown under Backup/Restore, or under Copy Saves for copies.
+  const saveSyncDestName = allSources.find((s) => s.id === saveSync?.to_source_id)?.name ?? "destination";
+  const renderSaveSyncStatus = () => saveSync && (
+    <div style={{ border: "1px solid #444", borderRadius: "4px", padding: "5px 8px", background: "#1a1a1a", fontSize: "0.82em" }}>
+      {saveSync.status === "running" && <span style={{ color: "#aaa" }}>⟳ {saveSync.direction === "backup" ? "Backing up" : saveSync.direction === "restore" ? "Restoring" : "Copying"} saves…</span>}
+      {saveSync.status === "done" && (
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ color: "#2ecc71" }}>✓ {saveSync.direction === "backup" ? "Saves backed up" : saveSync.direction === "restore" ? "Saves restored" : `Saves copied → ${saveSyncDestName}`}{saveSync.copied?.length ? ` (${saveSync.copied.length})` : ""}</span>
+            <Focusable onActivate={() => { if (saveSync.sync_id) clearSaveSyncStatus(saveSync.sync_id).catch(() => {}); setSaveSync(null); }} onClick={() => { if (saveSync.sync_id) clearSaveSyncStatus(saveSync.sync_id).catch(() => {}); setSaveSync(null); }} focusClassName="is-focused" style={{ cursor: "pointer", color: "#666", padding: "0 4px" }}>✕</Focusable>
+          </div>
+          {saveSync.saves_dir && saveSync.direction !== "restore" && (
+            <div style={{ fontSize: "0.72em", color: "#555", fontFamily: "monospace", wordBreak: "break-all", marginTop: "3px" }}>{saveSync.saves_dir}</div>
+          )}
+        </div>
+      )}
+      {saveSync.status === "failed" && (
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "6px" }}>
+          <span style={{ color: "tomato", wordBreak: "break-all", minWidth: 0, flex: 1 }}>✗ {saveSync.error ?? "Save sync failed"}</span>
+          <Focusable onActivate={() => { if (saveSync.sync_id) clearSaveSyncStatus(saveSync.sync_id).catch(() => {}); setSaveSync(null); }} onClick={() => { if (saveSync.sync_id) clearSaveSyncStatus(saveSync.sync_id).catch(() => {}); setSaveSync(null); }} focusClassName="is-focused" style={{ cursor: "pointer", color: "#666", padding: "0 4px" }}>✕</Focusable>
+        </div>
+      )}
+    </div>
+  );
+
   const handleCopySaves = async () => {
     if (!copySavesDest) return;
     setCopySavesConfirming(false);
@@ -2753,6 +2778,9 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
                   </Focusable>
                 </div>
               )}
+              {saveSync?.direction === "copy" && (
+                <div style={{ marginTop: "4px" }}>{renderSaveSyncStatus()}</div>
+              )}
             </div>
           )}
 
@@ -2935,29 +2963,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
                   </Focusable>
                 </>
               )}
-              {/* Save sync status */}
-              {saveSync && (
-                <div style={{ border: "1px solid #444", borderRadius: "4px", padding: "5px 8px", background: "#1a1a1a", fontSize: "0.82em" }}>
-                  {saveSync.status === "running" && <span style={{ color: "#aaa" }}>⟳ {saveSync.direction === "backup" ? "Backing up" : saveSync.direction === "restore" ? "Restoring" : "Copying"} saves…</span>}
-                  {saveSync.status === "done" && (
-                    <div>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <span style={{ color: "#2ecc71" }}>✓ {saveSync.direction === "backup" ? "Saves backed up" : saveSync.direction === "restore" ? "Saves restored" : "Saves copied"}{saveSync.copied?.length ? ` (${saveSync.copied.length})` : ""}</span>
-                        <Focusable onActivate={() => { if (saveSync.sync_id) clearSaveSyncStatus(saveSync.sync_id).catch(() => {}); setSaveSync(null); }} onClick={() => { if (saveSync.sync_id) clearSaveSyncStatus(saveSync.sync_id).catch(() => {}); setSaveSync(null); }} focusClassName="is-focused" style={{ cursor: "pointer", color: "#666", padding: "0 4px" }}>✕</Focusable>
-                      </div>
-                      {saveSync.saves_dir && saveSync.direction === "backup" && (
-                        <div style={{ fontSize: "0.72em", color: "#555", fontFamily: "monospace", wordBreak: "break-all", marginTop: "3px" }}>{saveSync.saves_dir}</div>
-                      )}
-                    </div>
-                  )}
-                  {saveSync.status === "failed" && (
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "6px" }}>
-                      <span style={{ color: "tomato", wordBreak: "break-all", minWidth: 0, flex: 1 }}>✗ {saveSync.error ?? "Save sync failed"}</span>
-                      <Focusable onActivate={() => { if (saveSync.sync_id) clearSaveSyncStatus(saveSync.sync_id).catch(() => {}); setSaveSync(null); }} onClick={() => { if (saveSync.sync_id) clearSaveSyncStatus(saveSync.sync_id).catch(() => {}); setSaveSync(null); }} focusClassName="is-focused" style={{ cursor: "pointer", color: "#666", padding: "0 4px" }}>✕</Focusable>
-                    </div>
-                  )}
-                </div>
-              )}
+              {/* Save sync status (copies report under Copy Saves) */}
+              {saveSync && saveSync.direction !== "copy" && renderSaveSyncStatus()}
             </div>
           )}
         </div>
