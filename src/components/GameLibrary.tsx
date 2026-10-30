@@ -154,16 +154,6 @@ export const GameLibrary: VFC = () => {
   const [filterCollections, setFilterCollections] = useState<Set<string>>(new Set());
   const [filterInstallStatus, setFilterInstallStatus] = useState<InstallFilter>("all");
 
-  const hasActiveFilters =
-    searchQuery !== "" || filterSourceIds.size > 0 || filterSteamStatus !== "all" || filterCollections.size > 0 ||
-    filterInstallStatus !== "all";
-
-  const activeFilterCount =
-    (filterSourceIds.size > 0 ? 1 : 0) +
-    (filterSteamStatus !== "all" ? 1 : 0) +
-    (filterCollections.size > 0 ? 1 : 0) +
-    (filterInstallStatus !== "all" ? 1 : 0);
-
   const clearFilters = () => {
     setSearchQuery("");
     setFilterSourceIds(new Set());
@@ -486,6 +476,23 @@ export const GameLibrary: VFC = () => {
     [games, ownedApps, showOwned, steamLibrarySource?.id],
   );
 
+  // The install-status chip row only exists while showOwned is true; if the toggle turns
+  // off while "Installed"/"Not installed" is selected, drop back to "all" so filteredGames
+  // doesn't keep silently hiding everything once the chip row (and its reset control) is gone.
+  useEffect(() => {
+    if (!showOwned) setFilterInstallStatus("all");
+  }, [showOwned]);
+
+  const hasActiveFilters =
+    searchQuery !== "" || filterSourceIds.size > 0 || filterSteamStatus !== "all" || filterCollections.size > 0 ||
+    (showOwned && filterInstallStatus !== "all");
+
+  const activeFilterCount =
+    (filterSourceIds.size > 0 ? 1 : 0) +
+    (filterSteamStatus !== "all" ? 1 : 0) +
+    (filterCollections.size > 0 ? 1 : 0) +
+    (showOwned && filterInstallStatus !== "all" ? 1 : 0);
+
   // ── Live download/verify progress, and reload once a tracked app finishes ──
   const downloads = useSteamDownloads();
   const prevDownloadAppidsRef = useRef<Set<number>>(new Set());
@@ -499,23 +506,30 @@ export const GameLibrary: VFC = () => {
     if (anyFinished) loadData();
   }, [downloads, loadData]);
 
-  // Once games refresh, if the detail page for one of them is open, swap in the fresh
-  // entry (e.g. an owned-not-installed placeholder that just became a real installed game)
-  // so the open page reflects the new state instead of a stale snapshot.
+  // Once the displayed list refreshes, if the detail page for one of them is open, swap in
+  // the fresh entry (e.g. an owned-not-installed placeholder that just became a real
+  // installed game) so the open page reflects the new state instead of a stale snapshot.
   useEffect(() => {
     if (view !== "game-detail" || !selectedGame) return;
-    const selAppids = selectedGame.sources
-      .map((s) => s.config.steam_app_id)
-      .filter((id): id is number => typeof id === "number");
-    const refreshed = games.find((g) =>
-      g.id === selectedGame.id ||
-      (selAppids.length > 0 && g.sources.some((s) => s.source_type === "steam_library" && selAppids.includes(s.config.steam_app_id as number)))
-    );
+    const byId = displayGames.find((g) => g.id === selectedGame.id);
+    // Only fall back to an appid match when the open game is itself an owned-not-installed
+    // placeholder — otherwise a real game with a manually set steam_app_id that happens to
+    // match a different steam_library entry's appid could hijack the open detail page.
+    const refreshed = byId ?? (isNotInstalled(selectedGame)
+      ? (() => {
+          const selAppids = selectedGame.sources
+            .map((s) => s.config.steam_app_id)
+            .filter((id): id is number => typeof id === "number");
+          return selAppids.length > 0
+            ? displayGames.find((g) => g.sources.some((s) => s.source_type === "steam_library" && selAppids.includes(s.config.steam_app_id as number)))
+            : undefined;
+        })()
+      : undefined);
     if (refreshed && refreshed !== selectedGame) setSelectedGame(refreshed);
-    // Only re-run when the backend game list changes; selectedGame/view are read, not watched,
+    // Only re-run when the displayed game list changes; selectedGame/view are read, not watched,
     // to avoid re-triggering off of the setSelectedGame call this effect itself makes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [games]);
+  }, [displayGames]);
 
   const openGame = (game: MergedGame) => {
     setInitialSourceId(null); // manual navigation — no source restore
@@ -536,8 +550,8 @@ export const GameLibrary: VFC = () => {
       return false;
     if (filterSteamStatus === "in-steam" && !steamNames.has(g.name)) return false;
     if (filterSteamStatus === "not-in-steam" && steamNames.has(g.name)) return false;
-    if (filterInstallStatus === "installed" && isNotInstalled(g)) return false;
-    if (filterInstallStatus === "not-installed" && !isNotInstalled(g)) return false;
+    if (showOwned && filterInstallStatus === "installed" && isNotInstalled(g)) return false;
+    if (showOwned && filterInstallStatus === "not-installed" && !isNotInstalled(g)) return false;
     if (filterCollections.size > 0) {
       const gameCollections = new Set(g.sources.flatMap((s) => s.config.collections || []));
       for (const col of filterCollections) {
