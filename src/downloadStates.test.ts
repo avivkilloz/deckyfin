@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { toDownloadStates } from "./downloadStates";
+import { toDownloadStates, formatDownloadLabel } from "./downloadStates";
 
 describe("toDownloadStates", () => {
   it("maps the active item with progress and the rest as queued", () => {
@@ -27,5 +27,13 @@ describe("toDownloadStates", () => {
 
   it("works without an overview", () => {
     expect(toDownloadStates([{ appid: 1, active: true, completed: false }], null)).toEqual({ 1: { status: "downloading", progress: 0 } });
+  });
+});
+
+describe("formatDownloadLabel", () => {
+  it("labels queued, verifying and downloading states", () => {
+    expect(formatDownloadLabel({ status: "queued", progress: 0 })).toBe("Queued");
+    expect(formatDownloadLabel({ status: "verifying", progress: 0.5 })).toBe("Verifying… 50%");
+    expect(formatDownloadLabel({ status: "downloading", progress: 0.333 })).toBe("33%");
   });
 });

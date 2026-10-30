@@ -7,6 +7,13 @@ export type RawDownloadOverview = {
 };
 export type DownloadState = { status: "downloading" | "queued" | "verifying"; progress: number };
 
+/** Shared label for a download/verify progress badge: "Queued" / "Verifying… N%" / "N%". */
+export function formatDownloadLabel(d: DownloadState): string {
+  if (d.status === "queued") return "Queued";
+  const pct = Math.round(d.progress * 100);
+  return d.status === "verifying" ? `Verifying… ${pct}%` : `${pct}%`;
+}
+
 export function toDownloadStates(items: RawDownloadItem[], overview: RawDownloadOverview | null): Record<number, DownloadState> {
   const out: Record<number, DownloadState> = {};
   for (const item of items ?? []) {

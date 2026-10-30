@@ -3,6 +3,7 @@ import { callable } from "@decky/api";
 import { Focusable } from "@decky/ui";
 import { MergedGame } from "../types";
 import { getCachedArt, setCachedArt } from "../artCache";
+import { DownloadState, formatDownloadLabel } from "../downloadStates";
 
 const getGameCardArt = callable<[game_name: string, game_id?: string], { data_uri: string | null }>("get_game_card_art");
 
@@ -12,9 +13,11 @@ interface Props {
   game: MergedGame;
   isInSteam: boolean;
   onClick: () => void;
+  notInstalled?: boolean;
+  download?: DownloadState;
 }
 
-export const GameArtRow: VFC<Props> = ({ game, isInSteam, onClick }) => {
+export const GameArtRow: VFC<Props> = ({ game, isInSteam, onClick, notInstalled, download }) => {
   const [artUri, setArtUri] = useState<string | null>(null);
 
   useEffect(() => {
@@ -40,6 +43,7 @@ export const GameArtRow: VFC<Props> = ({ game, isInSteam, onClick }) => {
         borderRadius: "6px",
         overflow: "hidden",
         cursor: "pointer",
+        opacity: notInstalled ? 0.55 : 1,
         background: artUri
           ? `center / cover no-repeat url("${artUri}")`
           : "linear-gradient(135deg, #667eea, #764ba2)",
@@ -51,6 +55,31 @@ export const GameArtRow: VFC<Props> = ({ game, isInSteam, onClick }) => {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: "100%", fontSize: "40px" }}>
           🎮
         </div>
+      )}
+
+      {notInstalled && (
+        <span style={{
+          position: "absolute", top: "6px", left: "8px",
+          fontSize: "10px", fontWeight: 700, padding: "2px 6px", borderRadius: "4px",
+          background: "rgba(0,0,0,0.65)", color: "#ccc",
+        }}>
+          Not installed
+        </span>
+      )}
+
+      {download && (
+        <>
+          <span style={{
+            position: "absolute", top: "6px", right: "8px",
+            fontSize: "10px", fontWeight: 700, padding: "2px 6px", borderRadius: "4px",
+            background: "rgba(0,0,0,0.65)", color: "#fff",
+          }}>
+            {formatDownloadLabel(download)}
+          </span>
+          <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "4px", background: "rgba(0,0,0,0.45)" }}>
+            <div style={{ width: `${Math.round(download.progress * 100)}%`, height: "100%", background: "#0078d4", transition: "width 0.3s" }} />
+          </div>
+        </>
       )}
 
       {/* Bottom row: name + badges */}

@@ -3,6 +3,7 @@ import { callable } from "@decky/api";
 import { Focusable } from "@decky/ui";
 import { GameConfig } from "../types";
 import { getCachedArt, setCachedArt } from "../artCache";
+import { DownloadState, formatDownloadLabel } from "../downloadStates";
 
 const getGameCardArt = callable<
   [game_name: string, game_id?: string],
@@ -15,9 +16,12 @@ interface Props {
   sourceCount?: number;
   onClick: () => void;
   artEnabled?: boolean;
+  notInstalled?: boolean;
+  download?: DownloadState;
+  steamAppId?: number;
 }
 
-export const GameCard: VFC<Props> = ({ game, isInSteam, sourceCount, onClick, artEnabled = true }) => {
+export const GameCard: VFC<Props> = ({ game, isInSteam, sourceCount, onClick, artEnabled = true, notInstalled, download, steamAppId }) => {
   const [artUri, setArtUri] = useState<string | null>(null);
 
   const cacheKey = game.id ?? game.name;
@@ -30,6 +34,11 @@ export const GameCard: VFC<Props> = ({ game, isInSteam, sourceCount, onClick, ar
       .catch(() => { setCachedArt(cacheKey, null); setArtUri(null); });
   }, [cacheKey, artEnabled]);
 
+  // Fallback to Steam's CDN header art when the backend has no custom art and we know the Steam app id
+  // (owned-but-not-installed games have no Deckyfin-applied art).
+  const fallbackArt = steamAppId ? `https://cdn.cloudflare.steamstatic.com/steam/apps/${steamAppId}/header.jpg` : null;
+  const effectiveArtUri = artUri ?? fallbackArt;
+
   return (
     <Focusable
       onActivate={onClick}
@@ -41,6 +50,7 @@ export const GameCard: VFC<Props> = ({ game, isInSteam, sourceCount, onClick, ar
         cursor: "pointer",
         border: "1px solid rgba(255,255,255,0.1)",
         transition: "background 0.2s",
+        opacity: notInstalled ? 0.55 : 1,
       }}
       onFocus={(e) => (e.currentTarget.style.boxShadow = "0 0 0 3px #51cbf8, 0 0 12px rgba(81,203,248,0.4)")}
       onBlur={(e) => (e.currentTarget.style.boxShadow = "none")}
@@ -56,12 +66,12 @@ export const GameCard: VFC<Props> = ({ game, isInSteam, sourceCount, onClick, ar
           marginBottom: "8px",
           position: "relative",
           overflow: "hidden",
-          background: artUri && artEnabled
-            ? `center / cover no-repeat url("${artUri}")`
+          background: effectiveArtUri && artEnabled
+            ? `center / cover no-repeat url("${effectiveArtUri}")`
             : "linear-gradient(135deg, #667eea, #764ba2)",
         }}
       >
-        {!artUri && (
+        {!(effectiveArtUri && artEnabled) && (
           <div
             style={{
               display: "flex",
@@ -74,6 +84,31 @@ export const GameCard: VFC<Props> = ({ game, isInSteam, sourceCount, onClick, ar
           >
             🎮
           </div>
+        )}
+
+        {notInstalled && (
+          <span style={{
+            position: "absolute", top: "4px", left: "4px",
+            fontSize: "10px", fontWeight: 700, padding: "1px 5px", borderRadius: "4px",
+            background: "rgba(0,0,0,0.65)", color: "#ccc",
+          }}>
+            Not installed
+          </span>
+        )}
+
+        {download && (
+          <>
+            <span style={{
+              position: "absolute", top: "4px", right: "4px",
+              fontSize: "10px", fontWeight: 700, padding: "1px 5px", borderRadius: "4px",
+              background: "rgba(0,0,0,0.65)", color: "#fff",
+            }}>
+              {formatDownloadLabel(download)}
+            </span>
+            <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "4px", background: "rgba(0,0,0,0.45)" }}>
+              <div style={{ width: `${Math.round(download.progress * 100)}%`, height: "100%", background: "#0078d4", transition: "width 0.3s" }} />
+            </div>
+          </>
         )}
       </div>
 

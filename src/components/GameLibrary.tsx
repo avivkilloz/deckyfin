@@ -3,12 +3,15 @@ import { callable } from "@decky/api";
 import { Focusable } from "@decky/ui";
 import { MergedGame, Source, TransferStatus } from "../types";
 import { useArtwork } from "../hooks/useArtwork";
+import { useSteamDownloads } from "../hooks/useSteamDownloads";
 import { GameCard } from "../components/GameCard";
 import { GameArtRow } from "../components/GameArtRow";
 import { SettingsPage } from "../components/SettingsPage";
 import { GameDetail } from "../components/GameDetail";
 import { CompactTextField } from "../components/CompactTextField";
 import { isBuiltinSourceType } from "../sourceStyle";
+import { readOwnedApps, mergeOwnedGames } from "../steamOwned";
+import { DownloadState, formatDownloadLabel } from "../downloadStates";
 
 const getGames = callable<[], MergedGame[]>("get_games");
 const listNonSteamGames = callable<[], { name: string }[]>("list_nonsteam_games");
@@ -50,6 +53,19 @@ function fmtBytes(b: number): string {
 }
 
 type SteamFilter = "all" | "in-steam" | "not-in-steam";
+type InstallFilter = "all" | "installed" | "not-installed";
+
+/** First steam_app_id among a merged game's sources, or undefined. */
+function appidOf(game: MergedGame): number | undefined {
+  for (const s of game.sources) {
+    if (typeof s.config.steam_app_id === "number") return s.config.steam_app_id;
+  }
+  return undefined;
+}
+
+/** True for a merged game whose only source(s) are an owned-but-not-installed Steam Library entry. */
+const isNotInstalled = (g: MergedGame): boolean =>
+  g.sources.length > 0 && g.sources.every((s) => s.source_type === "steam_library" && s.config.installed === false);
 
 const BTN: React.CSSProperties = {
   padding: "6px 10px",
@@ -136,20 +152,24 @@ export const GameLibrary: VFC = () => {
   const [filterSourceIds, setFilterSourceIds] = useState<Set<string>>(new Set());
   const [filterSteamStatus, setFilterSteamStatus] = useState<SteamFilter>("all");
   const [filterCollections, setFilterCollections] = useState<Set<string>>(new Set());
+  const [filterInstallStatus, setFilterInstallStatus] = useState<InstallFilter>("all");
 
   const hasActiveFilters =
-    searchQuery !== "" || filterSourceIds.size > 0 || filterSteamStatus !== "all" || filterCollections.size > 0;
+    searchQuery !== "" || filterSourceIds.size > 0 || filterSteamStatus !== "all" || filterCollections.size > 0 ||
+    filterInstallStatus !== "all";
 
   const activeFilterCount =
     (filterSourceIds.size > 0 ? 1 : 0) +
     (filterSteamStatus !== "all" ? 1 : 0) +
-    (filterCollections.size > 0 ? 1 : 0);
+    (filterCollections.size > 0 ? 1 : 0) +
+    (filterInstallStatus !== "all" ? 1 : 0);
 
   const clearFilters = () => {
     setSearchQuery("");
     setFilterSourceIds(new Set());
     setFilterSteamStatus("all");
     setFilterCollections(new Set());
+    setFilterInstallStatus("all");
   };
 
   const toggleSourceFilter = (id: string) => {
@@ -457,6 +477,46 @@ export const GameLibrary: VFC = () => {
     return () => clearInterval(poll);
   }, [hasRunningTransfer, hasRunningProton, hasRunningDep, hasRunningCopy, hasRunningPrefix, hasRunningSaveSync, hasRunningBatchAdd]);
 
+  // ── Owned-but-not-installed Steam games merge ──────────────────────────────
+  const steamLibrarySource = xferSources.find((s) => s.type === "steam_library");
+  const showOwned = !!steamLibrarySource && steamLibrarySource.enabled !== false && !!steamLibrarySource.show_uninstalled;
+  const ownedApps = useMemo(() => (showOwned ? readOwnedApps() : null), [showOwned, games]);
+  const displayGames = useMemo(
+    () => (showOwned && ownedApps && steamLibrarySource ? mergeOwnedGames(games, ownedApps, steamLibrarySource) : games),
+    [games, ownedApps, showOwned, steamLibrarySource?.id],
+  );
+
+  // ── Live download/verify progress, and reload once a tracked app finishes ──
+  const downloads = useSteamDownloads();
+  const prevDownloadAppidsRef = useRef<Set<number>>(new Set());
+  useEffect(() => {
+    const prevAppids = prevDownloadAppidsRef.current;
+    const currentAppids = new Set(Object.keys(downloads).map(Number));
+    const anyFinished = [...prevAppids].some((id) => !currentAppids.has(id));
+    prevDownloadAppidsRef.current = currentAppids;
+    // An appid that was tracked and is now gone means Steam finished (or cancelled) that
+    // download; either way the backend's installed state for that game may have changed.
+    if (anyFinished) loadData();
+  }, [downloads, loadData]);
+
+  // Once games refresh, if the detail page for one of them is open, swap in the fresh
+  // entry (e.g. an owned-not-installed placeholder that just became a real installed game)
+  // so the open page reflects the new state instead of a stale snapshot.
+  useEffect(() => {
+    if (view !== "game-detail" || !selectedGame) return;
+    const selAppids = selectedGame.sources
+      .map((s) => s.config.steam_app_id)
+      .filter((id): id is number => typeof id === "number");
+    const refreshed = games.find((g) =>
+      g.id === selectedGame.id ||
+      (selAppids.length > 0 && g.sources.some((s) => s.source_type === "steam_library" && selAppids.includes(s.config.steam_app_id as number)))
+    );
+    if (refreshed && refreshed !== selectedGame) setSelectedGame(refreshed);
+    // Only re-run when the backend game list changes; selectedGame/view are read, not watched,
+    // to avoid re-triggering off of the setSelectedGame call this effect itself makes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [games]);
+
   const openGame = (game: MergedGame) => {
     setInitialSourceId(null); // manual navigation — no source restore
     setSelectedGame(game);
@@ -467,7 +527,7 @@ export const GameLibrary: VFC = () => {
   // Built-in sources (Steam Shortcuts) always exist, so they must not count toward
   // "user configured a source" for onboarding/empty-state messaging.
   const configuredSourceCount = xferSources.filter((s) => !s.builtin).length;
-  const filteredGames = games.filter((g) => {
+  const filteredGames = displayGames.filter((g) => {
     if (disabledIds.size > 0 && g.sources.every((s) => disabledIds.has(s.source_id)))
       return false;
     if (searchQuery && !g.name.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -476,6 +536,8 @@ export const GameLibrary: VFC = () => {
       return false;
     if (filterSteamStatus === "in-steam" && !steamNames.has(g.name)) return false;
     if (filterSteamStatus === "not-in-steam" && steamNames.has(g.name)) return false;
+    if (filterInstallStatus === "installed" && isNotInstalled(g)) return false;
+    if (filterInstallStatus === "not-installed" && !isNotInstalled(g)) return false;
     if (filterCollections.size > 0) {
       const gameCollections = new Set(g.sources.flatMap((s) => s.config.collections || []));
       for (const col of filterCollections) {
@@ -1349,12 +1411,34 @@ export const GameLibrary: VFC = () => {
               </Focusable>
             ))}
           </Focusable>
+
+          {/* Installed / Not installed (owned-games library only) */}
+          {showOwned && (
+            <>
+              <div style={{ fontSize: "0.75em", color: "#888", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                Installed
+              </div>
+              <Focusable focusClassName="" style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                {(["all", "installed", "not-installed"] as const).map((opt) => (
+                  <Focusable
+                    key={opt}
+                    onActivate={() => setFilterInstallStatus(opt)}
+                    onClick={() => setFilterInstallStatus(opt)}
+                    focusClassName="is-focused"
+                    style={CHIP(filterInstallStatus === opt)}
+                  >
+                    {opt === "all" ? "All" : opt === "installed" ? "Installed" : "Not Installed"}
+                  </Focusable>
+                ))}
+              </Focusable>
+            </>
+          )}
         </div>
       )}
 
       {/* Game list */}
       {error && <p style={{ color: "red" }}>{error}</p>}
-      {!loading && !error && games.length === 0 && (
+      {!loading && !error && displayGames.length === 0 && (
         <div style={{ padding: "24px 16px", textAlign: "center", color: "#aaa" }}>
           {configuredSourceCount === 0 ? (
             <>
@@ -1397,6 +1481,8 @@ export const GameLibrary: VFC = () => {
               game={game}
               isInSteam={steamNames.has(game.name)}
               onClick={() => openGame(game)}
+              notInstalled={isNotInstalled(game)}
+              download={downloads[appidOf(game) ?? -1]}
             />
           ))}
         </div>
@@ -1416,12 +1502,18 @@ export const GameLibrary: VFC = () => {
               sourceCount={game.sources.length}
               onClick={() => openGame(game)}
               artEnabled={artEnabled}
+              notInstalled={isNotInstalled(game)}
+              download={downloads[appidOf(game) ?? -1]}
+              steamAppId={appidOf(game)}
             />
           ))}
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-          {filteredGames.map((game) => (
+          {filteredGames.map((game) => {
+            const rowNotInstalled = isNotInstalled(game);
+            const rowDownload = downloads[appidOf(game) ?? -1];
+            return (
             <Focusable
               key={game.id}
               onActivate={() => openGame(game)}
@@ -1433,6 +1525,7 @@ export const GameLibrary: VFC = () => {
                 cursor: "pointer",
                 border: "1px solid rgba(255,255,255,0.08)",
                 background: "transparent",
+                opacity: rowNotInstalled ? 0.55 : 1,
               }}
               onFocus={(e) => (e.currentTarget.style.boxShadow = "0 0 0 3px #51cbf8, 0 0 12px rgba(81,203,248,0.4)")}
               onBlur={(e) => (e.currentTarget.style.boxShadow = "none")}
@@ -1442,6 +1535,16 @@ export const GameLibrary: VFC = () => {
               <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                 <span style={{ fontSize: "13px", fontWeight: 600, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{game.name}</span>
                 <div style={{ display: "flex", alignItems: "center", gap: "4px", flexShrink: 0 }}>
+                  {rowNotInstalled && (
+                    <span style={{ fontSize: "10px", fontWeight: 700, padding: "1px 5px", borderRadius: "4px", background: "rgba(255,255,255,0.08)", color: "#aaa" }}>
+                      Not installed
+                    </span>
+                  )}
+                  {rowDownload && (
+                    <span style={{ fontSize: "10px", fontWeight: 700, padding: "1px 5px", borderRadius: "4px", background: "rgba(0,120,212,0.25)", color: "#74b9ff" }}>
+                      {formatDownloadLabel(rowDownload)}
+                    </span>
+                  )}
                   {game.sources.length > 1 && (
                     <span style={{ fontSize: "10px", fontWeight: 700, padding: "1px 5px", borderRadius: "4px", background: "rgba(0,120,212,0.25)", color: "#74b9ff" }}>
                       {game.sources.length}
@@ -1455,7 +1558,8 @@ export const GameLibrary: VFC = () => {
                 </div>
               </div>
             </Focusable>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
