@@ -80,7 +80,8 @@ def list_orphan_shortcuts(sources: list[dict]) -> list[dict]
 2. Build ownership sets from **all** non-builtin sources, enabled or not:
    - `owned_names`: lower-cased game names from each source's config
      (unreadable sources contribute nothing here).
-   - `owned_paths`: each source's `path` (resolved, string form).
+   - `owned_paths`: each source's `path`, `os.path.normpath`'d (not
+     resolved — resolving can hang on an offline network mount).
 3. A shortcut is **owned** if its lower-cased name is in `owned_names`, OR its
    exe path is under any path in `owned_paths`. Otherwise it is an orphan.
 
@@ -138,10 +139,14 @@ When the selected source's `source_type === "steam_shortcuts"`:
   prefix and artwork).
 - **Exe picker:** browses starting from the current exe's directory using the
   existing folder browser, instead of scanning a game folder.
-- **Kept:** Init prefix, Install deps, Artwork (SteamGridDB), Save
-  backup/restore, Remove from Steam, Purge. After Remove/Purge the game is no
-  longer an orphan → navigate back to the library.
-- **Hidden:** Add to Steam, Copy config, Transfer, delete game folder.
+- **Kept:** Init prefix, Install deps, Artwork (SteamGridDB), Remove from
+  Steam, Purge. After Remove/Purge the game is no longer an orphan → navigate
+  back to the library.
+- **Hidden:** Add to Steam, Copy config, Transfer, delete game folder, Save
+  backup/restore (backups are stored inside the game's source folder, which
+  orphans don't have).
+- Built-in sources are excluded from the library's "Add Games to Steam" and
+  "Backup All Saves" source pickers.
 - Built-in sources are excluded from all source/transfer pickers.
 
 Relative-path resolution in `add_steam_shortcut` / `update_steam_shortcut`
