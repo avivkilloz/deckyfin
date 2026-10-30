@@ -1,9 +1,10 @@
-import { VFC, useState, useEffect } from "react";
+import { memo, useState, useEffect, useMemo } from "react";
 import { callable } from "@decky/api";
 import { Focusable } from "@decky/ui";
 import { GameConfig } from "../types";
 import { getCachedArt, setCachedArt } from "../artCache";
 import { DownloadState, formatDownloadLabel } from "../downloadStates";
+import { steamArtUrls, artBackground } from "../steamOwned";
 
 const getGameCardArt = callable<
   [game_name: string, game_id?: string],
@@ -12,6 +13,8 @@ const getGameCardArt = callable<
 
 interface Props {
   game: GameConfig;
+  /** Merged game id — the art cache key and backend art id (same as GameArtRow/GameDetail). */
+  gameId?: string;
   isInSteam?: boolean;
   sourceCount?: number;
   onClick: () => void;
@@ -21,23 +24,31 @@ interface Props {
   steamAppId?: number;
 }
 
-export const GameCard: VFC<Props> = ({ game, isInSteam, sourceCount, onClick, artEnabled = true, notInstalled, download, steamAppId }) => {
+export const GameCard = memo(function GameCard({ game, gameId, isInSteam, sourceCount, onClick, artEnabled = true, notInstalled, download, steamAppId }: Props) {
   const [artUri, setArtUri] = useState<string | null>(null);
+  // True once the backend art lookup finished (or was skipped) — gates the Steam art fallback so it never flashes.
+  const [artResolved, setArtResolved] = useState(false);
 
-  const cacheKey = game.id ?? game.name;
+  const artId = gameId ?? game.id;
+  const cacheKey = artId ?? game.name;
   useEffect(() => {
-    if (!artEnabled) { setArtUri(null); return; }
+    if (!artEnabled) { setArtUri(null); setArtResolved(false); return; }
+    // Owned-but-not-installed placeholders have no Deckyfin art: use Steam's art directly, no backend call.
+    if (notInstalled) { setArtUri(null); setArtResolved(true); return; }
     const cached = getCachedArt(cacheKey);
-    if (cached !== undefined) { setArtUri(cached); return; }
-    getGameCardArt(game.name, game.id)
-      .then((res) => { const uri = res.data_uri || null; setCachedArt(cacheKey, uri); setArtUri(uri); })
-      .catch(() => { setCachedArt(cacheKey, null); setArtUri(null); });
-  }, [cacheKey, artEnabled]);
+    if (cached !== undefined) { setArtUri(cached); setArtResolved(true); return; }
+    setArtResolved(false);
+    let cancelled = false;
+    getGameCardArt(game.name, artId)
+      .then((res) => { const uri = res.data_uri || null; setCachedArt(cacheKey, uri); if (!cancelled) { setArtUri(uri); setArtResolved(true); } })
+      .catch(() => { setCachedArt(cacheKey, null); if (!cancelled) { setArtUri(null); setArtResolved(true); } });
+    return () => { cancelled = true; };
+  }, [cacheKey, artEnabled, notInstalled]);
 
-  // Fallback to Steam's CDN header art when the backend has no custom art and we know the Steam app id
-  // (owned-but-not-installed games have no Deckyfin-applied art).
-  const fallbackArt = steamAppId ? `https://cdn.cloudflare.steamstatic.com/steam/apps/${steamAppId}/header.jpg` : null;
-  const effectiveArtUri = artUri ?? fallbackArt;
+  // Steam art (cached landscape, then CDN header) once we know the backend has nothing.
+  const needFallback = !artUri && artResolved && !!steamAppId;
+  const fallbackUrls = useMemo(() => (needFallback && steamAppId ? steamArtUrls(steamAppId) : null), [needFallback, steamAppId]);
+  const artBg = artUri ? artBackground([artUri]) : fallbackUrls ? artBackground(fallbackUrls) : null;
 
   return (
     <Focusable
@@ -66,12 +77,10 @@ export const GameCard: VFC<Props> = ({ game, isInSteam, sourceCount, onClick, ar
           marginBottom: "8px",
           position: "relative",
           overflow: "hidden",
-          background: effectiveArtUri && artEnabled
-            ? `center / cover no-repeat url("${effectiveArtUri}")`
-            : "linear-gradient(135deg, #667eea, #764ba2)",
+          background: artBg && artEnabled ? artBg : "linear-gradient(135deg, #667eea, #764ba2)",
         }}
       >
-        {!(effectiveArtUri && artEnabled) && (
+        {!(artBg && artEnabled) && (
           <div
             style={{
               display: "flex",
@@ -144,4 +153,4 @@ export const GameCard: VFC<Props> = ({ game, isInSteam, sourceCount, onClick, ar
       </div>
     </Focusable>
   );
-};
+});

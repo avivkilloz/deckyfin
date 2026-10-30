@@ -1,9 +1,10 @@
-import { VFC, useState, useEffect } from "react";
+import { memo, useState, useEffect, useMemo } from "react";
 import { callable } from "@decky/api";
 import { Focusable } from "@decky/ui";
 import { MergedGame } from "../types";
 import { getCachedArt, setCachedArt } from "../artCache";
 import { DownloadState, formatDownloadLabel } from "../downloadStates";
+import { steamArtUrls, artBackground } from "../steamOwned";
 
 const getGameCardArt = callable<[game_name: string, game_id?: string], { data_uri: string | null }>("get_game_card_art");
 
@@ -15,18 +16,30 @@ interface Props {
   onClick: () => void;
   notInstalled?: boolean;
   download?: DownloadState;
+  steamAppId?: number;
 }
 
-export const GameArtRow: VFC<Props> = ({ game, isInSteam, onClick, notInstalled, download }) => {
+export const GameArtRow = memo(function GameArtRow({ game, isInSteam, onClick, notInstalled, download, steamAppId }: Props) {
   const [artUri, setArtUri] = useState<string | null>(null);
+  // True once the backend art lookup finished (or was skipped) — gates the Steam art fallback so it never flashes.
+  const [artResolved, setArtResolved] = useState(false);
 
   useEffect(() => {
+    // Owned-but-not-installed placeholders have no Deckyfin art: use Steam's art directly, no backend call.
+    if (notInstalled) { setArtUri(null); setArtResolved(true); return; }
     const cached = getCachedArt(game.id);
-    if (cached !== undefined) { setArtUri(cached); return; }
+    if (cached !== undefined) { setArtUri(cached); setArtResolved(true); return; }
+    setArtResolved(false);
+    let cancelled = false;
     getGameCardArt(game.name, game.id)
-      .then((res) => { const uri = res.data_uri || null; setCachedArt(game.id, uri); setArtUri(uri); })
-      .catch(() => { setCachedArt(game.id, null); setArtUri(null); });
-  }, [game.id, game.name]);
+      .then((res) => { const uri = res.data_uri || null; setCachedArt(game.id, uri); if (!cancelled) { setArtUri(uri); setArtResolved(true); } })
+      .catch(() => { setCachedArt(game.id, null); if (!cancelled) { setArtUri(null); setArtResolved(true); } });
+    return () => { cancelled = true; };
+  }, [game.id, game.name, notInstalled]);
+
+  const needFallback = !artUri && artResolved && !!steamAppId;
+  const fallbackUrls = useMemo(() => (needFallback && steamAppId ? steamArtUrls(steamAppId) : null), [needFallback, steamAppId]);
+  const artBg = artUri ? artBackground([artUri]) : fallbackUrls ? artBackground(fallbackUrls) : null;
 
   const name = game.name;
   const sourceCount = game.sources.length;
@@ -44,14 +57,12 @@ export const GameArtRow: VFC<Props> = ({ game, isInSteam, onClick, notInstalled,
         overflow: "hidden",
         cursor: "pointer",
         opacity: notInstalled ? 0.55 : 1,
-        background: artUri
-          ? `center / cover no-repeat url("${artUri}")`
-          : "linear-gradient(135deg, #667eea, #764ba2)",
+        background: artBg ?? "linear-gradient(135deg, #667eea, #764ba2)",
       }}
       onFocus={(e) => (e.currentTarget.style.boxShadow = "0 0 0 3px #51cbf8, 0 0 12px rgba(81,203,248,0.4)")}
       onBlur={(e) => (e.currentTarget.style.boxShadow = "none")}
     >
-      {!artUri && (
+      {!artBg && (
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: "100%", fontSize: "40px" }}>
           🎮
         </div>
@@ -105,4 +116,4 @@ export const GameArtRow: VFC<Props> = ({ game, isInSteam, onClick, notInstalled,
       </div>
     </Focusable>
   );
-};
+});
