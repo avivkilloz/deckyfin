@@ -90,3 +90,75 @@ def test_list_orphan_shortcuts_no_vdf(tmp_path, monkeypatch):
     mod = _reload(tmp_path, monkeypatch)
     monkeypatch.setattr(mod, "list_nonsteam_games", lambda: [])
     assert mod.list_orphan_shortcuts(SOURCES, _loader({})) == []
+
+
+import json
+
+
+def _write_store(tmp_path, games):
+    d = tmp_path / ".config" / "deckyfin" / "steam_shortcuts" / ".deckyfin"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "config.json").write_text(json.dumps({"games": games}))
+    return d / "config.json"
+
+
+def test_load_shortcut_games_builds_config_and_merges_store(tmp_path, monkeypatch):
+    mod = _reload(tmp_path, monkeypatch)
+    _write_store(tmp_path, [{"name": "Leftover", "proton_dependencies": ["vcrun2019"],
+                             "executable": "/stale.exe"}])
+    monkeypatch.setattr(mod, "list_nonsteam_games", lambda: [
+        _sc("Leftover", "/old/l.exe", 42, start_dir="/old", launch_options="-x",
+            collections=["RPG"], current_proton="GE-Proton9-1"),
+    ])
+    games = mod.load_shortcut_games(SOURCES, _loader({}))
+    assert len(games) == 1
+    g = games[0]
+    assert g["id"] == "shortcut-42"
+    assert g["executable"] == "/old/l.exe"          # VDF wins over stored
+    assert g["start_dir"] == "/old"
+    assert g["launch_options"] == "-x"
+    assert g["collections"] == ["RPG"]
+    assert g["proton_version"] == "GE-Proton9-1"
+    assert g["shortcut_app_id"] == 42
+    assert g["proton_dependencies"] == ["vcrun2019"]  # stored field kept
+    assert json.loads(g["steam_snapshot"]) == {
+        "name": "Leftover", "executable": "/old/l.exe", "start_dir": "/old",
+        "launch_options": "-x", "proton_version": "GE-Proton9-1", "collections": ["RPG"],
+    }
+    assert list(json.loads(g["steam_snapshot"]).keys()) == [
+        "name", "executable", "start_dir", "launch_options", "proton_version", "collections",
+    ]
+
+
+def test_load_shortcut_games_prunes_stale_store_entries(tmp_path, monkeypatch):
+    mod = _reload(tmp_path, monkeypatch)
+    cfg = _write_store(tmp_path, [{"name": "Leftover"}, {"name": "Gone"}])
+    monkeypatch.setattr(mod, "list_nonsteam_games", lambda: [_sc("Leftover", "/o/l.exe", 1)])
+    mod.load_shortcut_games(SOURCES, _loader({}))
+    assert [g["name"] for g in json.loads(cfg.read_text())["games"]] == ["Leftover"]
+
+
+def test_load_shortcut_games_no_prune_when_no_orphans(tmp_path, monkeypatch):
+    mod = _reload(tmp_path, monkeypatch)
+    cfg = _write_store(tmp_path, [{"name": "Leftover"}])
+    monkeypatch.setattr(mod, "list_nonsteam_games", lambda: [])
+    assert mod.load_shortcut_games(SOURCES, _loader({})) == []
+    assert [g["name"] for g in json.loads(cfg.read_text())["games"]] == ["Leftover"]
+
+
+def test_upsert_store_entry_creates_then_updates(tmp_path, monkeypatch):
+    mod = _reload(tmp_path, monkeypatch)
+    mod.upsert_store_entry("Leftover", {"proton_dependencies": ["d3dx9"]})
+    mod.upsert_store_entry("Leftover", {"proton_sync_paths": ["/x"]})
+    cfg = tmp_path / ".config" / "deckyfin" / "steam_shortcuts" / ".deckyfin" / "config.json"
+    games = json.loads(cfg.read_text())["games"]
+    assert games == [{"name": "Leftover", "proton_dependencies": ["d3dx9"], "proton_sync_paths": ["/x"]}]
+
+
+def test_load_source_games_dispatches_builtin(tmp_path, monkeypatch):
+    mod = _reload(tmp_path, monkeypatch)
+    import deckyfin_sources
+    monkeypatch.setattr(deckyfin_sources, "list_sources", lambda: SOURCES)
+    monkeypatch.setattr(mod, "list_nonsteam_games", lambda: [_sc("Leftover", "/o/l.exe", 7)])
+    games = deckyfin_sources.load_source_games(SOURCES[2])
+    assert [g["id"] for g in games] == ["shortcut-7"]

@@ -1,8 +1,11 @@
 """Steam Shortcuts built-in source — non-Steam shortcuts that no Deckyfin source owns."""
 
+import json
 import os
+from pathlib import Path
 from typing import Callable
 
+from deckyfin_config import get_app_config_path, get_games_config, save_games_config
 from steam_games import list_nonsteam_games
 
 LoadGames = Callable[[dict], list]
@@ -55,3 +58,74 @@ def list_orphan_shortcuts(sources: list, load_games: LoadGames) -> list:
         return []
     names, paths = build_ownership(sources, load_games)
     return find_orphans(shortcuts, names, paths)
+
+
+def store_root() -> Path:
+    """Folder whose .deckyfin/config.json holds Deckyfin-only data for orphans."""
+    return get_app_config_path() / "steam_shortcuts"
+
+
+def _snapshot(game: dict) -> str:
+    # Key order must match GameDetail's steamNeedsSync comparison object.
+    return json.dumps({
+        "name": game["name"],
+        "executable": game["executable"],
+        "start_dir": game["start_dir"],
+        "launch_options": game["launch_options"] or None,
+        "proton_version": game["proton_version"],
+        "collections": game["collections"],
+    })
+
+
+def load_shortcut_games(sources: list, load_games: LoadGames) -> list:
+    """Game configs for every orphan shortcut, merged with stored Deckyfin data."""
+    orphans = list_orphan_shortcuts(sources, load_games)
+    root = store_root()
+    config = get_games_config(root)
+    stored_list = config.get("games", [])
+    stored = {g.get("name"): g for g in stored_list}
+
+    # Prune entries whose shortcut is gone. Skip when there are no orphans at all
+    # (shortcuts.vdf may be temporarily unreadable).
+    if orphans:
+        names = {o["name"] for o in orphans}
+        kept = [g for g in stored_list if g.get("name") in names]
+        if len(kept) != len(stored_list):
+            try:
+                save_games_config({**config, "games": kept}, root)
+            except Exception:
+                pass
+
+    games = []
+    for o in orphans:
+        game = dict(stored.get(o["name"]) or {})
+        game.update({
+            "id": f"shortcut-{o['unsigned_appid']}",
+            "name": o["name"],
+            "executable": o["exe"],
+            "start_dir": o["start_dir"],
+            "launch_options": o["launch_options"],
+            "collections": o["collections"],
+            "proton_version": o["current_proton"],
+            "shortcut_app_id": o["unsigned_appid"],
+        })
+        game["steam_snapshot"] = _snapshot(game)
+        games.append(game)
+    return games
+
+
+def upsert_store_entry(name: str, updates: dict) -> dict:
+    """Merge `updates` into the stored entry for `name`, creating it if missing."""
+    root = store_root()
+    config = get_games_config(root)
+    games = config.get("games", [])
+    for g in games:
+        if g.get("name") == name:
+            g.update(updates)
+            entry = g
+            break
+    else:
+        entry = {"name": name, **updates}
+        games.append(entry)
+    save_games_config({**config, "games": games}, root)
+    return entry

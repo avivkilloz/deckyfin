@@ -260,6 +260,9 @@ def get_disk_usage(source: dict) -> dict:
 def load_source_games(source: dict) -> list:
     """Load all game configs from a source. Returns [] on any failure."""
     t = source.get("type")
+    if t == STEAM_SHORTCUTS_SOURCE_TYPE:
+        from deckyfin_steam_shortcuts import load_shortcut_games  # local import: avoids cycle
+        return load_shortcut_games(list_sources(), load_source_games)
     if t == "agent":
         try:
             return _agent_get(source["url"], "/games")
