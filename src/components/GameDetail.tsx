@@ -2248,7 +2248,13 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
                 onClick={() => Navigation.NavigateToExternalWeb(steamAppId ? `https://steamdb.info/app/${steamAppId}/` : `https://steamdb.info/search/?a=all&q=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`)}
                 focusClassName="is-focused" style={{ display: "inline", color: "#5dade2", cursor: "pointer", background: "transparent", border: "none", padding: 0, fontSize: "inherit" }}>
                 SteamDB
-              </Focusable>.
+              </Focusable>{" "}or check{" "}
+              <Focusable
+                onActivate={() => Navigation.NavigateToExternalWeb(steamAppId ? `https://www.protondb.com/app/${steamAppId}` : `https://www.protondb.com/search?q=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`)}
+                onClick={() => Navigation.NavigateToExternalWeb(steamAppId ? `https://www.protondb.com/app/${steamAppId}` : `https://www.protondb.com/search?q=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`)}
+                focusClassName="is-focused" style={{ display: "inline", color: "#5dade2", cursor: "pointer", background: "transparent", border: "none", padding: 0, fontSize: "inherit" }}>
+                ProtonDB
+              </Focusable>{" "}reports for the dependencies other players needed.
               {onNavigateToSettings && <>{" "}To add more popular dependency chips, go to{" "}<Focusable onActivate={onNavigateToSettings} onClick={onNavigateToSettings} focusClassName="is-focused" style={{ display: "inline", color: "#5dade2", cursor: "pointer", background: "transparent", border: "none", padding: 0, fontSize: "inherit" }}>Settings → Popular Dependencies</Focusable>.</>}
             </p>
             <Focusable focusClassName="" style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "10px" }}>
