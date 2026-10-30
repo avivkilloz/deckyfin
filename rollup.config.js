@@ -38,6 +38,6 @@ export default defineConfig({
       'process.env.NODE_ENV': JSON.stringify('production'),
       preventAssignment: true,
     }),
-    typescript(),
+    typescript({ exclude: ['**/*.test.ts'] }),
   ],
 });

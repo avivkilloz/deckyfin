@@ -29,6 +29,8 @@ export interface GameConfig {
   prefix_path?: string | null;
   has_prefix?: boolean;
   size_on_disk?: number;
+  /** Steam Library entries: false for owned-but-not-installed games. */
+  installed?: boolean;
 }
 
 export interface GameFolder {
