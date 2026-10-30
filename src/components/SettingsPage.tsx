@@ -443,11 +443,15 @@ export const SettingsPage: VFC<Props> = ({ onBack, artEnabled = true, onArtEnabl
   };
 
   const handleRescanSource = async (source_id: string) => {
+    if (sourceMessage?.id === source_id) return;
+    setSourceMessage({ id: source_id, msg: "Scanning…" });
     try {
       const res = await initializeSource(source_id);
-      setSourceMessage({ id: source_id, msg: res.success ? "✅ Rescanned" : "❌ Failed" });
-      setTimeout(() => setSourceMessage(null), 3000);
-    } catch {}
+      setSourceMessage({ id: source_id, msg: res.success ? "✓ Done" : "✗ Failed" });
+    } catch {
+      setSourceMessage({ id: source_id, msg: "✗ Failed" });
+    }
+    setTimeout(() => setSourceMessage(null), 3000);
   };
 
   const [togglingSourceIds, setTogglingSourceIds] = useState<Set<string>>(new Set());
@@ -676,11 +680,13 @@ export const SettingsPage: VFC<Props> = ({ onBack, artEnabled = true, onArtEnabl
         const typeBg = src.type === "local" ? "#1a3a1a" : src.type === "mount" ? "#2a2a1a" : "#1a1a3a";
         const offline = src.enabled !== false && !usage?.total && usage?.total !== undefined;
         const xfer = activeTransfers.find((t) => t.to_source_id === src.id && t.status === "running");
+        const dimOpacity = (offline || src.enabled === false) ? 0.5 : 1;
+        const srcBtn: React.CSSProperties = { ...BTN_STYLE, fontSize: "0.75em", padding: "2px 8px", whiteSpace: "nowrap", color: "#aaa", borderColor: "#888" };
         return (
-          <div key={src.id} style={{ border: "1px solid #3a3a3a", borderRadius: "6px", marginBottom: "8px", opacity: (offline || src.enabled === false) ? 0.5 : 1 }}>
+          <div key={src.id} style={{ border: "1px solid #3a3a3a", borderRadius: "6px", marginBottom: "8px" }}>
             {/* Header */}
             <Focusable focusClassName="" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "#1e1e1e", borderRadius: "6px 6px 0 0" }}>
-              <span style={{ fontWeight: 600, fontSize: "0.9em", color: "#e0e0e0" }}>
+              <span style={{ fontWeight: 600, fontSize: "0.9em", color: "#e0e0e0", opacity: dimOpacity }}>
                 {src.name}
                 {offline && <span style={{ marginLeft: "6px", fontSize: "0.75em", color: "#e74c3c" }}>⚠ offline</span>}
               </span>
@@ -698,27 +704,28 @@ export const SettingsPage: VFC<Props> = ({ onBack, artEnabled = true, onArtEnabl
             {/* Content */}
             <div style={{ padding: "8px 12px", borderTop: "1px solid #2a2a2a" }}>
               {/* Type pill + action buttons */}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-                <span style={{ padding: "2px 7px", fontSize: "0.75em", borderRadius: "10px", background: typeBg, color: typeColor, border: `1px solid ${typeColor}` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
+                <span style={{ padding: "2px 7px", fontSize: "0.75em", borderRadius: "10px", background: typeBg, color: typeColor, border: `1px solid ${typeColor}`, whiteSpace: "nowrap", opacity: dimOpacity }}>
                   {src.type}
                 </span>
-                <Focusable focusClassName="" style={{ display: "flex", gap: "4px" }}>
+                <Focusable focusClassName="" style={{ display: "flex", alignItems: "center", gap: "4px" }}>
                   <Focusable onActivate={() => handleRescanSource(src.id)} onClick={() => handleRescanSource(src.id)} focusClassName="is-focused"
-                    style={{ ...BTN_STYLE, fontSize: "0.75em", padding: "2px 8px" }}>
+                    style={{ ...srcBtn, minWidth: "5.5em", textAlign: "center", opacity: sourceMessage?.id === src.id ? 0.7 : 1 }}>
                     {sourceMessage?.id === src.id ? sourceMessage.msg : "Rescan"}
                   </Focusable>
                   <Focusable onActivate={() => !togglingSourceIds.has(src.id) && handleToggleSource(src.id, src.enabled === false)} onClick={() => !togglingSourceIds.has(src.id) && handleToggleSource(src.id, src.enabled === false)} focusClassName="is-focused"
-                    style={{ ...BTN_STYLE, fontSize: "0.75em", padding: "2px 8px", borderColor: src.enabled === false ? "#27ae60" : "#888", color: src.enabled === false ? "#2ecc71" : "#aaa", opacity: togglingSourceIds.has(src.id) ? 0.5 : 1 }}>
+                    style={{ ...srcBtn, borderColor: src.enabled === false ? "#27ae60" : "#888", color: src.enabled === false ? "#2ecc71" : "#aaa", opacity: togglingSourceIds.has(src.id) ? 0.5 : 1 }}>
                     {src.enabled === false ? "Enable" : "Disable"}
                   </Focusable>
                   <Focusable onActivate={() => handleRemoveSource(src.id)} onClick={() => handleRemoveSource(src.id)} focusClassName="is-focused"
-                    style={{ ...BTN_STYLE, fontSize: "0.75em", padding: "2px 8px", borderColor: "#c0392b", color: "#e74c3c" }}>
+                    style={{ ...srcBtn, borderColor: "#c0392b", color: "#e74c3c" }}>
                     Remove
                   </Focusable>
                 </Focusable>
               </div>
               {/* Path */}
-              <div style={{ fontSize: "0.78em", color: "#666", marginBottom: "6px" }}>{src.path || src.url}</div>
+              <div style={{ opacity: dimOpacity }}>
+              <div style={{ fontSize: "0.78em", color: "#666", marginBottom: "6px", wordBreak: "break-all" }}>{src.path || src.url}</div>
               {/* Disk usage */}
               {usedPct !== null && (
                 <>
@@ -736,6 +743,7 @@ export const SettingsPage: VFC<Props> = ({ onBack, artEnabled = true, onArtEnabl
                 const pct = xfer.total_bytes > 0 ? Math.round((xfer.bytes_copied / xfer.total_bytes) * 100) : 0;
                 return <div style={{ fontSize: "0.75em", color: "#e67e22", marginTop: "4px" }}>⟳ Receiving {xfer.game_name}… {pct}%</div>;
               })()}
+              </div>
             </div>
           </div>
         );
