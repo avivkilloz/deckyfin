@@ -4,6 +4,8 @@ import { Navigation, Focusable } from "@decky/ui";
 import { GameConfig, MergedGame, GameSource, SourceCapabilities, AssetType } from "../types";
 import { sourceTypeLabel, sourceTypeColors, isBuiltinSourceType } from "../sourceStyle";
 import { useArtwork } from "../hooks/useArtwork";
+import { useSteamDownloads } from "../hooks/useSteamDownloads";
+import { formatDownloadLabel } from "../downloadStates";
 import { CompactTextField } from "../components/CompactTextField";
 import {
   getCachedArt, setCachedArt, invalidateArtCache,
@@ -239,6 +241,26 @@ const fmtBytes = (b: number): string => {
   if (b >= 1e6) return `${(b / 1e6).toFixed(0)} MB`;
   return `${(b / 1e3).toFixed(0)} KB`;
 };
+
+// ── Guarded SteamClient calls (undocumented API — may be missing in some Steam versions) ──
+const steamCall = (fn: () => void): string | null => {
+  try { fn(); return null; } catch (e: any) { return e?.message || "Steam call failed"; }
+};
+const openInstall = (appid: number) => steamCall(() => {
+  const f = (window as any).SteamClient?.Installs?.OpenInstallWizard;
+  if (typeof f !== "function") throw new Error("Install isn't available in this Steam version");
+  f([appid]);
+});
+const openUninstall = (appid: number) => steamCall(() => {
+  const f = (window as any).SteamClient?.Installs?.OpenUninstallWizard;
+  if (typeof f !== "function") throw new Error("Uninstall isn't available in this Steam version");
+  f([appid], false);
+});
+const verifyApp = (appid: number) => steamCall(() => {
+  const f = (window as any).SteamClient?.Apps?.VerifyApp;
+  if (typeof f !== "function") throw new Error("Verify isn't available in this Steam version");
+  f(appid);
+});
 
 export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigateToSettings, initialSourceId, runningTaskCount = 0, artEnabled = true }) => {
   // ── Refs ─────────────────────────────────────────────────────────────
@@ -796,6 +818,12 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
       .catch(() => {});
     return () => { cancelled = true; };
   }, [game.name, selectedSource?.source_id]);
+
+  // ── Owned-but-not-installed Steam Library games ─────────────────────────
+  const isNotInstalled = isLibrarySource && currentConfig.installed === false;
+  const downloads = useSteamDownloads();
+  const appidForSteam = steamInfo?.unsigned_appid ?? (Number(currentConfig.steam_app_id) || undefined);
+  const download = appidForSteam ? downloads[appidForSteam] : undefined;
 
   // Fill Proton/launch options from Steam's live values (Store games). Steam is the
   // truth, so they also become the last-synced snapshot. The form is left alone when
@@ -1577,6 +1605,23 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
     setLoading(null);
   };
 
+  // ── Install / Verify / Uninstall via Steam's own wizards (undocumented API) ──
+  const handleInstallClick = () => {
+    if (!appidForSteam) return;
+    const err = openInstall(appidForSteam);
+    if (err) setFeedback({ ok: false, msg: err });
+  };
+  const handleVerifyClick = () => {
+    if (!appidForSteam) return;
+    const err = verifyApp(appidForSteam);
+    if (err) setFeedback({ ok: false, msg: err });
+  };
+  const handleUninstallClick = () => {
+    if (!appidForSteam) return;
+    const err = openUninstall(appidForSteam);
+    if (err) setFeedback({ ok: false, msg: err });
+  };
+
   const handleRemoveSteam = async () => {
     setLoading("remove");
     setFeedback(null);
@@ -1982,6 +2027,55 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
         )}
       </div>
 
+      {/* ── Not Installed (owned Steam Library game, no local files yet) ──────── */}
+      {isNotInstalled && (
+        <div style={{ border: "1px solid #3a3a3a", borderRadius: "6px", marginBottom: "8px", padding: "12px" }}>
+          <p style={{ fontSize: "0.85em", color: "#aaa", margin: "0 0 10px 0" }}>
+            Not installed — install it through Steam.
+          </p>
+          {download ? (
+            <div style={{ border: "1px solid #444", borderRadius: "4px", padding: "8px 10px", marginBottom: "10px", background: "#1a1a1a", fontSize: "0.82em" }}>
+              <div style={{ marginBottom: download.status === "queued" ? 0 : "4px" }}>
+                {download.status === "queued" && <span style={{ color: "#888" }}>⏳ Queued</span>}
+                {download.status === "downloading" && <span>▸ Downloading in Steam… {Math.round(download.progress * 100)}%</span>}
+                {download.status === "verifying" && <span>▸ {formatDownloadLabel(download)}</span>}
+              </div>
+              {download.status !== "queued" && (
+                <div style={{ background: "#333", borderRadius: "2px", height: "4px" }}>
+                  <div style={{ width: `${Math.round(download.progress * 100)}%`, background: "#0078d4", borderRadius: "2px", height: "100%", transition: "width 0.3s" }} />
+                </div>
+              )}
+            </div>
+          ) : (
+            <Focusable
+              onActivate={appidForSteam ? handleInstallClick : undefined}
+              onClick={appidForSteam ? handleInstallClick : undefined}
+              focusClassName="is-focused"
+              style={{ ...BTN_STYLE, display: "block", width: "100%", boxSizing: "border-box" as const, textAlign: "center" as const, marginBottom: "10px",
+                border: "1px solid #27ae60", color: "#2ecc71", opacity: appidForSteam ? 1 : 0.4 }}>
+              ⬇ Install
+            </Focusable>
+          )}
+          {feedback && <p style={{ margin: "0 0 8px 0", color: feedback.ok ? "lightgreen" : "tomato", fontSize: "0.9em" }}>{feedback.msg}</p>}
+          <p style={{ fontSize: "0.78em", color: "#888", margin: 0, lineHeight: 1.5 }}>
+            Look up requirements on{" "}
+            <Focusable
+              onActivate={() => Navigation.NavigateToExternalWeb(steamAppId ? `https://steamdb.info/app/${steamAppId}/` : `https://steamdb.info/search/?a=all&q=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`)}
+              onClick={() => Navigation.NavigateToExternalWeb(steamAppId ? `https://steamdb.info/app/${steamAppId}/` : `https://steamdb.info/search/?a=all&q=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`)}
+              focusClassName="is-focused" style={{ display: "inline", color: "#5dade2", cursor: "pointer", background: "transparent", border: "none", padding: 0, fontSize: "inherit" }}>
+              SteamDB
+            </Focusable>{" "}or check{" "}
+            <Focusable
+              onActivate={() => Navigation.NavigateToExternalWeb(steamAppId ? `https://www.protondb.com/app/${steamAppId}` : `https://www.protondb.com/search?q=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`)}
+              onClick={() => Navigation.NavigateToExternalWeb(steamAppId ? `https://www.protondb.com/app/${steamAppId}` : `https://www.protondb.com/search?q=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`)}
+              focusClassName="is-focused" style={{ display: "inline", color: "#5dade2", cursor: "pointer", background: "transparent", border: "none", padding: 0, fontSize: "inherit" }}>
+              ProtonDB
+            </Focusable>{" "}for community reports.
+          </p>
+        </div>
+      )}
+
+      {!isNotInstalled && (<>
       {/* ── Game Settings ────────────────────────────────────────────────────── */}
       <div style={{ border: "1px solid #3a3a3a", borderRadius: "6px", marginBottom: "8px" }}>
         <Focusable onActivate={() => setShowGameSettings((v) => !v)} onClick={() => setShowGameSettings((v) => !v)} focusClassName="is-focused"
@@ -2456,6 +2550,34 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
                   border: capabilities.can_play && steamNeedsSync ? "1px solid #27ae60" : "1px solid #555",
                   color: capabilities.can_play && steamNeedsSync ? "#2ecc71" : "#e0e0e0" }}>
                 {loading === "add" ? "Adding…" : loading === "update" ? "Updating…" : steamInfo ? "Update Steam Game" : "Add to Steam"}
+              </Focusable>
+            )}
+            {isLibrarySource && !isNotInstalled && appidForSteam && (
+              <>
+                <Focusable
+                  onActivate={handleVerifyClick}
+                  onClick={handleVerifyClick}
+                  focusClassName="is-focused"
+                  style={{ ...BTN_STYLE, display: "block", width: "100%", boxSizing: "border-box" as const, textAlign: "center" as const, marginBottom: "6px" }}>
+                  {download?.status === "verifying" ? formatDownloadLabel(download) : "Verify files"}
+                </Focusable>
+                <Focusable
+                  onActivate={handleUninstallClick}
+                  onClick={handleUninstallClick}
+                  focusClassName="is-focused"
+                  style={{ ...BTN_STYLE, display: "block", width: "100%", boxSizing: "border-box" as const, textAlign: "center" as const, marginBottom: "6px",
+                    border: "1px solid #c0392b", color: "#e74c3c" }}>
+                  Uninstall…
+                </Focusable>
+              </>
+            )}
+            {appidForSteam && !isNotInstalled && (
+              <Focusable
+                onActivate={() => Navigation.Navigate(`/library/app/${appidForSteam}`)}
+                onClick={() => Navigation.Navigate(`/library/app/${appidForSteam}`)}
+                focusClassName="is-focused"
+                style={{ ...BTN_STYLE, display: "block", width: "100%", boxSizing: "border-box" as const, textAlign: "center" as const, marginBottom: "6px" }}>
+                Open in Steam Library
               </Focusable>
             )}
             <Focusable
@@ -3401,6 +3523,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
         )}
       </div>
       )}
+      </>)}
 
     </Focusable>
   );
