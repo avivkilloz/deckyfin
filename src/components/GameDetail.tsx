@@ -2571,10 +2571,10 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
                 </Focusable>
               </>
             )}
-            {appidForSteam && !isNotInstalled && (
+            {steamInfo?.unsigned_appid && !isNotInstalled && (
               <Focusable
-                onActivate={() => Navigation.Navigate(`/library/app/${appidForSteam}`)}
-                onClick={() => Navigation.Navigate(`/library/app/${appidForSteam}`)}
+                onActivate={() => Navigation.Navigate(`/library/app/${steamInfo.unsigned_appid}`)}
+                onClick={() => Navigation.Navigate(`/library/app/${steamInfo.unsigned_appid}`)}
                 focusClassName="is-focused"
                 style={{ ...BTN_STYLE, display: "block", width: "100%", boxSizing: "border-box" as const, textAlign: "center" as const, marginBottom: "6px" }}>
                 Open in Steam Library
