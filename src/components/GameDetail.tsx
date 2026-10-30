@@ -112,7 +112,7 @@ const syncSaves = callable<
   { success: boolean; sync_id?: string; error?: string }
 >("sync_saves");
 const copySavesBetweenSources = callable<
-  [game_name: string, from_source_id: string, to_source_id: string],
+  [game_name: string, from_source_id: string, to_source_id: string, to_game_name?: string],
   { success: boolean; sync_id?: string; error?: string }
 >("copy_saves_between_sources");
 const listSaveSyncStatuses = callable<
@@ -315,6 +315,19 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
     currentConfig.launch_options || ""
   );
 
+  // ── Store games: Steam's live values are the truth for Proton/launch options ──
+  type SteamValues = { proton: string; launch: string };
+  // Latest live values reported by Steam (null until the first callback / when unavailable)
+  const liveSteamRef = useRef<SteamValues | null>(null);
+  // Values the form was last filled with from a non-user source (backend or Steam);
+  // a form that differs from these (and from Steam's) holds the user's unsaved edits.
+  const steamBaselineRef = useRef<SteamValues>({ proton: currentConfig.proton_version || "", launch: currentConfig.launch_options || "" });
+  // Current form values for async callbacks (avoid stale closures)
+  const protonVersionRef = useRef(protonVersion);
+  protonVersionRef.current = protonVersion;
+  const launchOptionsRef = useRef(launchOptions);
+  launchOptionsRef.current = launchOptions;
+
   // ── Collections: toggle chips + custom ─────────────────────────────────
   const [steamCollections, setSteamCollections] = useState<string[]>([]);
   const [checkedCollections, setCheckedCollections] = useState<string[]>([]);
@@ -365,7 +378,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
     let cancelled = false;
     const init = async () => {
       const [gameRes, uiStateRes, depsRes, launchersRes, savePfxRes] = await Promise.allSettled([
-        getGame(game.name, selectedSource.source_id),
+        getGame(currentConfig.name, selectedSource.source_id),
         getUiState(),
         getPopularDeps(),
         getPopularLaunchers(),
@@ -391,6 +404,9 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
         setSteamAppIdInput(g.steam_app_id != null ? String(g.steam_app_id) : "");
         setProtonVersion(g.proton_version || "");
         setLaunchOptions(g.launch_options || "");
+        protonVersionRef.current = g.proton_version || "";
+        launchOptionsRef.current = g.launch_options || "";
+        steamBaselineRef.current = { proton: g.proton_version || "", launch: g.launch_options || "" };
         const freshDeps = g.proton_dependencies || [];
         setCheckedDeps(freshDeps.filter((d: string) => popularDeps.includes(d)));
         setCustomDeps(freshDeps.filter((d: string) => !popularDeps.includes(d)).join(", "));
@@ -431,8 +447,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
           setSteamAppId(draft.steam_app_id ?? undefined);
           setSteamAppIdInput(draft.steam_app_id != null ? String(draft.steam_app_id) : "");
         }
-        if (draft.proton_version !== undefined) setProtonVersion(draft.proton_version);
-        if (draft.launch_options !== undefined) setLaunchOptions(draft.launch_options);
+        if (draft.proton_version !== undefined) { setProtonVersion(draft.proton_version); protonVersionRef.current = draft.proton_version; }
+        if (draft.launch_options !== undefined) { setLaunchOptions(draft.launch_options); launchOptionsRef.current = draft.launch_options; }
         if (draft.checked_launchers !== undefined) setCheckedLaunchers(draft.checked_launchers);
         if (draft.checked_deps !== undefined) setCheckedDeps(draft.checked_deps);
         if (draft.custom_deps !== undefined) setCustomDeps(draft.custom_deps);
@@ -440,6 +456,10 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
         if (draft.custom_collections !== undefined) setCustomCollections(draft.custom_collections);
         if (draft.sync_paths !== undefined) setSyncPaths(draft.sync_paths);
       }
+
+      // Store games: Steam may have reported live values before getGame resolved —
+      // re-apply them on top of the (possibly stale) file values from the backend.
+      if (isLibrarySource && liveSteamRef.current) applyLiveSteamValues(liveSteamRef.current);
     };
     init().catch(() => {});
     return () => { cancelled = true; };
@@ -680,6 +700,14 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
     });
     setNeedsRestartAfterAdd(currentConfig.needs_restart_after_add ?? false);
     setNeedsRestart(currentConfig.needs_restart ?? false);
+    // Each source may have its own prefix (Store games live in their library)
+    setPrefixRoot(null);
+    setShowPrefixBrowser(false);
+    setPfxBrowseFeedback(null);
+    setShowSavePathBrowser(false);
+    setSavePathBrowserFeedback(null);
+    steamBaselineRef.current = { proton: currentConfig.proton_version || "", launch: currentConfig.launch_options || "" };
+    liveSteamRef.current = null;
   }, [selectedSourceIdx]);
 
   useEffect(() => {
@@ -752,8 +780,10 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
     }
     const cached = getCachedSteamInfo(game.name);
     if (cached !== undefined) { setSteamInfo(cached); return; }
+    let cancelled = false;
     getSteamShortcut(game.name)
       .then((res) => {
+        if (cancelled) return; // source switched (e.g. to a Store source) meanwhile
         if (res.success && res.app_id && res.unsigned_appid) {
           const info = { app_id: res.app_id, unsigned_appid: res.unsigned_appid };
           setCachedSteamInfo(game.name, info);
@@ -764,7 +794,96 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
         }
       })
       .catch(() => {});
+    return () => { cancelled = true; };
   }, [game.name, selectedSource?.source_id]);
+
+  // Fill Proton/launch options from Steam's live values (Store games). Steam is the
+  // truth, so they also become the last-synced snapshot. The form is left alone when
+  // it holds the user's unsaved edits.
+  const applyLiveSteamValues = (live: SteamValues) => {
+    setLastSyncedSnapshot((prev: any) => ({
+      name: prev?.name ?? currentConfig.name,
+      launch_options: live.launch || null,
+      proton_version: live.proton || null,
+      collections: prev?.collections ?? [],
+    }));
+    const base = steamBaselineRef.current;
+    const form = { proton: protonVersionRef.current, launch: launchOptionsRef.current };
+    const matches = (v: SteamValues) => form.proton === v.proton && form.launch === v.launch;
+    if (!matches(base) && !matches(live)) return; // unsaved edits — keep them
+    steamBaselineRef.current = live;
+    protonVersionRef.current = live.proton;
+    launchOptionsRef.current = live.launch;
+    setProtonVersion(live.proton);
+    setLaunchOptions(live.launch);
+    // Keep the saved-config snapshot in step so this isn't seen as a user edit
+    setConfigSnapshot((prev) => ({ ...prev, proton_version: live.proton || null, launch_options: live.launch || null }));
+  };
+
+  // Subscribe to Steam's live app details for Store games. Steam writes its VDF files
+  // lazily, so the backend's file values can lag behind. Undocumented API — guarded;
+  // when unavailable the backend values (Steam's files) are kept.
+  useEffect(() => {
+    if (!isLibrarySource) return;
+    const appid = Number(currentConfig.steam_app_id);
+    if (!appid) return;
+    let reg: { unregister(): void } | null = null;
+    try {
+      const apps = typeof SteamClient !== "undefined" ? SteamClient?.Apps : undefined;
+      if (apps && typeof apps.RegisterForAppDetails === "function") {
+        reg = apps.RegisterForAppDetails(appid, (details) => {
+          try {
+            if (!details) return;
+            const live = {
+              proton: typeof details.strCompatToolName === "string" ? details.strCompatToolName : "",
+              launch: typeof details.strLaunchOptions === "string" ? details.strLaunchOptions : "",
+            };
+            liveSteamRef.current = live;
+            applyLiveSteamValues(live);
+          } catch {}
+        });
+      }
+    } catch {
+      reg = null;
+    }
+    return () => {
+      liveSteamRef.current = null;
+      try { reg?.unregister(); } catch {}
+    };
+  }, [isLibrarySource, currentConfig.steam_app_id, selectedSource?.source_id]);
+
+  // Store games: Proton options are Steam's own compat tools (internal names, e.g.
+  // "proton_9"); fall back to Deckyfin's Proton list if the API is unavailable.
+  const [storeCompatTools, setStoreCompatTools] = useState<{ value: string; label: string }[] | null>(null);
+  useEffect(() => {
+    setStoreCompatTools(null);
+    if (!isLibrarySource) return;
+    const appid = Number(currentConfig.steam_app_id);
+    if (!appid) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const apps = typeof SteamClient !== "undefined" ? SteamClient?.Apps : undefined;
+        if (!apps || typeof apps.GetAvailableCompatTools !== "function") return;
+        const tools = await apps.GetAvailableCompatTools(appid);
+        if (cancelled || !Array.isArray(tools)) return;
+        const opts = tools
+          .filter((t) => t && typeof t.strToolName === "string" && t.strToolName)
+          .map((t) => ({ value: t.strToolName, label: t.strDisplayName || t.strToolName }));
+        if (opts.length > 0) setStoreCompatTools(opts);
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, [isLibrarySource, currentConfig.steam_app_id, selectedSource?.source_id]);
+
+  const protonOptions: { value: string; label: string }[] = (() => {
+    if (!isLibrarySource) return protonVersions.map((v) => ({ value: v, label: v }));
+    const opts = storeCompatTools ?? protonVersions.map((v) => ({ value: v, label: v }));
+    // Steam may map the game to a tool not in the list — show it so it stays selected
+    return protonVersion && !opts.some((o) => o.value === protonVersion)
+      ? [{ value: protonVersion, label: protonVersion }, ...opts]
+      : opts;
+  })();
 
   // ── Fetch existing Steam collections on mount ───────────────────────────
   useEffect(() => {
@@ -787,15 +906,15 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
   useEffect(() => {
     getDepInstallStatuses()
       .then((statuses) => {
-        const key = `${game.name}|${selectedSource.source_id}`;
+        const key = `${currentConfig.name}|${selectedSource.source_id}`;
         const s = statuses?.[key];
         if (s) {
           setDepInstall(s);
           if (s.status === "done") {
             const installed = s.installed || [];
             setLastInstalledDeps(installed);
-            updateGameConfig(storedName, { deps_snapshot: installed }, selectedSource.source_id).catch(() => {});
-            clearDepInstallStatus(game.name, selectedSource.source_id).catch(() => {});
+            updateGameConfig(currentConfig.name, { deps_snapshot: installed }, selectedSource.source_id).catch(() => {});
+            clearDepInstallStatus(currentConfig.name, selectedSource.source_id).catch(() => {});
           }
         }
       })
@@ -808,7 +927,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
     const poll = setInterval(async () => {
       try {
         const statuses = await getDepInstallStatuses();
-        const key = `${game.name}|${selectedSource.source_id}`;
+        const key = `${currentConfig.name}|${selectedSource.source_id}`;
         const s = statuses?.[key];
         if (!s || s.status !== "installing") {
           clearInterval(poll);
@@ -817,8 +936,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
             if (s.status === "done") {
               const deps = pendingDepsRef.current;
               setLastInstalledDeps(deps);
-              updateGameConfig(storedName, { deps_snapshot: deps }, selectedSource.source_id).catch(() => {});
-              clearDepInstallStatus(game.name, selectedSource.source_id).catch(() => {});
+              updateGameConfig(currentConfig.name, { deps_snapshot: deps }, selectedSource.source_id).catch(() => {});
+              clearDepInstallStatus(currentConfig.name, selectedSource.source_id).catch(() => {});
             }
           } else {
             setDepInstall(null);
@@ -882,7 +1001,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
 
   const handleBackupSaves = async () => {
     if (!steamInfo) return;
-    const res: SaveSyncRes = await syncSaves(game.name, selectedSource.source_id, "backup", steamInfo.unsigned_appid).catch((e) => ({ success: false, error: String(e) }));
+    const res: SaveSyncRes = await syncSaves(storedName, selectedSource.source_id, "backup", steamInfo.unsigned_appid).catch((e) => ({ success: false, error: String(e) }));
     if (res.success && res.sync_id) {
       setSaveSync({ sync_id: res.sync_id, direction: "backup", status: "running", error: null, copied: [] });
     } else {
@@ -892,7 +1011,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
 
   const handleRestoreSaves = async () => {
     if (!steamInfo) return;
-    const res: SaveSyncRes = await syncSaves(game.name, selectedSource.source_id, "restore", steamInfo.unsigned_appid).catch((e) => ({ success: false, error: String(e) }));
+    const res: SaveSyncRes = await syncSaves(storedName, selectedSource.source_id, "restore", steamInfo.unsigned_appid).catch((e) => ({ success: false, error: String(e) }));
     if (res.success && res.sync_id) {
       setSaveSync({ sync_id: res.sync_id, direction: "restore", status: "running", error: null, copied: [] });
     } else {
@@ -943,7 +1062,10 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
     setCopySavesConfirming(false);
     const dest = copySavesDest;
     setCopySavesDest(null);
-    const res: SaveSyncRes = await copySavesBetweenSources(game.name, selectedSource.source_id, dest.source_id).catch((e) => ({ success: false, error: String(e) }));
+    // Merged games can be named differently per source: the destination's own config
+    // name when it holds this game, else the name the selected source uses.
+    const destName = game.sources.some((s) => s.source_id === dest.source_id) ? dest.config.name : storedName;
+    const res: SaveSyncRes = await copySavesBetweenSources(storedName, selectedSource.source_id, dest.source_id, destName).catch((e) => ({ success: false, error: String(e) }));
     if (res.success && res.sync_id) {
       setSaveSync({ sync_id: res.sync_id, direction: "copy", status: "running", error: null, copied: [], to_source_id: dest.source_id });
     } else {
@@ -1039,6 +1161,17 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
     setPfxBrowserLoading(false);
   };
 
+  // Store games' prefix lives in their own library's compatdata (backend-resolved);
+  // non-Steam shortcuts' prefix is looked up under the Steam root.
+  const resolvePrefixRoot = async (): Promise<string | null> => {
+    if (isLibrarySource) return currentConfig.prefix_path || null;
+    if (!steamInfo) return null;
+    return getGamePrefixPath(steamInfo.unsigned_appid).catch(() => null);
+  };
+  const noPrefixMsg = isLibrarySource
+    ? "No Proton prefix yet — launch the game once from Steam."
+    : "Prefix not initialized — run Init Prefix first.";
+
   const handleTogglePrefixBrowser = async () => {
     if (showPrefixBrowser) {
       setShowPrefixBrowser(false);
@@ -1049,9 +1182,9 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
       setPfxBrowseFeedback("Add game to Steam first.");
       return;
     }
-    const root = await getGamePrefixPath(steamInfo.unsigned_appid).catch(() => null);
+    const root = await resolvePrefixRoot();
     if (!root) {
-      setPfxBrowseFeedback("Prefix not initialized — run Init Prefix first.");
+      setPfxBrowseFeedback(noPrefixMsg);
       return;
     }
     setPfxBrowseFeedback(null);
@@ -1093,11 +1226,11 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
     }
     let root = prefixRoot;
     if (!root) {
-      root = await getGamePrefixPath(steamInfo.unsigned_appid).catch(() => null);
+      root = await resolvePrefixRoot();
       if (root) setPrefixRoot(root);
     }
     if (!root) {
-      setSavePathBrowserFeedback("Prefix not initialized — run Init Prefix first.");
+      setSavePathBrowserFeedback(noPrefixMsg);
       return;
     }
     setSavePathBrowserFeedback(null);
@@ -1418,6 +1551,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
     setFeedback(null);
     const appid = steamInfo.unsigned_appid;
     const snapshot = { name, launch_options: finalLaunchOptions || null, proton_version: protonVersion || null, collections: mergedCollections };
+    let collectionsChanged = false;
     try {
       SteamClient.Apps.SpecifyCompatTool(appid, protonVersion || "");
       SteamClient.Apps.SetAppLaunchOptions(appid, finalLaunchOptions || "");
@@ -1425,10 +1559,17 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
       if (JSON.stringify(prevCollections) !== JSON.stringify(mergedCollections)) {
         const res = await syncAppCollections(appid, mergedCollections, prevCollections);
         if (!res.success) throw new Error(res.error || "Failed to update collections");
+        collectionsChanged = true;
+        setNeedsRestart(true);
         onNeedsRestart?.();
       }
       setLastSyncedSnapshot(snapshot);
-      updateGameConfig(storedName, { steam_snapshot: JSON.stringify(snapshot) }, selectedSource.source_id).catch(() => {});
+      steamBaselineRef.current = { proton: protonVersion, launch: finalLaunchOptions };
+      updateGameConfig(
+        storedName,
+        { steam_snapshot: JSON.stringify(snapshot), ...(collectionsChanged ? { needs_restart: true } : {}) },
+        selectedSource.source_id,
+      ).catch(() => {});
       setFeedback({ ok: true, msg: "Applied to Steam" });
     } catch (err: any) {
       setFeedback({ ok: false, msg: err?.message || "Failed to apply to Steam" });
@@ -1523,7 +1664,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
     setDepInstall({ status: "installing", installed: [], failed_deps: [], error: null });
     try {
       const res = await startDepInstall(
-        game.name,
+        currentConfig.name, // must match the status-polling key above
         selectedSource.source_id,
         String(steamInfo.unsigned_appid),
         mergedDeps.join(", ")
@@ -1809,8 +1950,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
               {([
                 ["ID", currentConfig.id || "—"],
                 ["Name", name],
-                ["Executable", executable],
-                ["Start Dir", startDir || "—"],
+                ...(isLibrarySource ? [] : [["Executable", executable], ["Start Dir", startDir || "—"]]),
                 ["Proton Version", protonVersion || "—"],
                 ...(isLibrarySource ? [["Install Folder", currentConfig.install_dir || "—"], ["Library", currentConfig.library_path || "—"]] : []),
                 ["Dependencies", mergedDeps.length > 0 ? mergedDeps.join(", ") : "—"],
@@ -1818,7 +1958,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
                 ["Save Paths", syncPaths.length > 0 ? syncPaths.join(", ") : "—"],
                 ["Steam App ID", steamAppId != null ? String(steamAppId) : "—"],
                 ["SteamGridDB ID", sgdbGameId != null ? String(sgdbGameId) : "—"],
-                ["Shortcut App ID", steamInfo ? String(steamInfo.unsigned_appid) : "—"],
+                // Store games: the appid is the Steam App ID row above (no shortcut exists)
+                ...(isLibrarySource ? [] : [["Shortcut App ID", steamInfo ? String(steamInfo.unsigned_appid) : "—"]]),
                 ["In Steam", steamInfo ? "Yes" : "No"],
                 ["Source", `${selectedSource.source_name} (${sourceTypeLabel(selectedSource.source_type)})`],
               ] as [string, string][]).map(([label, value], i, arr) => (
@@ -1993,8 +2134,9 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
             </p>
             {/* Orphan shortcuts' launch_options is the raw VDF string, which already
                 contains any launcher prefix — re-ticking a chip here would prepend
-                it a second time, so these are hidden for shortcut-source games. */}
-            {!isShortcutSource && popularLaunchers.length > 0 && (
+                it a second time, so these are hidden for shortcut-source games.
+                Store games' launch options are Steam's own string, so the same applies. */}
+            {!isBuiltinSource && popularLaunchers.length > 0 && (
               <Focusable focusClassName="" style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "8px" }}>
                 {popularLaunchers.map((pl) => {
                   const active = checkedLaunchers.includes(pl.label);
@@ -2077,12 +2219,12 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
                 onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
                 — None —
               </Focusable>
-              {protonVersions.map((v) => (
-                <Focusable key={v} onActivate={() => setProtonVersion(v)} onClick={() => setProtonVersion(v)} focusClassName="is-focused"
-                  style={{ margin: "0 2px", padding: "4px 10px", cursor: "pointer", fontSize: "0.85em", borderBottom: "1px solid #2a2a2a", color: protonVersion === v ? "#0078d4" : "#ccc" }}
+              {protonOptions.map((o) => (
+                <Focusable key={o.value} onActivate={() => setProtonVersion(o.value)} onClick={() => setProtonVersion(o.value)} focusClassName="is-focused"
+                  style={{ margin: "0 2px", padding: "4px 10px", cursor: "pointer", fontSize: "0.85em", borderBottom: "1px solid #2a2a2a", color: protonVersion === o.value ? "#0078d4" : "#ccc" }}
                   onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.06)")}
                   onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
-                  {v}
+                  {o.label}
                 </Focusable>
               ))}
             </div>
@@ -3045,7 +3187,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
         </div>
       )}
 
-      {/* ── Danger Zone ──────────────────────────────────────────────────── */}
+      {/* ── Danger Zone (nothing in it applies to Store games) ─────────────── */}
+      {!isLibrarySource && (
       <div style={{ border: "1px solid #3a3a3a", borderRadius: "6px", marginBottom: "8px" }}>
         <Focusable
           onActivate={() => setShowDangerZone((v) => !v)}
@@ -3251,6 +3394,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
           </div>
         )}
       </div>
+      )}
 
     </Focusable>
   );

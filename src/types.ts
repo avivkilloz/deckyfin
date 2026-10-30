@@ -87,6 +87,21 @@ declare global {
     SetShortcutName(appId: number, name: string): void;
     SpecifyCompatTool(appId: number, toolName: string): void;
     SetAppLaunchOptions(appId: number, options: string): void;
+    /** Compat tools Steam offers for an app (internal names + display names). Undocumented — guard before use. */
+    GetAvailableCompatTools?(appId: number): Promise<SteamCompatTool[]>;
+    /** Live app details; the callback fires on registration and on every change. Undocumented — guard before use. */
+    RegisterForAppDetails?(appId: number, callback: (details: SteamAppDetails) => void): { unregister(): void };
+  }
+
+  interface SteamCompatTool {
+    strToolName: string;
+    strDisplayName: string;
+  }
+
+  /** Subset of SteamClient's AppDetails that Deckyfin reads. */
+  interface SteamAppDetails {
+    strCompatToolName?: string;
+    strLaunchOptions?: string;
   }
 
   interface SteamClient {
