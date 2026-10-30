@@ -666,13 +666,18 @@ def list_nonsteam_games(user_id: Optional[str] = None) -> list[dict]:
         if config_appid in compat_mapping:
             current_proton = compat_mapping[config_appid].get("name")
 
+        start_dir = shortcut.get("StartDir") or shortcut.get("startdir") or ""
         games.append({
             "index": idx,
             "name": app_name,
             "exe": exe.strip('"'),
             "app_id": app_id,
+            "unsigned_appid": convert_appid_to_unsigned_32bit(app_id),
             "config_appid": config_appid,
             "current_proton": current_proton,
+            "start_dir": start_dir.strip('"'),
+            "launch_options": shortcut.get("LaunchOptions") or shortcut.get("launchoptions") or "",
+            "collections": _parse_old_tags(shortcut) or [],
         })
 
     logger.info("Found %s non-Steam games for user %s", len(games), user_id_actual)
