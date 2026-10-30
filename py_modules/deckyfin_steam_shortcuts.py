@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Callable
 
 from deckyfin_config import get_app_config_path, get_games_config, get_games_config_file, save_games_config
-from deckyfin_consts import STEAM_SHORTCUTS_SOURCE_TYPE, STEAM_LIBRARY_SOURCE_TYPE, BUILTIN_SOURCE_TYPES
+from deckyfin_consts import STEAM_LIBRARY_SOURCE_TYPE, BUILTIN_SOURCE_TYPES
 from steam_games import list_nonsteam_games
 
 LoadGames = Callable[[dict], list]
@@ -93,11 +93,32 @@ def attach_builtin_games(games: list) -> list:
                     break
             if target is None:
                 target = by_name.get(g["name"].lower())
+                if target is not None and _conflicting_appid(target, store_ids):
+                    target = None
         if target is not None:
             target["sources"].extend(g["sources"])
         else:
             out.append(g)
     return out
+
+
+def _parse_appid(value):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _conflicting_appid(target: dict, store_ids: list) -> bool:
+    """True when the target records a steam_app_id that isn't one of the Store game's."""
+    ids = {i for i in (_parse_appid(a) for a in store_ids) if i is not None}
+    if not ids:
+        return False
+    for s in target["sources"]:
+        appid = _parse_appid((s.get("config") or {}).get("steam_app_id"))
+        if appid is not None and appid not in ids:
+            return True
+    return False
 
 
 def find_orphans(shortcuts: list, owned_names: set, owned_paths: list) -> list:
@@ -185,16 +206,23 @@ def load_shortcut_games(sources: list, load_games: LoadGames) -> list:
 def upsert_store_entry(name: str, updates: dict, root: Path = None) -> dict:
     """Merge `updates` into the stored entry for `name`, creating it if missing.
 
+    When `updates` carries a steam_app_id, an entry with that appid is matched first
+    (and renamed to `name`), so a Store game keeps its data across a rename.
+
     `root` is the built-in source's config root (defaults to the Steam Shortcuts store).
     """
     root = root or store_root()
     config = get_games_config(root)
     games = config.get("games", [])
-    for g in games:
-        if g.get("name") == name:
-            g.update(updates)
-            entry = g
-            break
+    entry = None
+    appid = _parse_appid(updates.get("steam_app_id"))
+    if appid is not None:
+        entry = next((g for g in games if _parse_appid(g.get("steam_app_id")) == appid), None)
+    if entry is None:
+        entry = next((g for g in games if g.get("name") == name), None)
+    if entry is not None:
+        entry.update(updates)
+        entry["name"] = name
     else:
         entry = {"name": name, **updates}
         games.append(entry)

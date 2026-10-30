@@ -1149,6 +1149,15 @@ class Plugin:
         state_updates = {k: v for k, v in updates.items() if k in STATE_FIELDS}
         if source.get("type") in BUILTIN_SOURCE_TYPES:
             try:
+                if source.get("type") == STEAM_LIBRARY_SOURCE_TYPE:
+                    # Steam owns Proton/launch options for Store games; record the
+                    # appid so the entry still matches after a rename.
+                    from deckyfin_steam_library import store_config_updates
+                    appid = updates.get("steam_app_id")
+                    if appid is None:
+                        current = next((g for g in _load_source_games(source) if g.get("name") == name), None)
+                        appid = (current or {}).get("steam_app_id")
+                    config_updates = store_config_updates(config_updates, appid)
                 if config_updates:
                     _upsert_builtin_store_entry(name, config_updates, _source_config_root(source))
                 if state_updates:
@@ -1904,7 +1913,13 @@ class Plugin:
             is_shortcut = source.get("type") == STEAM_SHORTCUTS_SOURCE_TYPE
             is_store = source.get("type") == STEAM_LIBRARY_SOURCE_TYPE
 
-            cfg = get_game_config(game_name, root)
+            store_info = None
+            if is_store:
+                # Loaded Store games carry their store entry (matched by appid, then name).
+                store_info = next((g for g in _load_source_games(source) if g.get("name") == game_name), None)
+                cfg = store_info
+            else:
+                cfg = get_game_config(game_name, root)
             sync_paths = (cfg or {}).get("proton_sync_paths", [])
             if not cfg and not (is_shortcut or is_store):
                 return {"success": False, "error": "Game config not found"}
@@ -1918,7 +1933,7 @@ class Plugin:
                     return {"success": False, "error": "This game has no game folder — game:// save paths aren't supported for Steam Shortcuts"}
                 game_folder = None
             elif is_store:
-                info = next((g for g in _load_source_games(source) if g.get("name") == game_name), None)
+                info = store_info
                 if not info:
                     return {"success": False, "error": f"'{game_name}' is not installed"}
                 game_folder = info.get("install_dir")
@@ -1974,9 +1989,14 @@ class Plugin:
             return {"success": False, "error": str(e)}
 
     async def copy_saves_between_sources(
-        self, game_name: str, from_source_id: str, to_source_id: str
+        self, game_name: str, from_source_id: str, to_source_id: str,
+        to_game_name: Optional[str] = None,
     ) -> dict:
-        """Background task: copy the saves directory from one source to another."""
+        """Background task: copy the saves directory from one source to another.
+
+        `to_game_name` is the game's name in the destination source (merged games
+        can be named differently per source); defaults to `game_name`.
+        """
         try:
             from deckyfin_saves import get_saves_dir, copy_saves_between
 
@@ -1990,8 +2010,8 @@ class Plugin:
             if not from_root or not to_root:
                 return {"success": False, "error": "Source has no path"}
             from_saves = get_saves_dir(str(from_root), game_name)
-            to_saves = get_saves_dir(str(to_root), game_name)
-            _debug(f"copy_saves_between_sources: {game_name!r} {from_saves!r} → {to_saves!r}")
+            to_saves = get_saves_dir(str(to_root), to_game_name or game_name)
+            _debug(f"copy_saves_between_sources: {game_name!r} → {to_game_name!r} {from_saves!r} → {to_saves!r}")
 
             sync_id = _uuid.uuid4().hex[:8]
             _save_sync_registry[sync_id] = {

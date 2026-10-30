@@ -159,19 +159,22 @@ def test_load_library_games_seeds_from_steam(tmp_path, monkeypatch):
     assert snap == {"name": "MapleStory", "launch_options": "-dx11", "proton_version": "proton_9", "collections": []}
 
 
-def test_load_library_games_store_values_win(tmp_path, monkeypatch):
+def test_load_library_games_steam_owns_proton_and_launch_options(tmp_path, monkeypatch):
     mod = _reload(tmp_path, monkeypatch)
     root = _setup_one_game(tmp_path)
     _store(tmp_path, [{"name": "MapleStory", "launch_options": "", "proton_version": None,
                        "selected_launchers": ["MangoHud"], "proton_dependencies": ["vcrun2019"],
-                       "collections": ["MMO"]}])
+                       "proton_sync_paths": ["drive_c/saves"], "collections": ["MMO"]}])
     monkeypatch.setattr(mod, "read_compat_mapping", lambda r: {"216150": "proton_9"})
     monkeypatch.setattr(mod, "read_launch_options", lambda r, u: {"216150": "-dx11"})
     [g] = mod.load_library_games(root, "42")
-    assert g["launch_options"] == ""
-    assert g["proton_version"] is None
-    assert g["selected_launchers"] == ["MangoHud"]
+    # Steam is the truth for these three — stored values are ignored.
+    assert g["launch_options"] == "-dx11"
+    assert g["proton_version"] == "proton_9"
+    assert g["selected_launchers"] == []
+    # Deckyfin-only data comes from the store.
     assert g["proton_dependencies"] == ["vcrun2019"]
+    assert g["proton_sync_paths"] == ["drive_c/saves"]
     assert g["collections"] == ["MMO"]
     snap = json.loads(g["steam_snapshot"])
     assert snap["collections"] == []
@@ -200,3 +203,59 @@ def test_load_source_games_dispatches_steam_library(tmp_path, monkeypatch):
     monkeypatch.setattr(mod, "load_library_games", lambda *a, **k: [{"id": "steam-1", "name": "X"}])
     src = {"id": "steam-library", "type": "steam_library", "path": None, "builtin": True}
     assert deckyfin_sources.load_source_games(src) == [{"id": "steam-1", "name": "X"}]
+
+
+def test_has_prefix_ignores_steam_linux_runtime_mapping(tmp_path, monkeypatch):
+    mod = _reload(tmp_path, monkeypatch)
+    root = tmp_path / "Steam"
+    _library_folders(root, root)
+    _manifest(root, 3139440, "GunZ")
+    [g] = mod.list_installed_games(root, {"3139440": "steamlinuxruntime_4"}, {})
+    assert g["has_prefix"] is False
+
+
+def test_has_missing_libraries(tmp_path, monkeypatch):
+    mod = _reload(tmp_path, monkeypatch)
+    root = tmp_path / "Steam"
+    (root / "steamapps").mkdir(parents=True)
+    _library_folders(root, root)
+    assert mod.has_missing_libraries(root) is False
+    _library_folders(root, root, tmp_path / "SD" / "SteamLibrary")
+    assert mod.has_missing_libraries(root) is True
+
+
+def test_load_library_games_no_prune_when_a_library_is_missing(tmp_path, monkeypatch):
+    mod = _reload(tmp_path, monkeypatch)
+    root = tmp_path / "Steam"
+    _library_folders(root, root, tmp_path / "SD" / "SteamLibrary")  # SD card not mounted
+    _manifest(root, 216150, "MapleStory")
+    cfg = _store(tmp_path, [{"name": "MapleStory"}, {"name": "On SD Card", "proton_dependencies": ["d3dx9"]}])
+    [g] = mod.load_library_games(root, "42")
+    assert g["name"] == "MapleStory"
+    assert [e["name"] for e in json.loads(cfg.read_text())["games"]] == ["MapleStory", "On SD Card"]
+
+
+def test_load_library_games_matches_store_entry_by_appid_first(tmp_path, monkeypatch):
+    mod = _reload(tmp_path, monkeypatch)
+    root = _setup_one_game(tmp_path)
+    cfg = _store(tmp_path, [
+        {"name": "MapleStory", "proton_dependencies": ["by-name"]},
+        {"name": "Maple Story (old name)", "steam_app_id": 216150, "proton_dependencies": ["by-appid"]},
+    ])
+    [g] = mod.load_library_games(root, "42")
+    assert g["name"] == "MapleStory"
+    assert g["proton_dependencies"] == ["by-appid"]
+    # The renamed entry matched by appid must not be pruned.
+    names = [e["name"] for e in json.loads(cfg.read_text())["games"]]
+    assert "Maple Story (old name)" in names
+
+
+def test_store_config_updates_drops_steam_owned_fields_and_adds_appid(tmp_path, monkeypatch):
+    mod = _reload(tmp_path, monkeypatch)
+    updates = {"proton_version": "proton_9", "launch_options": "-x", "selected_launchers": ["MangoHud"],
+               "executable": "/a.exe", "start_dir": "/a", "proton_dependencies": ["d3dx9"],
+               "collections": ["MMO"]}
+    assert mod.store_config_updates(updates, 216150) == {
+        "proton_dependencies": ["d3dx9"], "collections": ["MMO"], "steam_app_id": 216150,
+    }
+    assert mod.store_config_updates({"proton_version": "x"}, None) == {}

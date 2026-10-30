@@ -189,6 +189,27 @@ def test_attach_builtin_games_store_game_name_fallback(tmp_path, monkeypatch):
     assert [g["id"] for g in out] == ["w3"]
 
 
+def test_attach_builtin_games_name_fallback_skips_conflicting_appid(tmp_path, monkeypatch):
+    mod = _reload(tmp_path, monkeypatch)
+    target = _merged("w3", "The Witcher 3", "mount")
+    target["sources"][0]["config"]["steam_app_id"] = "499450"   # GOTY edition
+    store = _merged("steam-292030", "the witcher 3", "steam_library")
+    store["sources"][0]["config"]["steam_app_id"] = 292030
+    out = mod.attach_builtin_games([target, store])
+    assert [g["id"] for g in out] == ["w3", "steam-292030"]
+    assert [s["source_type"] for s in out[0]["sources"]] == ["mount"]
+
+
+def test_attach_builtin_games_name_fallback_ignores_unparseable_appid(tmp_path, monkeypatch):
+    mod = _reload(tmp_path, monkeypatch)
+    target = _merged("w3", "The Witcher 3", "mount")
+    target["sources"][0]["config"]["steam_app_id"] = ""
+    store = _merged("steam-292030", "the witcher 3", "steam_library")
+    store["sources"][0]["config"]["steam_app_id"] = 292030
+    out = mod.attach_builtin_games([target, store])
+    assert [g["id"] for g in out] == ["w3"]
+
+
 def test_attach_builtin_games_builtins_never_merge_together(tmp_path, monkeypatch):
     mod = _reload(tmp_path, monkeypatch)
     a = _merged("shortcut-1", "Halo", "steam_shortcuts")
@@ -329,3 +350,11 @@ def test_load_source_games_dispatches_builtin(tmp_path, monkeypatch):
     monkeypatch.setattr(mod, "list_nonsteam_games", lambda: [_sc("Leftover", "/o/l.exe", 7)])
     games = deckyfin_sources.load_source_games(SOURCES[2])
     assert [g["id"] for g in games] == ["shortcut-7"]
+
+
+def test_upsert_store_entry_matches_steam_app_id_first_and_renames(tmp_path, monkeypatch):
+    mod = _reload(tmp_path, monkeypatch)
+    mod.upsert_store_entry("Old Name", {"steam_app_id": 7, "proton_dependencies": ["a"]})
+    mod.upsert_store_entry("New Name", {"steam_app_id": 7, "proton_sync_paths": ["/x"]})
+    games = json.loads((mod.store_root() / ".deckyfin" / "config.json").read_text())["games"]
+    assert games == [{"name": "New Name", "steam_app_id": 7, "proton_dependencies": ["a"], "proton_sync_paths": ["/x"]}]
