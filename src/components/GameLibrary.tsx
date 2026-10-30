@@ -106,6 +106,8 @@ export const GameLibrary: VFC = () => {
   const [restarting, setRestarting] = useState(false);
   const [needsRestart, setNeedsRestartState] = useState(false);
   const [isRestoring, setIsRestoring] = useState(true);
+  // Last open game page to restore once the displayed list (incl. owned placeholders) is ready.
+  const [pendingRestore, setPendingRestore] = useState<{ game_name: string; source_id: string | null } | null>(null);
   const [viewMode, setViewMode] = useState<"card" | "art" | "list">("card");
   const [artEnabled, setArtEnabled] = useState(true);
   const shouldRestoreState = useRef(true);
@@ -348,19 +350,18 @@ export const GameLibrary: VFC = () => {
       if (uiStateRes.status === "fulfilled") {
         const uiState = uiStateRes.value;
         if (uiState?.view === "game-detail" && uiState?.game_name) {
-          const found = gamesRes.find((g) => g.name === uiState.game_name);
-          if (found) {
-            setInitialSourceId(uiState.source_id || null);
-            setSelectedGame(found);
-            setView("game-detail");
-          }
+          // Resolved in an effect against displayGames (which needs games AND sources), so
+          // owned-not-installed placeholders and attached Steam sources restore too.
+          setPendingRestore({ game_name: uiState.game_name, source_id: uiState.source_id || null });
         } else if (uiState?.view === "settings") {
           setView("settings");
         } else if (uiState?.view === "tasks") {
           setView("tasks");
         }
       }
-      setIsRestoring(false);
+      if (!(uiStateRes.status === "fulfilled" && uiStateRes.value?.view === "game-detail" && uiStateRes.value?.game_name)) {
+        setIsRestoring(false);
+      }
     }
     setLoading(false);
   }, []);
@@ -494,17 +495,69 @@ export const GameLibrary: VFC = () => {
     (showOwned && filterInstallStatus !== "all" ? 1 : 0);
 
   // ── Live download/verify progress, and reload once a tracked app finishes ──
-  const downloads = useSteamDownloads();
+  const { downloads, markVerifying } = useSteamDownloads();
+  // Appids of displayed owned-not-installed entries (placeholders, or not-installed Steam sources
+  // attached to a source game) — the only downloads whose finishing changes what the backend
+  // reports (updates/verifies of installed games don't).
+  const placeholderAppids = useMemo(() => {
+    const ids = new Set<number>();
+    for (const g of displayGames) for (const s of g.sources) {
+      if (s.source_type === "steam_library" && s.config.installed === false && typeof s.config.steam_app_id === "number") ids.add(s.config.steam_app_id);
+    }
+    return ids;
+  }, [displayGames]);
+  const placeholderAppidsRef = useRef(placeholderAppids);
+  placeholderAppidsRef.current = placeholderAppids;
+  // Placeholders whose download just finished while the reload that picks them up is in flight.
+  const [finishingAppids, setFinishingAppids] = useState<Set<number>>(new Set());
+  const reloadTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  useEffect(() => () => { reloadTimersRef.current.forEach(clearTimeout); }, []);
   const prevDownloadAppidsRef = useRef<Set<number>>(new Set());
   useEffect(() => {
     const prevAppids = prevDownloadAppidsRef.current;
     const currentAppids = new Set(Object.keys(downloads).map(Number));
-    const anyFinished = [...prevAppids].some((id) => !currentAppids.has(id));
     prevDownloadAppidsRef.current = currentAppids;
-    // An appid that was tracked and is now gone means Steam finished (or cancelled) that
-    // download; either way the backend's installed state for that game may have changed.
-    if (anyFinished) loadData();
+    // An appid that was tracked and is now gone means Steam finished (or cancelled) that download.
+    const finished = [...prevAppids].filter((id) => !currentAppids.has(id) && placeholderAppidsRef.current.has(id));
+    if (finished.length === 0) return;
+    setFinishingAppids((prev) => new Set([...prev, ...finished]));
+    const clearFinishing = () => setFinishingAppids((prev) => {
+      const next = new Set(prev);
+      finished.forEach((id) => next.delete(id));
+      return next;
+    });
+    loadData().finally(() => {
+      // Steam may not have written the manifest yet — retry once if still a placeholder.
+      const timer = setTimeout(() => {
+        if (finished.some((id) => placeholderAppidsRef.current.has(id))) loadData().finally(clearFinishing);
+        else clearFinishing();
+      }, 3000);
+      reloadTimersRef.current.push(timer);
+    });
   }, [downloads, loadData]);
+
+  // A finishing placeholder that the reload turned into an installed game is done.
+  useEffect(() => {
+    setFinishingAppids((prev) => {
+      if (prev.size === 0) return prev;
+      const next = new Set([...prev].filter((id) => placeholderAppids.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [placeholderAppids]);
+
+  // Restore the last open game page once the displayed list (games + sources) has loaded.
+  useEffect(() => {
+    if (!pendingRestore || loading) return;
+    const named = displayGames.filter((g) => g.name === pendingRestore.game_name);
+    const found = named.find((g) => g.sources.some((s) => s.source_id === pendingRestore.source_id)) ?? named[0];
+    if (found) {
+      setInitialSourceId(pendingRestore.source_id);
+      setSelectedGame(found);
+      setView("game-detail");
+    }
+    setPendingRestore(null);
+    setIsRestoring(false);
+  }, [pendingRestore, loading, displayGames]);
 
   // Once the displayed list refreshes, if the detail page for one of them is open, swap in
   // the fresh entry (e.g. an owned-not-installed placeholder that just became a real
@@ -535,6 +588,22 @@ export const GameLibrary: VFC = () => {
     setInitialSourceId(null); // manual navigation — no source restore
     setSelectedGame(game);
     setView("game-detail");
+  };
+
+  // Stable per-game click handlers so memoized cards/rows don't re-render on every library render.
+  const displayGamesRef = useRef(displayGames);
+  displayGamesRef.current = displayGames;
+  const openHandlersRef = useRef(new Map<string, () => void>());
+  const openHandlerFor = (id: string): (() => void) => {
+    let h = openHandlersRef.current.get(id);
+    if (!h) {
+      h = () => {
+        const g = displayGamesRef.current.find((x) => x.id === id);
+        if (g) openGame(g);
+      };
+      openHandlersRef.current.set(id, h);
+    }
+    return h;
   };
 
   const disabledIds = new Set(xferSources.filter((s) => s.enabled === false).map((s) => s.id));
@@ -924,6 +993,9 @@ export const GameLibrary: VFC = () => {
           saveUiState({ view: "settings" }).catch(() => {});
         }}
         artEnabled={artEnabled}
+        downloads={downloads}
+        markVerifying={markVerifying}
+        finishingAppids={finishingAppids}
       />
     );
   }
@@ -1494,9 +1566,10 @@ export const GameLibrary: VFC = () => {
               key={game.id}
               game={game}
               isInSteam={steamNames.has(game.name)}
-              onClick={() => openGame(game)}
+              onClick={openHandlerFor(game.id)}
               notInstalled={isNotInstalled(game)}
               download={downloads[appidOf(game) ?? -1]}
+              steamAppId={appidOf(game)}
             />
           ))}
         </div>
@@ -1512,9 +1585,10 @@ export const GameLibrary: VFC = () => {
             <GameCard
               key={game.id}
               game={game.sources[0]?.config ?? { name: game.name, executable: "" }}
+              gameId={game.id}
               isInSteam={steamNames.has(game.name)}
               sourceCount={game.sources.length}
-              onClick={() => openGame(game)}
+              onClick={openHandlerFor(game.id)}
               artEnabled={artEnabled}
               notInstalled={isNotInstalled(game)}
               download={downloads[appidOf(game) ?? -1]}

@@ -95,8 +95,8 @@ declare global {
     GetAvailableCompatTools?(appId: number): Promise<SteamCompatTool[]>;
     /** Live app details; the callback fires on registration and on every change. Undocumented — guard before use. */
     RegisterForAppDetails?(appId: number, callback: (details: SteamAppDetails) => void): { unregister(): void };
-    /** Re-verifies installed files for an app. Undocumented — guard before use. */
-    VerifyApp?(appId: number): void;
+    /** Re-verifies installed files for an app. Undocumented — guard before use (may return a Promise). */
+    VerifyApp?(appId: number): Promise<unknown> | void;
   }
 
   interface SteamCompatTool {

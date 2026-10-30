@@ -4,8 +4,8 @@ import { Navigation, Focusable } from "@decky/ui";
 import { GameConfig, MergedGame, GameSource, SourceCapabilities, AssetType } from "../types";
 import { sourceTypeLabel, sourceTypeColors, isBuiltinSourceType } from "../sourceStyle";
 import { useArtwork } from "../hooks/useArtwork";
-import { useSteamDownloads } from "../hooks/useSteamDownloads";
-import { formatDownloadLabel } from "../downloadStates";
+import { formatDownloadLabel, DownloadState } from "../downloadStates";
+import { steamArtUrls, artBackground } from "../steamOwned";
 import { CompactTextField } from "../components/CompactTextField";
 import {
   getCachedArt, setCachedArt, invalidateArtCache,
@@ -217,7 +217,16 @@ interface Props {
   initialSourceId?: string | null;
   runningTaskCount?: number;
   artEnabled?: boolean;
+  /** Live Steam download/verify states, from the library's single subscription. */
+  downloads?: Record<number, DownloadState>;
+  /** Mark an appid the user just asked Steam to verify. */
+  markVerifying?: (appid: number) => void;
+  /** Placeholder appids whose download finished and whose reload is still in flight. */
+  finishingAppids?: Set<number>;
 }
+
+const NO_DOWNLOADS: Record<number, DownloadState> = {};
+const NO_APPIDS: Set<number> = new Set();
 
 const LABEL_STYLE: React.CSSProperties = {
   display: "block",
@@ -243,26 +252,41 @@ const fmtBytes = (b: number): string => {
 };
 
 // ── Guarded SteamClient calls (undocumented API — may be missing in some Steam versions) ──
-const steamCall = (fn: () => void): string | null => {
-  try { fn(); return null; } catch (e: any) { return e?.message || "Steam call failed"; }
+// Called as methods (they may rely on `this`); a returned Promise is awaited so rejections surface.
+const steamCall = async (fn: () => unknown): Promise<string | null> => {
+  try {
+    const r: any = fn();
+    if (r && typeof r.then === "function") await r;
+    return null;
+  } catch (e: any) {
+    return e?.message || "Steam call failed";
+  }
 };
 const openInstall = (appid: number) => steamCall(() => {
-  const f = (window as any).SteamClient?.Installs?.OpenInstallWizard;
-  if (typeof f !== "function") throw new Error("Install isn't available in this Steam version");
-  f([appid]);
+  const inst = (window as any).SteamClient?.Installs;
+  if (typeof inst?.OpenInstallWizard !== "function") throw new Error("Install isn't available in this Steam version");
+  return inst.OpenInstallWizard([appid]);
 });
 const openUninstall = (appid: number) => steamCall(() => {
-  const f = (window as any).SteamClient?.Installs?.OpenUninstallWizard;
-  if (typeof f !== "function") throw new Error("Uninstall isn't available in this Steam version");
-  f([appid], false);
+  const inst = (window as any).SteamClient?.Installs;
+  if (typeof inst?.OpenUninstallWizard !== "function") throw new Error("Uninstall isn't available in this Steam version");
+  return inst.OpenUninstallWizard([appid], false);
 });
 const verifyApp = (appid: number) => steamCall(() => {
-  const f = (window as any).SteamClient?.Apps?.VerifyApp;
-  if (typeof f !== "function") throw new Error("Verify isn't available in this Steam version");
-  f(appid);
+  const apps = (window as any).SteamClient?.Apps;
+  if (typeof apps?.VerifyApp !== "function") throw new Error("Verify isn't available in this Steam version");
+  return apps.VerifyApp(appid);
 });
+/** Close Decky's quick-access menu so a Steam page/dialog we opened is visible (guarded). */
+const closeSideMenus = () => {
+  try { (Navigation as any)?.CloseSideMenus?.(); } catch { /* unavailable */ }
+};
+const openInSteamLibrary = (appid: number) => {
+  try { Navigation.Navigate(`/library/app/${appid}`); } catch { /* unavailable */ }
+  closeSideMenus();
+};
 
-export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigateToSettings, initialSourceId, runningTaskCount = 0, artEnabled = true }) => {
+export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigateToSettings, initialSourceId, runningTaskCount = 0, artEnabled = true, downloads = NO_DOWNLOADS, markVerifying, finishingAppids = NO_APPIDS }) => {
   // ── Refs ─────────────────────────────────────────────────────────────
   const rootRef = useRef<HTMLDivElement>(null);
   const backRef = useRef<HTMLDivElement>(null);
@@ -485,7 +509,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
     };
     init().catch(() => {});
     return () => { cancelled = true; };
-  }, [game.name, selectedSource?.source_id]);
+    // currentConfig.installed: a placeholder that just became installed must reload its config.
+  }, [game.name, selectedSource?.source_id, currentConfig.installed]);
 
   const mergedDeps = ((): string[] => {
     const custom = customDeps
@@ -659,13 +684,18 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
   // ── Artwork ───────────────────────────────────────────────────────────────
   const { applyArtById, applyArtByType } = useArtwork();
   const [headerArtUri, setHeaderArtUri] = useState<string | null>(null);
+  // True once the backend art lookup finished — gates the Steam art fallback so it never flashes.
+  const [headerArtResolved, setHeaderArtResolved] = useState(false);
   useEffect(() => {
-    if (!artEnabled) { setHeaderArtUri(null); return; }
+    if (!artEnabled) { setHeaderArtUri(null); setHeaderArtResolved(false); return; }
     const cached = getCachedArt(game.id);
-    if (cached !== undefined) { setHeaderArtUri(cached); return; }
+    if (cached !== undefined) { setHeaderArtUri(cached); setHeaderArtResolved(true); return; }
+    setHeaderArtResolved(false);
+    let cancelled = false;
     getGameCardArt(game.name, game.id)
-      .then((r) => { const uri = r.data_uri || null; setCachedArt(game.id, uri); setHeaderArtUri(uri); })
-      .catch(() => setHeaderArtUri(null));
+      .then((r) => { const uri = r.data_uri || null; setCachedArt(game.id, uri); if (!cancelled) { setHeaderArtUri(uri); setHeaderArtResolved(true); } })
+      .catch(() => { if (!cancelled) { setHeaderArtUri(null); setHeaderArtResolved(true); } });
+    return () => { cancelled = true; };
   }, [game.id, game.name, artEnabled]);
 
   // ── Load capabilities when source changes ─────────────────────────────────
@@ -757,7 +787,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
         })
         .catch(() => {});
     });
-  }, [game.name]);
+  }, [game.name, currentConfig.installed]);
 
   useEffect(() => {
     listAllSources().then(setAllSources).catch(() => {});
@@ -821,9 +851,16 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
 
   // ── Owned-but-not-installed Steam Library games ─────────────────────────
   const isNotInstalled = isLibrarySource && currentConfig.installed === false;
-  const downloads = useSteamDownloads();
   const appidForSteam = steamInfo?.unsigned_appid ?? (Number(currentConfig.steam_app_id) || undefined);
   const download = appidForSteam ? downloads[appidForSteam] : undefined;
+  const isFinishing = !!appidForSteam && finishingAppids.has(appidForSteam);
+  // Header art: Steam art (cached landscape, then CDN) for the Store app id once the backend has none
+  const storeAppid = Number(currentConfig.steam_app_id) || undefined;
+  const headerArtBg = headerArtUri
+    ? artBackground([headerArtUri])
+    : headerArtResolved && storeAppid ? artBackground(steamArtUrls(storeAppid)) : null;
+  // Appid the user last clicked Verify on (labels a queued entry as a verify, not an update)
+  const [verifyRequestedFor, setVerifyRequestedFor] = useState<number | null>(null);
 
   // Fill Proton/launch options from Steam's live values (Store games). Steam is the
   // truth, so they also become the last-synced snapshot. The form is left alone when
@@ -902,7 +939,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
       } catch {}
     })();
     return () => { cancelled = true; };
-  }, [isLibrarySource, currentConfig.steam_app_id, selectedSource?.source_id]);
+  }, [isLibrarySource, currentConfig.steam_app_id, selectedSource?.source_id, currentConfig.installed]);
 
   const protonOptions: { value: string; label: string }[] = (() => {
     if (!isLibrarySource) return protonVersions.map((v) => ({ value: v, label: v }));
@@ -1606,20 +1643,25 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
   };
 
   // ── Install / Verify / Uninstall via Steam's own wizards (undocumented API) ──
-  const handleInstallClick = () => {
+  const handleInstallClick = async () => {
     if (!appidForSteam) return;
-    const err = openInstall(appidForSteam);
+    const err = await openInstall(appidForSteam);
     if (err) setFeedback({ ok: false, msg: err });
+    else closeSideMenus();
   };
-  const handleVerifyClick = () => {
+  const handleVerifyClick = async () => {
     if (!appidForSteam) return;
-    const err = verifyApp(appidForSteam);
-    if (err) setFeedback({ ok: false, msg: err });
+    const appid = appidForSteam;
+    markVerifying?.(appid);
+    setVerifyRequestedFor(appid);
+    const err = await verifyApp(appid);
+    setFeedback(err ? { ok: false, msg: err } : { ok: true, msg: "Verifying files in Steam…" });
   };
-  const handleUninstallClick = () => {
+  const handleUninstallClick = async () => {
     if (!appidForSteam) return;
-    const err = openUninstall(appidForSteam);
+    const err = await openUninstall(appidForSteam);
     if (err) setFeedback({ ok: false, msg: err });
+    else closeSideMenus();
   };
 
   const handleRemoveSteam = async () => {
@@ -1955,8 +1997,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
       {/* ── Art header ──────────────────────────────────────────────────────── */}
       {artEnabled ? (
         <div style={{ position: "relative", width: "100%", height: "110px", borderRadius: "6px", marginBottom: "8px", overflow: "hidden",
-          background: headerArtUri ? `center / cover no-repeat url("${headerArtUri}")` : "linear-gradient(135deg, #667eea, #764ba2)" }}>
-          {!headerArtUri && (
+          background: headerArtBg ?? "linear-gradient(135deg, #667eea, #764ba2)" }}>
+          {!headerArtBg && (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: "100%", fontSize: "40px" }}>🎮</div>
           )}
           <div style={{ position: "absolute", bottom: "6px", left: "8px", background: "rgba(0,0,0,0.55)", borderRadius: "4px", padding: "2px 8px",
@@ -2005,7 +2047,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
                 ["SteamGridDB ID", sgdbGameId != null ? String(sgdbGameId) : "—"],
                 // Store games: the appid is the Steam App ID row above (no shortcut exists)
                 ...(isLibrarySource ? [] : [["Shortcut App ID", steamInfo ? String(steamInfo.unsigned_appid) : "—"]]),
-                ["In Steam", steamInfo ? "Yes" : "No"],
+                // An owned-not-installed placeholder isn't "in Steam" as a playable game
+                ["In Steam", isNotInstalled ? "Owned — not installed" : steamInfo ? "Yes" : "No"],
                 ["Source", `${selectedSource.source_name} (${sourceTypeLabel(selectedSource.source_type)})`],
               ] as [string, string][]).map(([label, value], i, arr) => (
                 <Fragment key={label}>
@@ -2033,7 +2076,11 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
           <p style={{ fontSize: "0.85em", color: "#aaa", margin: "0 0 10px 0" }}>
             Not installed — install it through Steam.
           </p>
-          {download ? (
+          {!download && isFinishing ? (
+            <div style={{ border: "1px solid #444", borderRadius: "4px", padding: "8px 10px", marginBottom: "10px", background: "#1a1a1a", fontSize: "0.82em", color: "#aaa" }}>
+              ⏳ Finishing…
+            </div>
+          ) : download ? (
             <div style={{ border: "1px solid #444", borderRadius: "4px", padding: "8px 10px", marginBottom: "10px", background: "#1a1a1a", fontSize: "0.82em" }}>
               <div style={{ marginBottom: download.status === "queued" ? 0 : "4px" }}>
                 {download.status === "queued" && <span style={{ color: "#888" }}>⏳ Queued</span>}
@@ -2512,6 +2559,23 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
             <span style={{ fontSize: "0.78em", color: "#666" }}>{showSteamActions ? "▲" : "▼"}</span>
           </div>
         </Focusable>
+        {/* Verify / update progress — visible even while the section is collapsed */}
+        {!isNotInstalled && download && (
+          <div style={{ padding: "6px 12px 8px", borderTop: "1px solid #2a2a2a", fontSize: "0.78em", color: "#aaa" }}>
+            <div style={{ marginBottom: download.status === "queued" ? 0 : "4px" }}>
+              {download.status === "queued"
+                ? `⏳ ${verifyRequestedFor === appidForSteam ? "Verify" : "Update"} queued in Steam`
+                : download.status === "verifying"
+                  ? `▸ ${formatDownloadLabel(download)}`
+                  : `▸ Updating in Steam… ${Math.round(download.progress * 100)}%`}
+            </div>
+            {download.status !== "queued" && (
+              <div style={{ background: "#333", borderRadius: "2px", height: "4px" }}>
+                <div style={{ width: `${Math.round(download.progress * 100)}%`, background: "#0078d4", borderRadius: "2px", height: "100%", transition: "width 0.3s" }} />
+              </div>
+            )}
+          </div>
+        )}
         {showSteamActions && (
           <div style={{ padding: "8px" }}>
             <p style={{ fontSize: "0.78em", color: "#888", margin: "0 0 8px 0", lineHeight: 1.5 }}>
@@ -2573,8 +2637,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
             )}
             {steamInfo?.unsigned_appid && !isNotInstalled && (
               <Focusable
-                onActivate={() => Navigation.Navigate(`/library/app/${steamInfo.unsigned_appid}`)}
-                onClick={() => Navigation.Navigate(`/library/app/${steamInfo.unsigned_appid}`)}
+                onActivate={() => openInSteamLibrary(steamInfo.unsigned_appid)}
+                onClick={() => openInSteamLibrary(steamInfo.unsigned_appid)}
                 focusClassName="is-focused"
                 style={{ ...BTN_STYLE, display: "block", width: "100%", boxSizing: "border-box" as const, textAlign: "center" as const, marginBottom: "6px" }}>
                 Open in Steam Library
