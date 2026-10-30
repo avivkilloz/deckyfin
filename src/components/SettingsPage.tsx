@@ -752,7 +752,9 @@ export const SettingsPage: VFC<Props> = ({ onBack, artEnabled = true, onArtEnabl
                       ? "Disabled"
                       : builtinCounts[src.id] === undefined
                         ? "Counting…"
-                        : `${builtinCounts[src.id]} orphan shortcut${builtinCounts[src.id] === 1 ? "" : "s"}`)
+                        : (src.type === "steam_library"
+                          ? `${builtinCounts[src.id]} installed game${builtinCounts[src.id] === 1 ? "" : "s"}`
+                          : `${builtinCounts[src.id]} orphan shortcut${builtinCounts[src.id] === 1 ? "" : "s"}`))
                   : (src.path || src.url)}
               </div>
               {/* Disk usage */}

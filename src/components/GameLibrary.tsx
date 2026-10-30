@@ -8,6 +8,7 @@ import { GameArtRow } from "../components/GameArtRow";
 import { SettingsPage } from "../components/SettingsPage";
 import { GameDetail } from "../components/GameDetail";
 import { CompactTextField } from "../components/CompactTextField";
+import { isBuiltinSourceType } from "../sourceStyle";
 
 const getGames = callable<[], MergedGame[]>("get_games");
 const listNonSteamGames = callable<[], { name: string }[]>("list_nonsteam_games");
@@ -175,7 +176,7 @@ export const GameLibrary: VFC = () => {
     games.forEach((g) =>
       g.sources.forEach((s) => {
         if (!seen.has(s.source_id))
-          seen.set(s.source_id, { id: s.source_id, name: s.source_name, type: s.source_type, builtin: s.source_type === "steam_shortcuts" });
+          seen.set(s.source_id, { id: s.source_id, name: s.source_name, type: s.source_type, builtin: isBuiltinSourceType(s.source_type) });
       })
     );
     return Array.from(seen.values());

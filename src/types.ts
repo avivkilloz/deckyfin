@@ -23,6 +23,12 @@ export interface GameConfig {
   steamgriddb_game_id?: number;
   /** Unsigned shortcut app id — set for games from the Steam Shortcuts source. */
   shortcut_app_id?: number;
+  /** Steam Library (Store) games only. */
+  library_path?: string;
+  install_dir?: string;
+  prefix_path?: string | null;
+  has_prefix?: boolean;
+  size_on_disk?: number;
 }
 
 export interface GameFolder {
@@ -79,6 +85,8 @@ declare global {
     SetCustomArtworkForApp(appId: number, data: string, format: string, assetType: SteamAssetType): Promise<void>;
     ClearCustomArtworkForApp(appId: number, assetType: SteamAssetType): Promise<void>;
     SetShortcutName(appId: number, name: string): void;
+    SpecifyCompatTool(appId: number, toolName: string): void;
+    SetAppLaunchOptions(appId: number, options: string): void;
   }
 
   interface SteamClient {
@@ -90,7 +98,7 @@ declare global {
 
 // ── Multi-source types ────────────────────────────────────────────────────────
 
-export type SourceType = "local" | "mount" | "agent" | "steam_shortcuts";
+export type SourceType = "local" | "mount" | "agent" | "steam_shortcuts" | "steam_library";
 
 export interface Source {
   id: string;
