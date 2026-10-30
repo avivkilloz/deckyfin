@@ -77,17 +77,19 @@ def list_orphan_shortcuts(sources: list[dict]) -> list[dict]
 
 1. Read shortcuts via `list_nonsteam_games()` (current Steam user), extended to
    also return `start_dir`, `launch_options` and `tags` per shortcut.
-2. Build ownership sets from **all** non-builtin sources, enabled or not:
-   - `owned_names`: lower-cased game names from each source's config
-     (unreadable sources contribute nothing here).
-   - `owned_paths`: each source's `path`, `os.path.normpath`'d (not
-     resolved — resolving can hang on an offline network mount).
-3. A shortcut is **owned** if its lower-cased name is in `owned_names`, OR its
-   exe path is under any path in `owned_paths`. Otherwise it is an orphan.
-
-The path rule keeps games of an offline/unmounted source from appearing as
-orphans; including disabled sources keeps disabled sources' games from
-reappearing here.
+2. For each non-builtin, non-agent source, decide whether its game list is
+   **known**: enabled, its `.deckyfin/config.json` exists, and it loads without
+   error.
+   - Known → it owns the lower-cased names in its config (**name rule only**).
+     A game removed from the source but left in Steam is therefore an orphan,
+     even if its exe path is still under the source folder.
+   - Unknown (disabled, offline/unmounted, unreadable config) → it owns every
+     shortcut whose exe is under its `path` (**folder rule**), using
+     `os.path.normpath` (not resolved — resolving can hang on an offline
+     network mount). Disabled sources are never read.
+   - Agent sources are skipped (no local path; loading is a network call).
+3. A shortcut is **owned** if its name is owned by a known source, or its exe
+   is under an unknown source's path. Otherwise it is an orphan.
 
 Failure handling: missing/unreadable `shortcuts.vdf` or no Steam user → `[]`.
 
@@ -167,9 +169,9 @@ is a no-op for this source (paths in `shortcuts.vdf` are absolute).
 - `remove_source` refuses builtin.
 - `list_orphan_shortcuts` with fixture `shortcuts.vdf`:
   - name match (case-insensitive) → owned
-  - exe under a source path → owned
-  - disabled source still owns
-  - unreadable source still owns via path rule
+  - leftover under a readable source's folder but not in its config → orphan
+  - disabled / offline / unreadable source owns via folder rule (disabled never read)
+  - agent sources skipped
   - unmatched → orphan
   - missing `shortcuts.vdf` → `[]`
 - `load_source_games` for `steam_shortcuts`: VDF fields win over stored; stored

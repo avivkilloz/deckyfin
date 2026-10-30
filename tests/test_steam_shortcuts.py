@@ -1,5 +1,6 @@
 """Tests for deckyfin_steam_shortcuts — orphan detection and loading."""
 
+import json
 import sys
 from pathlib import Path
 
@@ -40,47 +41,90 @@ def _loader(names_by_source):
     return load
 
 
-def test_build_ownership_includes_disabled_and_skips_builtin(tmp_path, monkeypatch):
+def _readable_source(tmp_path, sid, names, enabled=True):
+    """A local source whose .deckyfin/config.json exists on disk."""
+    root = tmp_path / f"src-{sid}"
+    (root / ".deckyfin").mkdir(parents=True)
+    (root / ".deckyfin" / "config.json").write_text(
+        json.dumps({"games": [{"name": n} for n in names]})
+    )
+    return {"id": sid, "type": "local", "path": str(root), "enabled": enabled, "builtin": False}
+
+
+def _real_loader(source):
+    import deckyfin_sources
+    return deckyfin_sources.load_source_games(source)
+
+
+def test_build_ownership_readable_source_owns_by_name_only(tmp_path, monkeypatch):
+    mod = _reload(tmp_path, monkeypatch)
+    src = _readable_source(tmp_path, "a", ["Halo"])
+    names, paths = mod.build_ownership([src], _real_loader)
+    assert names == {"halo"}
+    assert paths == []  # list is known, so the folder rule doesn't apply
+
+
+def test_build_ownership_disabled_source_owns_by_path_without_loading(tmp_path, monkeypatch):
+    mod = _reload(tmp_path, monkeypatch)
+    src = _readable_source(tmp_path, "b", ["Doom"], enabled=False)
+    calls = []
+
+    def load(source):
+        calls.append(source["id"])
+        return []
+
+    names, paths = mod.build_ownership([src, SOURCES[2]], load)
+    assert names == set()
+    assert paths == [src["path"]]
+    assert calls == []
+
+
+def test_build_ownership_missing_config_owns_by_path(tmp_path, monkeypatch):
+    """Offline/unmounted source: config file absent → fall back to the folder rule."""
+    mod = _reload(tmp_path, monkeypatch)
+    src = {"id": "a", "type": "mount", "path": str(tmp_path / "offline"), "enabled": True, "builtin": False}
+    names, paths = mod.build_ownership([src], _real_loader)
+    assert names == set()
+    assert paths == [src["path"]]
+
+
+def test_build_ownership_unreadable_enabled_source_owns_by_path(tmp_path, monkeypatch):
+    mod = _reload(tmp_path, monkeypatch)
+    src = _readable_source(tmp_path, "a", ["Halo"])
+
+    def load(source):
+        raise PermissionError("fuse")
+
+    names, paths = mod.build_ownership([src], load)
+    assert names == set()
+    assert paths == [src["path"]]
+
+
+def test_build_ownership_skips_agent_and_builtin(tmp_path, monkeypatch):
     mod = _reload(tmp_path, monkeypatch)
     calls = []
 
     def load(source):
         calls.append(source["id"])
-        return [{"name": n} for n in {"a": ["Halo"], "b": ["Doom"]}.get(source["id"], [])]
+        return [{"name": "ShouldNotAppear"}]
 
-    names, paths = mod.build_ownership(SOURCES, load)
-    # Disabled source b contributes its path (so its games aren't flagged as
-    # orphans) but is never loaded, so its name doesn't show up.
-    assert names == {"halo"}
-    assert paths == ["/games", "/mnt/nas/games"]
-    assert calls == ["a"]
+    agent = {"id": "c", "type": "agent", "url": "http://x", "enabled": True, "builtin": False}
+    names, paths = mod.build_ownership([agent, SOURCES[2]], load)
+    assert names == set()
+    assert paths == []
+    assert calls == []
 
 
-def test_build_ownership_skips_agent_source_entirely(tmp_path, monkeypatch):
+def test_leftover_under_readable_source_is_orphan(tmp_path, monkeypatch):
+    """Game removed from a source's config but its shortcut kept → orphan."""
     mod = _reload(tmp_path, monkeypatch)
-    sources = SOURCES + [
-        {"id": "c", "type": "agent", "url": "http://x", "enabled": True, "builtin": False},
-    ]
-    calls = []
-
-    def load(source):
-        calls.append(source["id"])
-        if source["id"] == "c":
-            return [{"name": "ShouldNotAppear"}]
-        return [{"name": n} for n in {"a": ["Halo"]}.get(source["id"], [])]
-
-    names, paths = mod.build_ownership(sources, load)
-    assert names == {"halo"}
-    assert "shouldnotappear" not in names
-    assert paths == ["/games", "/mnt/nas/games"]
-    assert "c" not in calls
-
-
-def test_build_ownership_unreadable_source_keeps_path(tmp_path, monkeypatch):
-    mod = _reload(tmp_path, monkeypatch)
-    names, paths = mod.build_ownership(SOURCES, _loader({"a": ["Halo"], "b": "raise"}))
-    assert names == {"halo"}
-    assert "/mnt/nas/games" in paths
+    src = _readable_source(tmp_path, "a", ["Halo"])
+    monkeypatch.setattr(mod, "list_nonsteam_games", lambda: [
+        _sc("Halo", f"{src['path']}/Halo/halo.exe", 1),
+        _sc("Bloodborne", f"{src['path']}/Bloodborne/bb.exe", 2),
+    ])
+    orphans = mod.list_orphan_shortcuts([src], _real_loader)
+    assert [o["name"] for o in orphans] == ["Bloodborne"]
 
 
 def test_find_orphans_name_match_is_case_insensitive(tmp_path, monkeypatch):

@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 from typing import Callable
 
-from deckyfin_config import get_app_config_path, get_games_config, save_games_config
+from deckyfin_config import get_app_config_path, get_games_config, get_games_config_file, save_games_config
 from steam_games import list_nonsteam_games
 
 LoadGames = Callable[[dict], list]
@@ -17,29 +17,38 @@ def _is_under(path: str, root: str) -> bool:
     return p == r or p.startswith(r.rstrip("/") + "/")
 
 
+def _config_exists(source_path: str) -> bool:
+    try:
+        return get_games_config_file(Path(source_path)).is_file()
+    except Exception:
+        return False
+
+
 def build_ownership(sources: list, load_games: LoadGames) -> tuple:
     """Return (lower-cased owned names, owned source paths) across all non-builtin sources.
 
-    Agent sources are skipped entirely (no names, no paths, never loaded) — they have
-    no local path and loading them is a network call we don't want on every scan.
-    Disabled sources still contribute their path (so the orphan scan doesn't treat
-    their games as orphans) but are not loaded for names. Enabled local/mount sources
-    contribute both their path and their games' names; a source whose games can't be
-    read still owns everything under its path.
+    A source whose game list is known (enabled, config file present and loadable)
+    owns only the games listed in it — so a game removed from the source but left
+    in Steam becomes an orphan. When the list is unknown (disabled, offline mount,
+    unreadable config) the source falls back to owning everything under its path.
+    Agent sources are skipped entirely: no local path, and loading is a network call.
     """
     names: set = set()
     paths: list = []
     for source in sources:
         if source.get("builtin") or source.get("type") == "agent":
             continue
-        if source.get("path"):
-            paths.append(os.path.normpath(source["path"]))
-        if source.get("enabled") is False:
+        path = source.get("path")
+        games = None
+        if source.get("enabled") is not False and path and _config_exists(path):
+            try:
+                games = load_games(source) or []
+            except Exception:
+                games = None
+        if games is None:
+            if path:
+                paths.append(os.path.normpath(path))
             continue
-        try:
-            games = load_games(source) or []
-        except Exception:
-            games = []
         names.update(g["name"].lower() for g in games if g.get("name"))
     return names, paths
 
