@@ -1,5 +1,7 @@
 /** TypeScript types matching the Python backend models. */
 
+import type { RawDownloadItem, RawDownloadOverview } from "./downloadStates";
+
 export interface GameConfig {
   id?: string;
   name: string;
@@ -93,6 +95,8 @@ declare global {
     GetAvailableCompatTools?(appId: number): Promise<SteamCompatTool[]>;
     /** Live app details; the callback fires on registration and on every change. Undocumented — guard before use. */
     RegisterForAppDetails?(appId: number, callback: (details: SteamAppDetails) => void): { unregister(): void };
+    /** Re-verifies installed files for an app. Undocumented — guard before use. */
+    VerifyApp?(appId: number): void;
   }
 
   interface SteamCompatTool {
@@ -106,8 +110,22 @@ declare global {
     strLaunchOptions?: string;
   }
 
+  /** SteamClient.Installs — install/uninstall wizard launchers. Undocumented — guard before use. */
+  interface SteamClientInstalls {
+    OpenInstallWizard?(appIds: number[]): void;
+    OpenUninstallWizard?(appIds: number[], dontPrompt: boolean): void;
+  }
+
+  /** SteamClient.Downloads — live download queue/progress subscriptions. Undocumented — guard before use. */
+  interface SteamClientDownloads {
+    RegisterForDownloadItems?(cb: (isDownloading: boolean, items: RawDownloadItem[]) => void): { unregister(): void };
+    RegisterForDownloadOverview?(cb: (overview: RawDownloadOverview) => void): { unregister(): void };
+  }
+
   interface SteamClient {
     Apps: SteamClientApps;
+    Installs?: SteamClientInstalls;
+    Downloads?: SteamClientDownloads;
   }
 
   var SteamClient: SteamClient;
