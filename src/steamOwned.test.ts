@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { filterOwnedGames, mergeOwnedGames } from "./steamOwned";
+import { describe, it, expect, afterEach } from "vitest";
+import { filterOwnedGames, mergeOwnedGames, readOwnedApps, steamArtUrls } from "./steamOwned";
 import type { MergedGame } from "./types";
 
 const lib = { id: "steam-library", name: "Steam Library" };
@@ -23,6 +23,47 @@ describe("filterOwnedGames", () => {
       { appid: 10, name: "Halo", installed: false },
       { appid: 11, name: "Doom", installed: true },
     ]);
+  });
+});
+
+describe("filterOwnedGames installed state", () => {
+  const base = { app_type: 1 };
+  it("uses local_per_client_data when defined, ignoring LAN clients", () => {
+    const out = filterOwnedGames([
+      { ...base, appid: 1, display_name: "A", local_per_client_data: { clientid: "0", installed: false },
+        per_client_data: [{ clientid: "0", installed: false }, { clientid: "12345", installed: true }] },
+      { ...base, appid: 2, display_name: "B", local_per_client_data: { clientid: "0", installed: true },
+        per_client_data: [{ clientid: "0", installed: false }] },
+    ]);
+    expect(out.map((x) => x.installed)).toEqual([false, true]);
+  });
+
+  it("falls back to the local client entry (clientid \"0\") in per_client_data", () => {
+    const out = filterOwnedGames([
+      { ...base, appid: 1, display_name: "A", per_client_data: [{ clientid: "777", installed: true }, { clientid: "0", installed: false }] },
+      { ...base, appid: 2, display_name: "B", per_client_data: [{ clientid: "777", installed: false }, { clientid: "0", installed: true }] },
+    ]);
+    expect(out.map((x) => x.installed)).toEqual([false, true]);
+  });
+
+  it("falls back to any client when no local data exists", () => {
+    const out = filterOwnedGames([
+      { ...base, appid: 1, display_name: "A", per_client_data: [{ installed: true }] },
+      { ...base, appid: 2, display_name: "B" },
+    ]);
+    expect(out.map((x) => x.installed)).toEqual([true, false]);
+  });
+});
+
+describe("readOwnedApps", () => {
+  afterEach(() => { delete (globalThis as any).window; });
+  it("returns null for a missing or empty store and filters a populated one", () => {
+    (globalThis as any).window = {};
+    expect(readOwnedApps()).toBeNull();
+    (globalThis as any).window = { appStore: { allApps: [] } };
+    expect(readOwnedApps()).toBeNull();
+    (globalThis as any).window = { appStore: { allApps: [{ appid: 3, display_name: "C", app_type: 1 }] } };
+    expect(readOwnedApps()).toEqual([{ appid: 3, name: "C", installed: false }]);
   });
 });
 
@@ -71,5 +112,23 @@ describe("mergeOwnedGames", () => {
     const target = g("w3", "The Witcher 3", "mount");
     mergeOwnedGames([target], [{ appid: 292030, name: "The Witcher 3", installed: false }], lib);
     expect(target.sources).toHaveLength(1);
+  });
+});
+
+describe("steamArtUrls", () => {
+  afterEach(() => { delete (globalThis as any).window; });
+  const cdn = "https://cdn.cloudflare.steamstatic.com/steam/apps/42/header.jpg";
+  it("falls back to the CDN header when Steam's stores are unavailable or throw", () => {
+    expect(steamArtUrls(42)).toEqual([cdn]);
+    (globalThis as any).window = { appStore: { GetAppOverviewByAppID: () => { throw new Error("x"); } } };
+    expect(steamArtUrls(42)).toEqual([cdn]);
+  });
+  it("puts Steam's cached landscape URL first when available", () => {
+    const ov = { appid: 42 };
+    (globalThis as any).window = { appStore: {
+      GetAppOverviewByAppID: (id: number) => (id === 42 ? ov : null),
+      GetCachedLandscapeImageURLForApp: (o: unknown) => (o === ov ? "https://steamloopback.host/42.jpg" : ""),
+    } };
+    expect(steamArtUrls(42)).toEqual(["https://steamloopback.host/42.jpg", cdn]);
   });
 });

@@ -6,13 +6,26 @@ export type RawApp = {
   app_type?: number;
   installed?: boolean;
   visible_in_game_list?: boolean;
-  per_client_data?: { installed?: boolean }[];
+  per_client_data?: RawClientData[];
+  local_per_client_data?: RawClientData;
 };
+type RawClientData = { clientid?: string; installed?: boolean };
 export type OwnedApp = { appid: number; name: string; installed: boolean };
 
 const APP_TYPE_GAME = 1;
 const TOOL_APPIDS = new Set([228980, 1070560, 1391110, 1628350, 4183110, 1826330, 1161040]);
 const BUILTIN_TYPES = new Set(["steam_shortcuts", "steam_library"]);
+
+/** Installed on THIS client: local data first, then the local ("0") client entry, then any client. */
+function isInstalledLocally(a: RawApp): boolean {
+  const local = a.local_per_client_data?.installed;
+  if (typeof local === "boolean") return local;
+  const clients = Array.isArray(a.per_client_data) ? a.per_client_data : [];
+  const self = clients.find((c) => c?.clientid === "0");
+  if (self && typeof self.installed === "boolean") return self.installed;
+  if (typeof a.installed === "boolean") return a.installed;
+  return clients.some((c) => !!c?.installed);
+}
 
 export function filterOwnedGames(apps: RawApp[]): OwnedApp[] {
   const seen = new Set<number>();
@@ -21,8 +34,7 @@ export function filterOwnedGames(apps: RawApp[]): OwnedApp[] {
     if (!a || typeof a.appid !== "number" || seen.has(a.appid)) continue;
     if (a.app_type !== APP_TYPE_GAME || a.visible_in_game_list === false || TOOL_APPIDS.has(a.appid)) continue;
     seen.add(a.appid);
-    const installed = a.installed ?? (a.per_client_data ?? []).some((c) => !!c?.installed);
-    out.push({ appid: a.appid, name: a.display_name ?? String(a.appid), installed: !!installed });
+    out.push({ appid: a.appid, name: a.display_name ?? String(a.appid), installed: isInstalledLocally(a) });
   }
   return out;
 }
@@ -68,9 +80,33 @@ export function readOwnedApps(): OwnedApp[] | null {
       w.collectionStore?.allGamesCollection?.allApps ??
       w.collectionStore?.allAppsCollection?.allApps ??
       w.appStore?.allApps;
-    if (!Array.isArray(raw)) return null;
+    // An empty list means the stores are not populated yet (e.g. still loading at boot).
+    if (!Array.isArray(raw) || raw.length === 0) return null;
     return filterOwnedGames(raw as RawApp[]);
   } catch {
     return null;
   }
+}
+
+/**
+ * Steam art for an app without any backend call: Steam's own cached landscape image when its
+ * store exposes it, then the public CDN header. Layer them (first on top) so a missing
+ * cached image falls through to the CDN.
+ */
+export function steamArtUrls(appid: number): string[] {
+  const cdn = `https://cdn.cloudflare.steamstatic.com/steam/apps/${appid}/header.jpg`;
+  try {
+    const store = (window as any).appStore;
+    if (typeof store?.GetAppOverviewByAppID === "function" && typeof store?.GetCachedLandscapeImageURLForApp === "function") {
+      const overview = store.GetAppOverviewByAppID(appid);
+      const url = overview ? store.GetCachedLandscapeImageURLForApp(overview) : null;
+      if (typeof url === "string" && url && url !== cdn) return [url, cdn];
+    }
+  } catch { /* store unavailable */ }
+  return [cdn];
+}
+
+/** CSS `background` value layering the given art URLs over a gradient placeholder. */
+export function artBackground(urls: string[]): string {
+  return [...urls.map((u) => `center / cover no-repeat url("${u}")`), "linear-gradient(135deg, #667eea, #764ba2)"].join(", ");
 }
