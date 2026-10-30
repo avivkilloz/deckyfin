@@ -151,22 +151,49 @@ def _merged(gid, name, *source_types):
     ]}
 
 
-def test_attach_orphans_by_name_merges_into_same_name_game(tmp_path, monkeypatch):
+def test_attach_builtin_games_merges_into_same_name_game(tmp_path, monkeypatch):
     mod = _reload(tmp_path, monkeypatch)
     games = [
         _merged("god-of-war", "God Of War", "mount"),
         _merged("shortcut-1", "god of war", "steam_shortcuts"),
         _merged("shortcut-2", "Bloodborne", "steam_shortcuts"),
     ]
-    out = mod.attach_orphans_by_name(games)
+    out = mod.attach_builtin_games(games)
     assert [g["id"] for g in out] == ["god-of-war", "shortcut-2"]
     assert [s["source_type"] for s in out[0]["sources"]] == ["mount", "steam_shortcuts"]
 
 
-def test_attach_orphans_by_name_leaves_unmatched_alone(tmp_path, monkeypatch):
+def test_attach_builtin_games_leaves_unmatched_alone(tmp_path, monkeypatch):
     mod = _reload(tmp_path, monkeypatch)
     games = [_merged("halo", "Halo", "local"), _merged("shortcut-2", "Bloodborne", "steam_shortcuts")]
-    assert mod.attach_orphans_by_name(games) == games
+    assert mod.attach_builtin_games(games) == games
+
+
+def test_attach_builtin_games_store_game_by_steam_app_id(tmp_path, monkeypatch):
+    mod = _reload(tmp_path, monkeypatch)
+    target = _merged("cp", "Cyberpunk Repack", "local")
+    target["sources"][0]["config"]["steam_app_id"] = "1091500"
+    store = _merged("steam-1091500", "Cyberpunk 2077", "steam_library")
+    store["sources"][0]["config"]["steam_app_id"] = 1091500
+    out = mod.attach_builtin_games([target, store])
+    assert [g["id"] for g in out] == ["cp"]
+    assert [s["source_type"] for s in out[0]["sources"]] == ["local", "steam_library"]
+
+
+def test_attach_builtin_games_store_game_name_fallback(tmp_path, monkeypatch):
+    mod = _reload(tmp_path, monkeypatch)
+    target = _merged("w3", "The Witcher 3", "mount")
+    store = _merged("steam-292030", "the witcher 3", "steam_library")
+    store["sources"][0]["config"]["steam_app_id"] = 292030
+    out = mod.attach_builtin_games([target, store])
+    assert [g["id"] for g in out] == ["w3"]
+
+
+def test_attach_builtin_games_builtins_never_merge_together(tmp_path, monkeypatch):
+    mod = _reload(tmp_path, monkeypatch)
+    a = _merged("shortcut-1", "Halo", "steam_shortcuts")
+    b = _merged("steam-2", "Halo", "steam_library")
+    assert mod.attach_builtin_games([a, b]) == [a, b]
 
 
 def test_find_orphans_name_match_is_case_insensitive(tmp_path, monkeypatch):

@@ -497,8 +497,51 @@ def _init_prefix_for_deps(compatdata_path: Path, steam_root: Optional[Path]) -> 
         )
 
 
+def _resolve_prefix_dir(pfxid: str, compatdata_path: Optional[str] = None) -> tuple:
+    """Return (prefix_dir, steam_root, error).
+
+    With `compatdata_path` (Store games): use it as-is and never create it —
+    Steam creates Store prefixes on first launch.
+    Without it (shortcuts): <steam root>/steamapps/compatdata/<pfxid>, created
+    only when neither native nor flatpak protontricks is available.
+    """
+    steam_root = None
+    try:
+        from steam_utils import find_steam_root
+        steam_root = find_steam_root()
+    except Exception as e:
+        logger.warning("Could not find Steam root: %s", e)
+
+    if compatdata_path:
+        if Path(compatdata_path).exists():
+            return str(compatdata_path), steam_root, None
+        return None, steam_root, "Proton prefix not found — launch the game once from Steam first"
+
+    prefix_dir = None
+    try:
+        from deckyfin_consts import STEAM_STEAMAPPS_FOLDER as _SSAF, COMPATDATA_FOLDER as _CDF
+        if steam_root:
+            compatdata = steam_root / _SSAF / _CDF / pfxid
+            if compatdata.exists():
+                prefix_dir = str(compatdata)
+            else:
+                logger.warning("Prefix directory not found at %s", compatdata)
+                # Only create here if neither native nor flatpak is available
+                # (both can auto-create the prefix on their own).
+                if not shutil.which("protontricks") and not shutil.which("flatpak"):
+                    try:
+                        _init_prefix_for_deps(compatdata, steam_root)
+                        prefix_dir = str(compatdata)
+                    except Exception as e2:
+                        logger.error("Failed to auto-create prefix: %s", e2)
+    except Exception as e:
+        logger.warning("Could not derive prefix directory: %s", e)
+    return prefix_dir, steam_root, None
+
+
 def install_protontricks_dependencies(
-    pfxid: str, dependencies: str, timeout: int = _METHOD_TIMEOUT
+    pfxid: str, dependencies: str, timeout: int = _METHOD_TIMEOUT,
+    compatdata_path: Optional[str] = None,
 ) -> dict:
     """
     Install Windows dependencies in a Proton prefix via protontricks.
@@ -514,6 +557,9 @@ def install_protontricks_dependencies(
         pfxid: Unsigned 32-bit app ID (used as prefix ID)
         dependencies: Comma-separated (e.g. "vcrun2022,d3dx9")
         timeout: Seconds per method attempt (default 120)
+        compatdata_path: Prefix dir for Store games (may live on another
+            library); used as-is and never auto-created. None for shortcuts,
+            which resolve under the Steam root and may be auto-created.
 
     Returns:
         dict with 'success', 'installed', 'failed', 'output', 'errors' keys
@@ -525,31 +571,9 @@ def install_protontricks_dependencies(
     if not dep_list:
         raise ValueError("No valid dependencies specified")
 
-    # Derive prefix directory and steam_root
-    prefix_dir = None
-    steam_root = None
-    try:
-        from steam_utils import find_steam_root
-        from deckyfin_consts import STEAM_STEAMAPPS_FOLDER as _SSAF, COMPATDATA_FOLDER as _CDF
-        steam_root = find_steam_root()
-        if steam_root:
-            compatdata = steam_root / _SSAF / _CDF / pfxid
-            if compatdata.exists():
-                prefix_dir = str(compatdata)
-            else:
-                logger.warning("Prefix directory not found at %s", compatdata)
-                # ── Try to create prefix so protontricks can find it ──
-                # When native protontricks is used, it needs the prefix to exist.
-                # Only create here if neither native nor flatpak is available
-                # (both can auto-create the prefix on their own).
-                if not shutil.which("protontricks") and not shutil.which("flatpak"):
-                    try:
-                        _init_prefix_for_deps(compatdata, steam_root)
-                        prefix_dir = str(compatdata)
-                    except Exception as e2:
-                        logger.error("Failed to auto-create prefix: %s", e2)
-    except Exception as e:
-        logger.warning("Could not derive prefix directory: %s", e)
+    prefix_dir, steam_root, prefix_error = _resolve_prefix_dir(pfxid, compatdata_path)
+    if prefix_error:
+        return {"success": False, "installed": [], "failed": dep_list, "output": [], "errors": [prefix_error]}
 
     pfx_path = str(Path(prefix_dir) / "pfx") if prefix_dir else None
 

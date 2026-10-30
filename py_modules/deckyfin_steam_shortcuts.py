@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Callable
 
 from deckyfin_config import get_app_config_path, get_games_config, get_games_config_file, save_games_config
-from deckyfin_consts import STEAM_SHORTCUTS_SOURCE_TYPE
+from deckyfin_consts import STEAM_SHORTCUTS_SOURCE_TYPE, STEAM_LIBRARY_SOURCE_TYPE, BUILTIN_SOURCE_TYPES
 from steam_games import list_nonsteam_games
 
 LoadGames = Callable[[dict], list]
@@ -55,25 +55,52 @@ def build_ownership(sources: list, load_games: LoadGames) -> tuple:
     return names, paths
 
 
-def attach_orphans_by_name(games: list) -> list:
-    """Fold each orphan-only merged game into a non-orphan game with the same name.
+def attach_builtin_games(games: list) -> list:
+    """Fold each built-in-only merged game into a matching user-source game.
 
-    `games` is get_games' merged list ({id, name, sources: [{source_type, ...}]}).
-    The orphan's source entry is appended to the matching game, so the game page
-    can switch between it and the other source (e.g. to copy saves).
+    `games` is get_games' merged list ({id, name, sources: [{source_type, config}]}).
+    Steam Library games match a target whose source config has the same
+    steam_app_id, else the same name; Steam Shortcuts orphans match by name.
+    Built-in games never merge with each other. Unmatched games stay separate.
     """
-    def is_orphan(g):
-        return bool(g["sources"]) and all(s["source_type"] == STEAM_SHORTCUTS_SOURCE_TYPE for s in g["sources"])
+    def builtin_only(g):
+        return bool(g["sources"]) and all(s["source_type"] in BUILTIN_SOURCE_TYPES for s in g["sources"])
 
-    by_name = {g["name"].lower(): g for g in games if not is_orphan(g)}
+    targets = [g for g in games if not builtin_only(g)]
+    by_name = {g["name"].lower(): g for g in targets}
+    by_appid = {}
+    for g in targets:
+        for s in g["sources"]:
+            try:
+                by_appid.setdefault(int((s.get("config") or {}).get("steam_app_id")), g)
+            except (TypeError, ValueError):
+                pass
+
     out = []
     for g in games:
-        target = by_name.get(g["name"].lower()) if is_orphan(g) else None
+        target = None
+        if builtin_only(g):
+            store_ids = [
+                (s.get("config") or {}).get("steam_app_id")
+                for s in g["sources"] if s["source_type"] == STEAM_LIBRARY_SOURCE_TYPE
+            ]
+            for appid in store_ids:
+                try:
+                    target = by_appid.get(int(appid))
+                except (TypeError, ValueError):
+                    target = None
+                if target is not None:
+                    break
+            if target is None:
+                target = by_name.get(g["name"].lower())
         if target is not None:
             target["sources"].extend(g["sources"])
         else:
             out.append(g)
     return out
+
+
+attach_orphans_by_name = attach_builtin_games  # temporary alias; main.py switches in Task 4
 
 
 def find_orphans(shortcuts: list, owned_names: set, owned_paths: list) -> list:

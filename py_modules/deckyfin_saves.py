@@ -12,13 +12,20 @@ def get_saves_dir(source_path: str, game_name: str) -> str:
     return os.path.join(source_path, ".deckyfin", "saves", game_name)
 
 
-def get_prefix_path(shortcut_app_id: int) -> Optional[str]:
-    """Return the Proton prefix root (pfx/) for a shortcut app id, or None if absent."""
-    from steam_utils import find_steam_root
-    steam_root = find_steam_root()
-    if not steam_root:
-        return None
-    path = os.path.join(steam_root, "steamapps", "compatdata", str(shortcut_app_id), "pfx")
+def get_prefix_path(shortcut_app_id: int, library_path: Optional[str] = None) -> Optional[str]:
+    """Return the Proton prefix root (pfx/) for an app id, or None if absent.
+
+    `library_path` is the Steam library holding the game (Store games may live on
+    another drive); defaults to the Steam root (non-Steam shortcuts).
+    """
+    if library_path:
+        base = library_path
+    else:
+        from steam_utils import find_steam_root
+        base = find_steam_root()
+        if not base:
+            return None
+    path = os.path.join(str(base), "steamapps", "compatdata", str(shortcut_app_id), "pfx")
     return path if os.path.isdir(path) else None
 
 
