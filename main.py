@@ -73,8 +73,8 @@ from deckyfin_sources import (
 )
 from steam_utils import get_user_id, list_steam_users
 from steam_games import convert_appid_to_unsigned_32bit
-from deckyfin_steam_shortcuts import upsert_store_entry as _upsert_shortcut_store_entry, attach_orphans_by_name as _attach_orphans_by_name
-from deckyfin_consts import APP_NAME, APP_VERSION, STEAM_SHORTCUTS_SOURCE_TYPE
+from deckyfin_steam_shortcuts import upsert_store_entry as _upsert_builtin_store_entry, attach_builtin_games as _attach_builtin_games
+from deckyfin_consts import APP_NAME, APP_VERSION, STEAM_SHORTCUTS_SOURCE_TYPE, STEAM_LIBRARY_SOURCE_TYPE, BUILTIN_SOURCE_TYPES
 
 DEBUG_LOG = Path(os.environ.get("DECKY_PLUGIN_RUNTIME_DIR", str(Path(__file__).parent))) / "debug.log"
 
@@ -353,6 +353,19 @@ def _write_game_config_to_source(
             dst_games.append({"name": game_name, **portable})
         dst_config["games"] = dst_games
         save_games_config(dst_config, Path(dst_path))
+
+
+def _builtin_state(source: dict, name: str) -> dict:
+    """State-store overlay for a built-in source's game.
+
+    Steam Shortcuts: shortcuts.vdf is the truth for Steam fields, so the stored
+    steam_snapshot is dropped. Steam Library: the last Apply's snapshot wins
+    (Steam writes its files lazily after live API changes).
+    """
+    state = get_game_state(source["id"], name)
+    if source.get("type") == STEAM_SHORTCUTS_SOURCE_TYPE:
+        state = {k: v for k, v in state.items() if k != "steam_snapshot"}
+    return state
 
 
 class Plugin:
@@ -1074,10 +1087,7 @@ class Plugin:
                     continue
                 name = game.get("name", game_id)
                 # Overlay ephemeral state from central store (state takes precedence over config)
-                state = get_game_state(source["id"], name)
-                if state and source.get("type") == STEAM_SHORTCUTS_SOURCE_TYPE:
-                    # shortcuts.vdf is the source of truth for orphans' Steam fields
-                    state = {k: v for k, v in state.items() if k != "steam_snapshot"}
+                state = _builtin_state(source, name) if source.get("builtin") else get_game_state(source["id"], name)
                 if state:
                     game = {**game, **state}
                 if game_id not in merged:
@@ -1088,18 +1098,18 @@ class Plugin:
                     "source_type": source["type"],
                     "config": game,
                 })
-        # Orphan shortcuts sharing a name with a source game become a second source of it
-        return _attach_orphans_by_name(list(merged.values()))
+        # Built-in games (orphans, Store games) matching a source game become extra sources of it
+        return _attach_builtin_games(list(merged.values()))
 
     async def get_game(self, name: str, source_id: Optional[str] = None) -> dict:
         source = _get_source_by_id(source_id) if source_id else (_list_sources() or [None])[0]
         if not source:
             return {"success": False, "error": "No source configured"}
-        if source.get("type") == STEAM_SHORTCUTS_SOURCE_TYPE:
+        if source.get("type") in BUILTIN_SOURCE_TYPES:
             game = next((g for g in _load_source_games(source) if g.get("name") == name), None)
             if not game:
                 return {"success": False, "error": f"Game '{name}' not found"}
-            state = {k: v for k, v in get_game_state(source["id"], name).items() if k != "steam_snapshot"}
+            state = _builtin_state(source, name)
             return {"success": True, "game": {**game, **state}}
         path = source.get("path")
         try:
@@ -1137,17 +1147,17 @@ class Plugin:
         # Split into permanent config and ephemeral state
         config_updates = {k: v for k, v in updates.items() if k not in STATE_FIELDS}
         state_updates = {k: v for k, v in updates.items() if k in STATE_FIELDS}
-        if source.get("type") == STEAM_SHORTCUTS_SOURCE_TYPE:
+        if source.get("type") in BUILTIN_SOURCE_TYPES:
             try:
                 if config_updates:
-                    _upsert_shortcut_store_entry(name, config_updates)
+                    _upsert_builtin_store_entry(name, config_updates, _source_config_root(source))
                 if state_updates:
                     update_game_state(source["id"], name, state_updates)
             except Exception as e:
                 return {"success": False, "error": str(e)}
             game = next((g for g in _load_source_games(source) if g.get("name") == name), None)
             if game:
-                st = {k: v for k, v in get_game_state(source["id"], name).items() if k != "steam_snapshot"}
+                st = _builtin_state(source, name)
                 game = {**game, **st}
             return {"success": True, "game": game}
         owner_uid, owner_gid = _owner_creds_for(path or "") if path else (0, 0)
@@ -1807,6 +1817,17 @@ class Plugin:
         """Delete a Steam collection by name."""
         return delete_steam_collection(name)
 
+    async def sync_app_collections(self, app_id: int, collections: list, old_collections: Optional[list] = None) -> dict:
+        """Write a Store game's Steam collections (takes effect after a Steam restart)."""
+        try:
+            from steam_games import _sync_user_collections
+            _sync_user_collections(get_user_id(), int(app_id), collections or None, old_collections or None)
+            self._set_needs_restart_flag(True)
+            return {"success": True}
+        except Exception as e:
+            _debug(f"sync_app_collections: {e!r}")
+            return {"success": False, "error": str(e)}
+
     async def ensure_proton(self, proton_name: str) -> dict:
         ensure_proton_available(proton_name)
         return {"success": True, "proton_name": proton_name}
@@ -1881,19 +1902,27 @@ class Plugin:
                 return {"success": False, "error": "Source not found or has no path"}
             root = str(root)
             is_shortcut = source.get("type") == STEAM_SHORTCUTS_SOURCE_TYPE
+            is_store = source.get("type") == STEAM_LIBRARY_SOURCE_TYPE
 
             cfg = get_game_config(game_name, root)
             sync_paths = (cfg or {}).get("proton_sync_paths", [])
-            if not cfg and not is_shortcut:
+            if not cfg and not (is_shortcut or is_store):
                 return {"success": False, "error": "Game config not found"}
             if not sync_paths:
                 return {"success": False, "error": "No save paths configured — add paths in the Save Paths section"}
 
+            library_path = None
             if is_shortcut:
                 # Orphan shortcuts have no game folder; prefix and userdata:// paths still work
                 if any(p.startswith("game://") for p in sync_paths):
                     return {"success": False, "error": "This game has no game folder — game:// save paths aren't supported for Steam Shortcuts"}
                 game_folder = None
+            elif is_store:
+                info = next((g for g in _load_source_games(source) if g.get("name") == game_name), None)
+                if not info:
+                    return {"success": False, "error": f"'{game_name}' is not installed"}
+                game_folder = info.get("install_dir")
+                library_path = info.get("library_path")
             else:
                 game_rel = cfg.get("path")
                 if not game_rel:
@@ -1904,9 +1933,10 @@ class Plugin:
                 not p.startswith("game://") and not p.startswith("userdata://")
                 for p in sync_paths
             )
-            prefix_path = get_prefix_path(shortcut_app_id) if has_prefix_paths else None
+            prefix_path = get_prefix_path(shortcut_app_id, library_path) if has_prefix_paths else None
             if has_prefix_paths and not prefix_path:
-                return {"success": False, "error": f"Proton prefix not found for app {shortcut_app_id} — init the prefix first"}
+                hint = "launch the game once from Steam first" if is_store else "init the prefix first"
+                return {"success": False, "error": f"Proton prefix not found for app {shortcut_app_id} — {hint}"}
 
             saves_dir = get_saves_dir(root, game_name)
             sync_id = _uuid.uuid4().hex[:8]
@@ -2127,6 +2157,13 @@ class Plugin:
         key = f"{game_name}|{source_id}"
         if _dep_install_registry.get(key, {}).get("status") == "installing":
             return {"success": False, "error": "Already installing"}
+        compatdata_path = None
+        src = _get_source_by_id(source_id)
+        if src and src.get("type") == STEAM_LIBRARY_SOURCE_TYPE:
+            info = next((g for g in _load_source_games(src) if g.get("name") == game_name), None)
+            if not info:
+                return {"success": False, "error": f"'{game_name}' is not installed"}
+            compatdata_path = os.path.join(info["library_path"], "steamapps", "compatdata", str(info["steam_app_id"]))
         _dep_install_registry[key] = {
             "game_name": game_name, "source_id": source_id,
             "deps": dependencies, "status": "installing",
@@ -2134,7 +2171,7 @@ class Plugin:
         }
         def _run():
             try:
-                res = install_protontricks_dependencies(pfxid, dependencies, timeout=1200)
+                res = install_protontricks_dependencies(pfxid, dependencies, timeout=1200, compatdata_path=compatdata_path)
                 _dep_install_registry[key]["installed"] = res.get("installed") or []
                 _dep_install_registry[key]["failed_deps"] = res.get("failed") or []
                 if res.get("success"):

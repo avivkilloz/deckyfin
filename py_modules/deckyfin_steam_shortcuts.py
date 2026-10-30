@@ -100,9 +100,6 @@ def attach_builtin_games(games: list) -> list:
     return out
 
 
-attach_orphans_by_name = attach_builtin_games  # temporary alias; main.py switches in Task 4
-
-
 def find_orphans(shortcuts: list, owned_names: set, owned_paths: list) -> list:
     """Shortcuts whose name isn't owned and whose exe isn't under any owned path."""
     orphans = []
