@@ -8,8 +8,8 @@ import urllib.request
 from pathlib import Path
 from typing import Optional
 
-from deckyfin_config import get_app_config, set_app_config, get_games_config
-from deckyfin_consts import SOURCES_FILE
+from deckyfin_config import get_app_config, set_app_config, get_games_config, get_app_config_path
+from deckyfin_consts import SOURCES_FILE, STEAM_SHORTCUTS_SOURCE_ID, STEAM_SHORTCUTS_SOURCE_TYPE
 
 
 # ── Filesystem helpers ────────────────────────────────────────────────────────
@@ -68,9 +68,12 @@ def _validate_local_path(path: str) -> None:
 # ── Source CRUD ───────────────────────────────────────────────────────────────
 
 def list_sources() -> list:
-    """Return all configured sources, normalizing missing enabled field to True."""
+    """Return all configured sources, normalizing missing enabled/builtin fields."""
     sources = get_app_config().get("sources", [])
-    return [{**s, "enabled": s.get("enabled", True)} for s in sources]
+    return [
+        {**s, "enabled": s.get("enabled", True), "builtin": s.get("builtin", False)}
+        for s in sources
+    ]
 
 
 def get_source_by_id(source_id: str) -> Optional[dict]:
@@ -99,6 +102,8 @@ def add_source(name: str, type_: str, path: Optional[str], url: Optional[str]) -
 def remove_source(source_id: str) -> bool:
     """Remove source by id. Returns True if found and removed."""
     sources = list_sources()
+    if any(s["id"] == source_id and s.get("builtin") for s in sources):
+        return False
     new_sources = [s for s in sources if s["id"] != source_id]
     if len(new_sources) == len(sources):
         return False
@@ -131,6 +136,40 @@ def set_source_enabled(source_id: str, enabled: bool) -> bool:
             set_app_config({"sources": sources})
             return True
     return False
+
+
+# ── Built-in sources ──────────────────────────────────────────────────────────
+
+_BUILTIN_SOURCES = [
+    {
+        "id": STEAM_SHORTCUTS_SOURCE_ID,
+        "name": "Steam Shortcuts",
+        "type": STEAM_SHORTCUTS_SOURCE_TYPE,
+        "builtin": True,
+        "enabled": False,
+        "path": None,
+        "url": None,
+    },
+]
+
+
+def ensure_builtin_sources() -> bool:
+    """Append missing built-in sources. Never touches existing records. Returns True if any added."""
+    sources = list_sources()
+    existing = {s["id"] for s in sources}
+    missing = [dict(b) for b in _BUILTIN_SOURCES if b["id"] not in existing]
+    if not missing:
+        return False
+    set_app_config({"sources": sources + missing})
+    return True
+
+
+def source_config_root(source: dict) -> Optional[Path]:
+    """Folder holding a source's .deckyfin/config.json (built-in sources live in the app config dir)."""
+    if source.get("type") == STEAM_SHORTCUTS_SOURCE_TYPE:
+        return get_app_config_path() / "steam_shortcuts"
+    path = source.get("path")
+    return Path(path) if path else None
 
 
 # ── Migration ─────────────────────────────────────────────────────────────────
@@ -173,6 +212,8 @@ def _agent_get(url: str, path: str) -> dict:
 def detect_capabilities(source: dict) -> dict:
     """Return {can_play, can_write_config, can_download_to} for a source."""
     t = source.get("type")
+    if t == STEAM_SHORTCUTS_SOURCE_TYPE:
+        return {"can_play": True, "can_write_config": True, "can_download_to": False}
     if t == "agent":
         try:
             data = _agent_get(source["url"], "/capabilities")
@@ -197,6 +238,8 @@ def get_disk_usage(source: dict) -> dict:
     """Return {used, total, free} in bytes. Returns None values on failure."""
     null = {"used": None, "total": None, "free": None}
     t = source.get("type")
+    if t == STEAM_SHORTCUTS_SOURCE_TYPE:
+        return null
     if t == "agent":
         try:
             return _agent_get(source["url"], "/disk")
