@@ -20,6 +20,7 @@ const addSource = callable<
 const removeSource = callable<[source_id: string], { success: boolean }>("remove_source");
 const reorderSource = callable<[source_id: string, direction: string], { success: boolean }>("reorder_source");
 const setSourceEnabled = callable<[source_id: string, enabled: boolean], { success: boolean }>("set_source_enabled");
+const getBuiltinSourceSummary = callable<[source_id: string], { count: number }>("get_builtin_source_summary");
 const getSourceDiskUsage = callable<[source_id: string], { used: number | null; total: number | null; free: number | null }>("get_source_disk_usage");
 const initializeSource = callable<[source_id: string], { success: boolean; message?: string }>("initialize_source");
 const listActiveTransfers = callable<
@@ -336,6 +337,14 @@ export const SettingsPage: VFC<Props> = ({ onBack, artEnabled = true, onArtEnabl
   const [diskUsages, setDiskUsages] = useState<Record<string, { used: number | null; total: number | null; free: number | null }>>({});
   const [activeTransfers, setActiveTransfers] = useState<import("../types").TransferStatus[]>([]);
   const [sourceMessage, setSourceMessage] = useState<{ id: string; msg: string } | null>(null);
+  const [builtinCounts, setBuiltinCounts] = useState<Record<string, number>>({});
+  useEffect(() => {
+    sources.filter((s) => s.builtin && s.enabled !== false).forEach((s) => {
+      getBuiltinSourceSummary(s.id)
+        .then((r) => setBuiltinCounts((prev) => ({ ...prev, [s.id]: r.count })))
+        .catch(() => {});
+    });
+  }, [sources]);
 
   // Add source form
   const [showAddForm, setShowAddForm] = useState(false);
@@ -676,9 +685,9 @@ export const SettingsPage: VFC<Props> = ({ onBack, artEnabled = true, onArtEnabl
       {sources.map((src, srcIdx) => {
         const usage = diskUsages[src.id];
         const usedPct = usage?.total ? Math.round((usage.used! / usage.total) * 100) : null;
-        const typeColor = src.type === "local" ? "#27ae60" : src.type === "mount" ? "#e67e22" : "#0984e3";
-        const typeBg = src.type === "local" ? "#1a3a1a" : src.type === "mount" ? "#2a2a1a" : "#1a1a3a";
-        const offline = src.enabled !== false && !usage?.total && usage?.total !== undefined;
+        const typeColor = src.builtin ? "#66c0f4" : src.type === "local" ? "#27ae60" : src.type === "mount" ? "#e67e22" : "#0984e3";
+        const typeBg = src.builtin ? "#1a2a3a" : src.type === "local" ? "#1a3a1a" : src.type === "mount" ? "#2a2a1a" : "#1a1a3a";
+        const offline = !src.builtin && src.enabled !== false && !usage?.total && usage?.total !== undefined;
         const xfer = activeTransfers.find((t) => t.to_source_id === src.id && t.status === "running");
         const dimOpacity = (offline || src.enabled === false) ? 0.5 : 1;
         const srcBtn: React.CSSProperties = { ...BTN_STYLE, fontSize: "0.75em", padding: "2px 8px", whiteSpace: "nowrap", color: "#aaa", borderColor: "#888" };
@@ -706,26 +715,38 @@ export const SettingsPage: VFC<Props> = ({ onBack, artEnabled = true, onArtEnabl
               {/* Type pill + action buttons */}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
                 <span style={{ padding: "2px 7px", fontSize: "0.75em", borderRadius: "10px", background: typeBg, color: typeColor, border: `1px solid ${typeColor}`, whiteSpace: "nowrap", opacity: dimOpacity }}>
-                  {src.type}
+                  {src.builtin ? "steam" : src.type}
                 </span>
                 <Focusable focusClassName="" style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                  <Focusable onActivate={() => handleRescanSource(src.id)} onClick={() => handleRescanSource(src.id)} focusClassName="is-focused"
-                    style={{ ...srcBtn, minWidth: "5.5em", textAlign: "center", opacity: sourceMessage?.id === src.id ? 0.7 : 1 }}>
-                    {sourceMessage?.id === src.id ? sourceMessage.msg : "Rescan"}
-                  </Focusable>
+                  {!src.builtin && (
+                    <Focusable onActivate={() => handleRescanSource(src.id)} onClick={() => handleRescanSource(src.id)} focusClassName="is-focused"
+                      style={{ ...srcBtn, minWidth: "5.5em", textAlign: "center", opacity: sourceMessage?.id === src.id ? 0.7 : 1 }}>
+                      {sourceMessage?.id === src.id ? sourceMessage.msg : "Rescan"}
+                    </Focusable>
+                  )}
                   <Focusable onActivate={() => !togglingSourceIds.has(src.id) && handleToggleSource(src.id, src.enabled === false)} onClick={() => !togglingSourceIds.has(src.id) && handleToggleSource(src.id, src.enabled === false)} focusClassName="is-focused"
                     style={{ ...srcBtn, borderColor: src.enabled === false ? "#27ae60" : "#888", color: src.enabled === false ? "#2ecc71" : "#aaa", opacity: togglingSourceIds.has(src.id) ? 0.5 : 1 }}>
                     {src.enabled === false ? "Enable" : "Disable"}
                   </Focusable>
-                  <Focusable onActivate={() => handleRemoveSource(src.id)} onClick={() => handleRemoveSource(src.id)} focusClassName="is-focused"
-                    style={{ ...srcBtn, borderColor: "#c0392b", color: "#e74c3c" }}>
-                    Remove
-                  </Focusable>
+                  {!src.builtin && (
+                    <Focusable onActivate={() => handleRemoveSource(src.id)} onClick={() => handleRemoveSource(src.id)} focusClassName="is-focused"
+                      style={{ ...srcBtn, borderColor: "#c0392b", color: "#e74c3c" }}>
+                      Remove
+                    </Focusable>
+                  )}
                 </Focusable>
               </div>
               {/* Path */}
               <div style={{ opacity: dimOpacity }}>
-              <div style={{ fontSize: "0.78em", color: "#666", marginBottom: "6px", wordBreak: "break-all" }}>{src.path || src.url}</div>
+              <div style={{ fontSize: "0.78em", color: "#666", marginBottom: "6px", wordBreak: "break-all" }}>
+                {src.builtin
+                  ? (src.enabled === false
+                      ? "Disabled"
+                      : builtinCounts[src.id] === undefined
+                        ? "Counting…"
+                        : `${builtinCounts[src.id]} orphan shortcut${builtinCounts[src.id] === 1 ? "" : "s"}`)
+                  : (src.path || src.url)}
+              </div>
               {/* Disk usage */}
               {usedPct !== null && (
                 <>

@@ -21,6 +21,8 @@ export interface GameConfig {
   /** Persisted snapshot of deps at last install time. */
   deps_snapshot?: string[];
   steamgriddb_game_id?: number;
+  /** Unsigned shortcut app id — set for games from the Steam Shortcuts source. */
+  shortcut_app_id?: number;
 }
 
 export interface GameFolder {
@@ -88,7 +90,7 @@ declare global {
 
 // ── Multi-source types ────────────────────────────────────────────────────────
 
-export type SourceType = "local" | "mount" | "agent";
+export type SourceType = "local" | "mount" | "agent" | "steam_shortcuts";
 
 export interface Source {
   id: string;
@@ -97,6 +99,7 @@ export interface Source {
   path: string | null;
   url: string | null;
   enabled: boolean;
+  builtin?: boolean;
 }
 
 export interface SourceCapabilities {
