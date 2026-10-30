@@ -20,16 +20,22 @@ def _is_under(path: str, root: str) -> bool:
 def build_ownership(sources: list, load_games: LoadGames) -> tuple:
     """Return (lower-cased owned names, owned source paths) across all non-builtin sources.
 
-    Disabled sources count as owners. A source whose games can't be read still
-    owns everything under its path.
+    Agent sources are skipped entirely (no names, no paths, never loaded) — they have
+    no local path and loading them is a network call we don't want on every scan.
+    Disabled sources still contribute their path (so the orphan scan doesn't treat
+    their games as orphans) but are not loaded for names. Enabled local/mount sources
+    contribute both their path and their games' names; a source whose games can't be
+    read still owns everything under its path.
     """
     names: set = set()
     paths: list = []
     for source in sources:
-        if source.get("builtin"):
+        if source.get("builtin") or source.get("type") == "agent":
             continue
         if source.get("path"):
             paths.append(os.path.normpath(source["path"]))
+        if source.get("enabled") is False:
+            continue
         try:
             games = load_games(source) or []
         except Exception:
@@ -70,7 +76,7 @@ def _snapshot(game: dict) -> str:
     return json.dumps({
         "name": game["name"],
         "executable": game["executable"],
-        "start_dir": game["start_dir"],
+        "start_dir": game["start_dir"] or None,
         "launch_options": game["launch_options"] or None,
         "proton_version": game["proton_version"],
         "collections": game["collections"],
@@ -108,6 +114,12 @@ def load_shortcut_games(sources: list, load_games: LoadGames) -> list:
             "collections": o["collections"],
             "proton_version": o["current_proton"],
             "shortcut_app_id": o["unsigned_appid"],
+            # The VDF launch_options string already contains any launcher prefix
+            # (MangoHud, gamescope, etc). A stored selected_launchers would make
+            # GameDetail's buildLaunchOptions prepend the same launcher again on
+            # every Update, duplicating it. Orphan shortcuts have no concept of
+            # "selected launchers" separate from the raw launch_options string.
+            "selected_launchers": [],
         })
         game["steam_snapshot"] = _snapshot(game)
         games.append(game)

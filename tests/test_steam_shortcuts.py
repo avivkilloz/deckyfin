@@ -42,9 +42,38 @@ def _loader(names_by_source):
 
 def test_build_ownership_includes_disabled_and_skips_builtin(tmp_path, monkeypatch):
     mod = _reload(tmp_path, monkeypatch)
-    names, paths = mod.build_ownership(SOURCES, _loader({"a": ["Halo"], "b": ["Doom"]}))
-    assert names == {"halo", "doom"}
+    calls = []
+
+    def load(source):
+        calls.append(source["id"])
+        return [{"name": n} for n in {"a": ["Halo"], "b": ["Doom"]}.get(source["id"], [])]
+
+    names, paths = mod.build_ownership(SOURCES, load)
+    # Disabled source b contributes its path (so its games aren't flagged as
+    # orphans) but is never loaded, so its name doesn't show up.
+    assert names == {"halo"}
     assert paths == ["/games", "/mnt/nas/games"]
+    assert calls == ["a"]
+
+
+def test_build_ownership_skips_agent_source_entirely(tmp_path, monkeypatch):
+    mod = _reload(tmp_path, monkeypatch)
+    sources = SOURCES + [
+        {"id": "c", "type": "agent", "url": "http://x", "enabled": True, "builtin": False},
+    ]
+    calls = []
+
+    def load(source):
+        calls.append(source["id"])
+        if source["id"] == "c":
+            return [{"name": "ShouldNotAppear"}]
+        return [{"name": n} for n in {"a": ["Halo"]}.get(source["id"], [])]
+
+    names, paths = mod.build_ownership(sources, load)
+    assert names == {"halo"}
+    assert "shouldnotappear" not in names
+    assert paths == ["/games", "/mnt/nas/games"]
+    assert "c" not in calls
 
 
 def test_build_ownership_unreadable_source_keeps_path(tmp_path, monkeypatch):
@@ -128,6 +157,31 @@ def test_load_shortcut_games_builds_config_and_merges_store(tmp_path, monkeypatc
     assert list(json.loads(g["steam_snapshot"]).keys()) == [
         "name", "executable", "start_dir", "launch_options", "proton_version", "collections",
     ]
+
+
+def test_load_shortcut_games_drops_stored_selected_launchers(tmp_path, monkeypatch):
+    mod = _reload(tmp_path, monkeypatch)
+    _write_store(tmp_path, [{"name": "Leftover", "selected_launchers": ["MangoHud"]}])
+    monkeypatch.setattr(mod, "list_nonsteam_games", lambda: [
+        _sc("Leftover", "/old/l.exe", 42, launch_options="mangohud %command%"),
+    ])
+    games = mod.load_shortcut_games(SOURCES, _loader({}))
+    assert len(games) == 1
+    # The VDF launch_options string already contains the launcher prefix; a
+    # surviving stored selected_launchers would make GameDetail's
+    # buildLaunchOptions prepend it a second time on every Update.
+    assert games[0]["selected_launchers"] == []
+
+
+def test_snapshot_normalizes_empty_start_dir_and_launch_options_to_null(tmp_path, monkeypatch):
+    mod = _reload(tmp_path, monkeypatch)
+    monkeypatch.setattr(mod, "list_nonsteam_games", lambda: [
+        _sc("Leftover", "/old/l.exe", 42, start_dir="", launch_options=""),
+    ])
+    games = mod.load_shortcut_games(SOURCES, _loader({}))
+    snapshot = json.loads(games[0]["steam_snapshot"])
+    assert snapshot["start_dir"] is None
+    assert snapshot["launch_options"] is None
 
 
 def test_load_shortcut_games_prunes_stale_store_entries(tmp_path, monkeypatch):
