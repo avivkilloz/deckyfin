@@ -69,10 +69,11 @@ from deckyfin_sources import (
     migrate_games_folder_to_source as _migrate_games_folder_to_source,
     load_source_games as _load_source_games,
     ensure_builtin_sources as _ensure_builtin_sources,
+    source_config_root as _source_config_root,
 )
 from steam_utils import get_user_id, list_steam_users
 from steam_games import convert_appid_to_unsigned_32bit
-from deckyfin_steam_shortcuts import upsert_store_entry as _upsert_shortcut_store_entry
+from deckyfin_steam_shortcuts import upsert_store_entry as _upsert_shortcut_store_entry, attach_orphans_by_name as _attach_orphans_by_name
 from deckyfin_consts import APP_NAME, APP_VERSION, STEAM_SHORTCUTS_SOURCE_TYPE
 
 DEBUG_LOG = Path(os.environ.get("DECKY_PLUGIN_RUNTIME_DIR", str(Path(__file__).parent))) / "debug.log"
@@ -1087,7 +1088,8 @@ class Plugin:
                     "source_type": source["type"],
                     "config": game,
                 })
-        return list(merged.values())
+        # Orphan shortcuts sharing a name with a source game become a second source of it
+        return _attach_orphans_by_name(list(merged.values()))
 
     async def get_game(self, name: str, source_id: Optional[str] = None) -> dict:
         source = _get_source_by_id(source_id) if source_id else (_list_sources() or [None])[0]
@@ -1874,21 +1876,29 @@ class Plugin:
             from deckyfin_config import get_game_config
 
             source = _get_source_by_id(source_id)
-            if not source or not source.get("path"):
+            root = _source_config_root(source) if source else None
+            if not source or not root:
                 return {"success": False, "error": "Source not found or has no path"}
+            root = str(root)
+            is_shortcut = source.get("type") == STEAM_SHORTCUTS_SOURCE_TYPE
 
-            cfg = get_game_config(game_name, source.get("path"))
-            if not cfg:
+            cfg = get_game_config(game_name, root)
+            sync_paths = (cfg or {}).get("proton_sync_paths", [])
+            if not cfg and not is_shortcut:
                 return {"success": False, "error": "Game config not found"}
-
-            sync_paths = cfg.get("proton_sync_paths", [])
             if not sync_paths:
                 return {"success": False, "error": "No save paths configured — add paths in the Save Paths section"}
 
-            game_rel = cfg.get("path")
-            if not game_rel:
-                return {"success": False, "error": "Game folder path not set in config"}
-            game_folder = os.path.join(source.get("path"), game_rel)
+            if is_shortcut:
+                # Orphan shortcuts have no game folder; prefix and userdata:// paths still work
+                if any(p.startswith("game://") for p in sync_paths):
+                    return {"success": False, "error": "This game has no game folder — game:// save paths aren't supported for Steam Shortcuts"}
+                game_folder = None
+            else:
+                game_rel = cfg.get("path")
+                if not game_rel:
+                    return {"success": False, "error": "Game folder path not set in config"}
+                game_folder = os.path.join(root, game_rel)
 
             has_prefix_paths = any(
                 not p.startswith("game://") and not p.startswith("userdata://")
@@ -1898,7 +1908,7 @@ class Plugin:
             if has_prefix_paths and not prefix_path:
                 return {"success": False, "error": f"Proton prefix not found for app {shortcut_app_id} — init the prefix first"}
 
-            saves_dir = get_saves_dir(source.get("path"), game_name)
+            saves_dir = get_saves_dir(root, game_name)
             sync_id = _uuid.uuid4().hex[:8]
             _save_sync_registry[sync_id] = {
                 "sync_id": sync_id, "game_name": game_name, "source_id": source_id,
@@ -1945,8 +1955,12 @@ class Plugin:
             if not from_source or not to_source:
                 return {"success": False, "error": "Source not found"}
 
-            from_saves = get_saves_dir(from_source.get("path"), game_name)
-            to_saves = get_saves_dir(to_source.get("path"), game_name)
+            from_root = _source_config_root(from_source)
+            to_root = _source_config_root(to_source)
+            if not from_root or not to_root:
+                return {"success": False, "error": "Source has no path"}
+            from_saves = get_saves_dir(str(from_root), game_name)
+            to_saves = get_saves_dir(str(to_root), game_name)
             _debug(f"copy_saves_between_sources: {game_name!r} {from_saves!r} → {to_saves!r}")
 
             sync_id = _uuid.uuid4().hex[:8]

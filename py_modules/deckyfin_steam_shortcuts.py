@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Callable
 
 from deckyfin_config import get_app_config_path, get_games_config, get_games_config_file, save_games_config
+from deckyfin_consts import STEAM_SHORTCUTS_SOURCE_TYPE
 from steam_games import list_nonsteam_games
 
 LoadGames = Callable[[dict], list]
@@ -31,12 +32,13 @@ def build_ownership(sources: list, load_games: LoadGames) -> tuple:
     owns only the games listed in it — so a game removed from the source but left
     in Steam becomes an orphan. When the list is unknown (disabled, offline mount,
     unreadable config) the source falls back to owning everything under its path.
-    Agent sources are skipped entirely: no local path, and loading is a network call.
+    Only local sources take part: mount and agent sources can't add games to Steam,
+    so a same-named game there must not hide an orphan.
     """
     names: set = set()
     paths: list = []
     for source in sources:
-        if source.get("builtin") or source.get("type") == "agent":
+        if source.get("builtin") or source.get("type") != "local":
             continue
         path = source.get("path")
         games = None
@@ -51,6 +53,27 @@ def build_ownership(sources: list, load_games: LoadGames) -> tuple:
             continue
         names.update(g["name"].lower() for g in games if g.get("name"))
     return names, paths
+
+
+def attach_orphans_by_name(games: list) -> list:
+    """Fold each orphan-only merged game into a non-orphan game with the same name.
+
+    `games` is get_games' merged list ({id, name, sources: [{source_type, ...}]}).
+    The orphan's source entry is appended to the matching game, so the game page
+    can switch between it and the other source (e.g. to copy saves).
+    """
+    def is_orphan(g):
+        return bool(g["sources"]) and all(s["source_type"] == STEAM_SHORTCUTS_SOURCE_TYPE for s in g["sources"])
+
+    by_name = {g["name"].lower(): g for g in games if not is_orphan(g)}
+    out = []
+    for g in games:
+        target = by_name.get(g["name"].lower()) if is_orphan(g) else None
+        if target is not None:
+            target["sources"].extend(g["sources"])
+        else:
+            out.append(g)
+    return out
 
 
 def find_orphans(shortcuts: list, owned_names: set, owned_paths: list) -> list:

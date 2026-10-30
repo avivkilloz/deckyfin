@@ -82,7 +82,7 @@ def test_build_ownership_disabled_source_owns_by_path_without_loading(tmp_path, 
 def test_build_ownership_missing_config_owns_by_path(tmp_path, monkeypatch):
     """Offline/unmounted source: config file absent → fall back to the folder rule."""
     mod = _reload(tmp_path, monkeypatch)
-    src = {"id": "a", "type": "mount", "path": str(tmp_path / "offline"), "enabled": True, "builtin": False}
+    src = {"id": "a", "type": "local", "path": str(tmp_path / "offline"), "enabled": True, "builtin": False}
     names, paths = mod.build_ownership([src], _real_loader)
     assert names == set()
     assert paths == [src["path"]]
@@ -125,6 +125,48 @@ def test_leftover_under_readable_source_is_orphan(tmp_path, monkeypatch):
     ])
     orphans = mod.list_orphan_shortcuts([src], _real_loader)
     assert [o["name"] for o in orphans] == ["Bloodborne"]
+
+
+def test_build_ownership_ignores_non_local_sources(tmp_path, monkeypatch):
+    """Mount sources can't add games to Steam, so they never own shortcuts."""
+    mod = _reload(tmp_path, monkeypatch)
+    mount = _readable_source(tmp_path, "m", ["God Of War"])
+    mount["type"] = "mount"
+    disabled_mount = {"id": "d", "type": "mount", "path": "/mnt/nas/games", "enabled": False, "builtin": False}
+    calls = []
+
+    def load(source):
+        calls.append(source["id"])
+        return [{"name": "God Of War"}]
+
+    names, paths = mod.build_ownership([mount, disabled_mount], load)
+    assert names == set()
+    assert paths == []
+    assert calls == []
+
+
+def _merged(gid, name, *source_types):
+    return {"id": gid, "name": name, "sources": [
+        {"source_id": t, "source_name": t, "source_type": t, "config": {"name": name}} for t in source_types
+    ]}
+
+
+def test_attach_orphans_by_name_merges_into_same_name_game(tmp_path, monkeypatch):
+    mod = _reload(tmp_path, monkeypatch)
+    games = [
+        _merged("god-of-war", "God Of War", "mount"),
+        _merged("shortcut-1", "god of war", "steam_shortcuts"),
+        _merged("shortcut-2", "Bloodborne", "steam_shortcuts"),
+    ]
+    out = mod.attach_orphans_by_name(games)
+    assert [g["id"] for g in out] == ["god-of-war", "shortcut-2"]
+    assert [s["source_type"] for s in out[0]["sources"]] == ["mount", "steam_shortcuts"]
+
+
+def test_attach_orphans_by_name_leaves_unmatched_alone(tmp_path, monkeypatch):
+    mod = _reload(tmp_path, monkeypatch)
+    games = [_merged("halo", "Halo", "local"), _merged("shortcut-2", "Bloodborne", "steam_shortcuts")]
+    assert mod.attach_orphans_by_name(games) == games
 
 
 def test_find_orphans_name_match_is_case_insensitive(tmp_path, monkeypatch):

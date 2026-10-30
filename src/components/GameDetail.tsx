@@ -888,6 +888,19 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
     }
   };
 
+  // Saves can go to any other source of this game, or to any other writable user
+  // source (saves land in <source>/.deckyfin/saves/<game>/ even without the game there).
+  const copySavesDests: GameSource[] = [
+    ...game.sources.filter((s) => s.source_id !== selectedSource?.source_id),
+    ...allSources
+      .filter((s) => s.enabled !== false && s.type !== "agent" && !s.builtin && !game.sources.some((gs) => gs.source_id === s.id))
+      .map((s) => ({ source_id: s.id, source_name: s.name, source_type: s.type, config: { name: game.name, executable: "" } })),
+  ];
+  // Config copies need a real source folder on both ends.
+  const copyConfigDests = game.sources.filter(
+    (s) => s.source_id !== selectedSource?.source_id && s.source_type !== "steam_shortcuts",
+  );
+
   const handleCopySaves = async () => {
     if (!copySavesDest) return;
     setCopySavesConfirming(false);
@@ -2039,7 +2052,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
       </div>
 
       {/* Save Paths */}
-      {!isShortcutSource && (
+      {(
       <div style={{ border: "1px solid #3a3a3a", borderRadius: "6px", marginBottom: "8px" }}>
         <Focusable onActivate={() => setShowSavePaths((v) => !v)} onClick={() => setShowSavePaths((v) => !v)} focusClassName="is-focused"
           style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", cursor: "pointer", background: "#1e1e1e", borderRadius: showSavePaths ? "6px 6px 0 0" : "6px" }}>
@@ -2079,7 +2092,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
               { label: "Local", path: "drive_c/users/steamuser/AppData/Local" },
               { label: "Documents", path: "drive_c/users/Public/Documents" },
               { label: "Saved Games", path: "drive_c/users/steamuser/Saved Games" },
-              { label: "Game Folder", path: "game://" },
+              ...(isShortcutSource ? [] : [{ label: "Game Folder", path: "game://" }]),
               ...customSavePrefixes.filter((cp) => !["Roaming","LocalLow","Local","Documents","Saved Games","Game Folder","Custom","Browse"].includes(cp.label)),
               { label: "Custom", path: "" },
               { label: "Browse", path: "" },
@@ -2561,14 +2574,14 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
         </div>
 
       {/* ── Transfer Actions ──────────────────────────────────────────────── */}
-      {!isShortcutSource && (game.sources.length >= 2 ||
+      {((!isShortcutSource && (copyConfigDests.length > 0 ||
         allSources.some(
           (s) =>
             s.type !== "agent" &&
             !s.builtin &&
             !game.sources.some((gs) => gs.source_id === s.id),
-        ) ||
-        (game.sources.length >= 2 && syncPaths.length > 0)) && (
+        ))) ||
+        (copySavesDests.length > 0 && syncPaths.length > 0)) && (
         <div style={{ border: "1px solid #3a3a3a", borderRadius: "6px", marginBottom: "8px" }}>
           <Focusable
             onActivate={() => setShowTransferActions((v) => !v)}
@@ -2585,7 +2598,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
             Copy this game or its settings between sources. Copy Game transfers the game files to another location, Copy Config replicates its Deckyfin configuration to another source, and Copy Saves moves save data between sources.
           </p>
           {/* Copy game block */}
-          {allSources.some((s) => s.type !== "agent" && !s.builtin && !game.sources.some((gs) => gs.source_id === s.id)) && (
+          {!isShortcutSource && allSources.some((s) => s.type !== "agent" && !s.builtin && !game.sources.some((gs) => gs.source_id === s.id)) && (
             <div style={{ marginBottom: "6px" }}>
               <Focusable
                 onActivate={() => {
@@ -2646,7 +2659,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
           )}
 
           {/* Copy config block */}
-          {game.sources.length >= 2 && (
+          {!isShortcutSource && copyConfigDests.length > 0 && (
             <div style={{ marginBottom: "6px" }}>
               <Focusable
                 onActivate={() => {
@@ -2669,8 +2682,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
 
               {showCopyConfigPicker && !copyConfigConfirming && (
                 <div style={{ border: "1px solid #555", borderRadius: "4px", padding: "2px 0", marginTop: "4px" }}>
-                  {game.sources
-                    .filter((s) => s.source_id !== selectedSource.source_id)
+                  {copyConfigDests
                     .map((src) => (
                       <Focusable
                         key={src.source_id}
@@ -2707,7 +2719,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
           )}
 
           {/* Copy saves block */}
-          {game.sources.length >= 2 && syncPaths.length > 0 && (
+          {copySavesDests.length > 0 && syncPaths.length > 0 && (
             <div style={{ marginBottom: "6px" }}>
               <Focusable
                 onActivate={() => { setShowCopySavesPicker((v) => !v); setCopySavesDest(null); setCopySavesConfirming(false); }}
@@ -2718,7 +2730,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
               </Focusable>
               {showCopySavesPicker && !copySavesConfirming && (
                 <div style={{ border: "1px solid #555", borderRadius: "4px", padding: "2px 0", marginTop: "4px" }}>
-                  {game.sources.filter((s) => s.source_id !== selectedSource.source_id).map((src) => (
+                  {copySavesDests.map((src) => (
                     <Focusable key={src.source_id}
                       onActivate={() => { setCopySavesDest(src); setShowCopySavesPicker(false); setCopySavesConfirming(true); }}
                       onClick={() => { setCopySavesDest(src); setShowCopySavesPicker(false); setCopySavesConfirming(true); }}
@@ -2898,7 +2910,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
       )}
 
       {/* ── Save Actions ───────────────────────────────────────────────────── */}
-      {!isShortcutSource && syncPaths.length > 0 && (capabilities.can_write_config || !!steamInfo) && (
+      {syncPaths.length > 0 && (capabilities.can_write_config || !!steamInfo) && (
         <div style={{ border: "1px solid #3a3a3a", borderRadius: "6px", marginBottom: "8px" }}>
           <Focusable onActivate={() => setShowSaveActions((v) => !v)} onClick={() => setShowSaveActions((v) => !v)} focusClassName="is-focused"
             style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", cursor: "pointer", background: "#1e1e1e", borderRadius: showSaveActions ? "6px 6px 0 0" : "6px" }}>

@@ -77,7 +77,9 @@ def list_orphan_shortcuts(sources: list[dict]) -> list[dict]
 
 1. Read shortcuts via `list_nonsteam_games()` (current Steam user), extended to
    also return `start_dir`, `launch_options` and `tags` per shortcut.
-2. For each non-builtin, non-agent source, decide whether its game list is
+2. Only **local** sources take part (mount and agent sources can't add games
+   to Steam, so a same-named game there must not hide an orphan). For each
+   local source, decide whether its game list is
    **known**: enabled, its `.deckyfin/config.json` exists, and it loads without
    error.
    - Known → it owns the lower-cased names in its config (**name rule only**).
@@ -87,7 +89,6 @@ def list_orphan_shortcuts(sources: list[dict]) -> list[dict]
      shortcut whose exe is under its `path` (**folder rule**), using
      `os.path.normpath` (not resolved — resolving can hang on an offline
      network mount). Disabled sources are never read.
-   - Agent sources are skipped (no local path; loading is a network call).
 3. A shortcut is **owned** if its name is owned by a known source, or its exe
    is under an unknown source's path. Otherwise it is an orphan.
 
@@ -110,7 +111,13 @@ orphan, returns a game config:
 | `shortcut_app_id` | stored shortcut `appid` (unsigned) |
 | other fields | from the Deckyfin store entry with the same name |
 
-Shortcut-derived fields win over stored values. `get_games` therefore includes
+Shortcut-derived fields win over stored values.
+
+**Merging with same-name games:** after `get_games` builds its merged list, an
+orphan whose name (case-insensitive) matches a game from another enabled source
+is appended as an extra source of that game (`attach_orphans_by_name`), so the
+game page can switch to it — e.g. to back up the orphan's prefix saves and copy
+them to the mount source. Unmatched orphans stay separate games. `get_games` therefore includes
 orphans only when the built-in source is enabled (existing `enabled` guard).
 
 ### Capabilities and disk usage
@@ -141,12 +148,17 @@ When the selected source's `source_type === "steam_shortcuts"`:
   prefix and artwork).
 - **Exe picker:** browses starting from the current exe's directory using the
   existing folder browser, instead of scanning a game folder.
-- **Kept:** Init prefix, Install deps, Artwork (SteamGridDB), Remove from
-  Steam, Purge. After Remove/Purge the game is no longer an orphan → navigate
-  back to the library.
-- **Hidden:** Add to Steam, Copy config, Transfer, delete game folder, Save
-  backup/restore (backups are stored inside the game's source folder, which
-  orphans don't have).
+- **Kept:** Init prefix, Install deps, Artwork (SteamGridDB), Save Paths,
+  Save backup/restore, Copy Saves, Remove from Steam, Purge. After
+  Remove/Purge the game is no longer an orphan → navigate back to the library.
+- **Saves:** backups go to `~/.config/deckyfin/steam_shortcuts/.deckyfin/saves/<game>/`
+  (the built-in source's config root). Prefix and `userdata://` save paths
+  work; `game://` paths are rejected (no game folder) and the "Game Folder"
+  chip is hidden.
+- **Hidden:** Add to Steam, Copy Game, Copy Config, delete game folder.
+- **Copy Saves destinations (all games):** the game's other sources plus every
+  enabled, non-agent, non-builtin source — saves land in
+  `<source>/.deckyfin/saves/<game>/` even if the game isn't in that source.
 - Built-in sources are excluded from the library's "Add Games to Steam" and
   "Backup All Saves" source pickers.
 - Built-in sources are excluded from all source/transfer pickers.
