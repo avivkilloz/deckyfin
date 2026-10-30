@@ -173,6 +173,8 @@ def test_load_library_games_store_values_win(tmp_path, monkeypatch):
     assert g["selected_launchers"] == ["MangoHud"]
     assert g["proton_dependencies"] == ["vcrun2019"]
     assert g["collections"] == ["MMO"]
+    snap = json.loads(g["steam_snapshot"])
+    assert snap["collections"] == []
 
 
 def test_load_library_games_prunes_uninstalled(tmp_path, monkeypatch):

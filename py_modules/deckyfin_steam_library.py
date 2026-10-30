@@ -192,6 +192,7 @@ def load_library_games(steam_root: Path = None, user_id: str = None) -> list:
             "collections": entry.get("collections") or [],
         }
         game["steam_snapshot"] = _snapshot({**game, "launch_options": g["steam_launch_options"],
-                                            "proton_version": g["proton_version"]})
+                                            "proton_version": g["proton_version"],
+                                            "collections": []})
         games.append(game)
     return games
