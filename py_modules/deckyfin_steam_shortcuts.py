@@ -158,9 +158,12 @@ def load_shortcut_games(sources: list, load_games: LoadGames) -> list:
     return games
 
 
-def upsert_store_entry(name: str, updates: dict) -> dict:
-    """Merge `updates` into the stored entry for `name`, creating it if missing."""
-    root = store_root()
+def upsert_store_entry(name: str, updates: dict, root: Path = None) -> dict:
+    """Merge `updates` into the stored entry for `name`, creating it if missing.
+
+    `root` is the built-in source's config root (defaults to the Steam Shortcuts store).
+    """
+    root = root or store_root()
     config = get_games_config(root)
     games = config.get("games", [])
     for g in games:

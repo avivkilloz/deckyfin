@@ -1,5 +1,6 @@
 """Steam Library built-in source — installed Steam Store games."""
 
+import json
 import os
 from pathlib import Path
 
@@ -121,4 +122,76 @@ def list_installed_games(steam_root: Path, compat: dict, launch: dict) -> list:
                 "size_on_disk": int(_ci_get(state, "SizeOnDisk", 0) or 0),
                 "steam_launch_options": launch.get(str(appid), ""),
             })
+    return games
+
+
+def store_root() -> Path:
+    """Folder whose .deckyfin/config.json holds Deckyfin-only data for Store games."""
+    from deckyfin_config import get_app_config_path
+    return get_app_config_path() / "steam_library"
+
+
+def _snapshot(game: dict) -> str:
+    # Key order must match GameDetail's steamNeedsSync object (executable/start_dir
+    # are undefined for Store games and dropped by JSON.stringify).
+    return json.dumps({
+        "name": game["name"],
+        "launch_options": game["launch_options"] or None,
+        "proton_version": game["proton_version"],
+        "collections": game["collections"],
+    })
+
+
+def load_library_games(steam_root: Path = None, user_id: str = None) -> list:
+    """Game configs for installed Store games, merged with stored Deckyfin data."""
+    from deckyfin_config import get_games_config, save_games_config
+    try:
+        if steam_root is None:
+            from steam_utils import find_steam_root
+            steam_root = find_steam_root()
+        if user_id is None:
+            from steam_utils import get_user_id
+            user_id = get_user_id()
+    except Exception:
+        return []
+    if not steam_root:
+        return []
+    installed = list_installed_games(
+        Path(steam_root), read_compat_mapping(Path(steam_root)), read_launch_options(Path(steam_root), user_id),
+    )
+    root = store_root()
+    config = get_games_config(root)
+    stored_list = config.get("games", [])
+    stored = {g.get("name"): g for g in stored_list}
+
+    if installed:  # skip pruning on an empty scan (e.g. library temporarily unavailable)
+        names = {g["name"] for g in installed}
+        kept = [g for g in stored_list if g.get("name") in names]
+        if len(kept) != len(stored_list):
+            try:
+                save_games_config({**config, "games": kept}, root)
+            except Exception:
+                pass
+
+    games = []
+    for g in installed:
+        entry = dict(stored.get(g["name"]) or {})
+        game = {
+            **entry,
+            "id": f"steam-{g['appid']}",
+            "name": g["name"],
+            "steam_app_id": g["appid"],
+            "library_path": g["library_path"],
+            "install_dir": g["install_dir"],
+            "prefix_path": g["prefix_path"],
+            "has_prefix": g["has_prefix"],
+            "size_on_disk": g["size_on_disk"],
+            "launch_options": entry["launch_options"] if "launch_options" in entry else g["steam_launch_options"],
+            "proton_version": entry["proton_version"] if "proton_version" in entry else g["proton_version"],
+            "selected_launchers": entry.get("selected_launchers") or [],
+            "collections": entry.get("collections") or [],
+        }
+        game["steam_snapshot"] = _snapshot({**game, "launch_options": g["steam_launch_options"],
+                                            "proton_version": g["proton_version"]})
+        games.append(game)
     return games

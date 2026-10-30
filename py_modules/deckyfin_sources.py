@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Optional
 
 from deckyfin_config import get_app_config, set_app_config, get_games_config, get_app_config_path
-from deckyfin_consts import SOURCES_FILE, STEAM_SHORTCUTS_SOURCE_ID, STEAM_SHORTCUTS_SOURCE_TYPE
+from deckyfin_consts import SOURCES_FILE, STEAM_SHORTCUTS_SOURCE_ID, STEAM_SHORTCUTS_SOURCE_TYPE, STEAM_LIBRARY_SOURCE_ID, STEAM_LIBRARY_SOURCE_TYPE, BUILTIN_SOURCE_TYPES
 
 
 # ── Filesystem helpers ────────────────────────────────────────────────────────
@@ -150,6 +150,15 @@ _BUILTIN_SOURCES = [
         "path": None,
         "url": None,
     },
+    {
+        "id": STEAM_LIBRARY_SOURCE_ID,
+        "name": "Steam Library",
+        "type": STEAM_LIBRARY_SOURCE_TYPE,
+        "builtin": True,
+        "enabled": False,
+        "path": None,
+        "url": None,
+    },
 ]
 
 
@@ -166,6 +175,8 @@ def ensure_builtin_sources() -> bool:
 
 def source_config_root(source: dict) -> Optional[Path]:
     """Folder holding a source's .deckyfin/config.json (built-in sources live in the app config dir)."""
+    if source.get("type") == STEAM_LIBRARY_SOURCE_TYPE:
+        return get_app_config_path() / "steam_library"
     if source.get("type") == STEAM_SHORTCUTS_SOURCE_TYPE:
         return get_app_config_path() / "steam_shortcuts"
     path = source.get("path")
@@ -212,7 +223,7 @@ def _agent_get(url: str, path: str) -> dict:
 def detect_capabilities(source: dict) -> dict:
     """Return {can_play, can_write_config, can_download_to} for a source."""
     t = source.get("type")
-    if t == STEAM_SHORTCUTS_SOURCE_TYPE:
+    if t in BUILTIN_SOURCE_TYPES:
         return {"can_play": True, "can_write_config": True, "can_download_to": False}
     if t == "agent":
         try:
@@ -238,7 +249,7 @@ def get_disk_usage(source: dict) -> dict:
     """Return {used, total, free} in bytes. Returns None values on failure."""
     null = {"used": None, "total": None, "free": None}
     t = source.get("type")
-    if t == STEAM_SHORTCUTS_SOURCE_TYPE:
+    if t in BUILTIN_SOURCE_TYPES:
         return null
     if t == "agent":
         try:
@@ -263,6 +274,9 @@ def load_source_games(source: dict) -> list:
     if t == STEAM_SHORTCUTS_SOURCE_TYPE:
         from deckyfin_steam_shortcuts import load_shortcut_games  # local import: avoids cycle
         return load_shortcut_games(list_sources(), load_source_games)
+    if t == STEAM_LIBRARY_SOURCE_TYPE:
+        from deckyfin_steam_library import load_library_games  # local import: avoids cycle
+        return load_library_games()
     if t == "agent":
         try:
             return _agent_get(source["url"], "/games")

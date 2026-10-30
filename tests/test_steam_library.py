@@ -124,3 +124,77 @@ def test_read_launch_options(tmp_path, monkeypatch):
     )
     assert mod.read_launch_options(root, "42") == {"216150": "-dx11 %command%"}
     assert mod.read_launch_options(root, "missing") == {}
+
+
+def _store(tmp_path, games):
+    d = tmp_path / ".config" / "deckyfin" / "steam_library" / ".deckyfin"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "config.json").write_text(json.dumps({"games": games}))
+    return d / "config.json"
+
+
+def _setup_one_game(tmp_path):
+    root = tmp_path / "Steam"
+    _library_folders(root, root)
+    _manifest(root, 216150, "MapleStory")
+    (root / "steamapps" / "compatdata" / "216150" / "pfx").mkdir(parents=True)
+    return root
+
+
+def test_load_library_games_seeds_from_steam(tmp_path, monkeypatch):
+    mod = _reload(tmp_path, monkeypatch)
+    root = _setup_one_game(tmp_path)
+    monkeypatch.setattr(mod, "read_compat_mapping", lambda r: {"216150": "proton_9"})
+    monkeypatch.setattr(mod, "read_launch_options", lambda r, u: {"216150": "-dx11"})
+    [g] = mod.load_library_games(root, "42")
+    assert g["id"] == "steam-216150"
+    assert g["steam_app_id"] == 216150
+    assert g["launch_options"] == "-dx11"
+    assert g["selected_launchers"] == []
+    assert g["proton_version"] == "proton_9"
+    assert g["collections"] == []
+    assert g["has_prefix"] is True
+    snap = json.loads(g["steam_snapshot"])
+    assert list(snap) == ["name", "launch_options", "proton_version", "collections"]
+    assert snap == {"name": "MapleStory", "launch_options": "-dx11", "proton_version": "proton_9", "collections": []}
+
+
+def test_load_library_games_store_values_win(tmp_path, monkeypatch):
+    mod = _reload(tmp_path, monkeypatch)
+    root = _setup_one_game(tmp_path)
+    _store(tmp_path, [{"name": "MapleStory", "launch_options": "", "proton_version": None,
+                       "selected_launchers": ["MangoHud"], "proton_dependencies": ["vcrun2019"],
+                       "collections": ["MMO"]}])
+    monkeypatch.setattr(mod, "read_compat_mapping", lambda r: {"216150": "proton_9"})
+    monkeypatch.setattr(mod, "read_launch_options", lambda r, u: {"216150": "-dx11"})
+    [g] = mod.load_library_games(root, "42")
+    assert g["launch_options"] == ""
+    assert g["proton_version"] is None
+    assert g["selected_launchers"] == ["MangoHud"]
+    assert g["proton_dependencies"] == ["vcrun2019"]
+    assert g["collections"] == ["MMO"]
+
+
+def test_load_library_games_prunes_uninstalled(tmp_path, monkeypatch):
+    mod = _reload(tmp_path, monkeypatch)
+    root = _setup_one_game(tmp_path)
+    cfg = _store(tmp_path, [{"name": "MapleStory"}, {"name": "Uninstalled"}])
+    mod.load_library_games(root, "42")
+    assert [g["name"] for g in json.loads(cfg.read_text())["games"]] == ["MapleStory"]
+
+
+def test_load_library_games_no_prune_when_empty(tmp_path, monkeypatch):
+    mod = _reload(tmp_path, monkeypatch)
+    root = tmp_path / "Steam"
+    (root / "steamapps").mkdir(parents=True)
+    cfg = _store(tmp_path, [{"name": "MapleStory"}])
+    assert mod.load_library_games(root, "42") == []
+    assert [g["name"] for g in json.loads(cfg.read_text())["games"]] == ["MapleStory"]
+
+
+def test_load_source_games_dispatches_steam_library(tmp_path, monkeypatch):
+    mod = _reload(tmp_path, monkeypatch)
+    import deckyfin_sources
+    monkeypatch.setattr(mod, "load_library_games", lambda *a, **k: [{"id": "steam-1", "name": "X"}])
+    src = {"id": "steam-library", "type": "steam_library", "path": None, "builtin": True}
+    assert deckyfin_sources.load_source_games(src) == [{"id": "steam-1", "name": "X"}]

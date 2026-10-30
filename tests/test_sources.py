@@ -340,7 +340,7 @@ def test_ensure_builtin_sources_adds_disabled_record(tmp_path, monkeypatch):
     mod = _reload_sources(tmp_path, monkeypatch)
     assert mod.ensure_builtin_sources() is True
     sources = mod.list_sources()
-    assert [s["id"] for s in sources] == ["a", "steam-shortcuts"]
+    assert [s["id"] for s in sources] == ["a", "steam-shortcuts", "steam-library"]
     b = sources[1]
     assert b["type"] == "steam_shortcuts"
     assert b["name"] == "Steam Shortcuts"
@@ -353,12 +353,14 @@ def test_ensure_builtin_sources_idempotent_and_preserves_state(tmp_path, monkeyp
     _make_app_config(tmp_path, {"sources": [
         {"id": "steam-shortcuts", "name": "Steam Shortcuts", "type": "steam_shortcuts",
          "builtin": True, "enabled": True, "path": None, "url": None},
+        {"id": "steam-library", "name": "Steam Library", "type": "steam_library",
+         "builtin": True, "enabled": False, "path": None, "url": None},
         {"id": "a", "name": "Games", "type": "local", "path": "/g", "url": None},
     ]})
     mod = _reload_sources(tmp_path, monkeypatch)
     assert mod.ensure_builtin_sources() is False
     sources = mod.list_sources()
-    assert [s["id"] for s in sources] == ["steam-shortcuts", "a"]
+    assert [s["id"] for s in sources] == ["steam-shortcuts", "steam-library", "a"]
     assert sources[0]["enabled"] is True
 
 
@@ -366,7 +368,7 @@ def test_ensure_builtin_sources_with_no_sources_key(tmp_path, monkeypatch):
     _make_app_config(tmp_path, {})
     mod = _reload_sources(tmp_path, monkeypatch)
     assert mod.ensure_builtin_sources() is True
-    assert [s["id"] for s in mod.list_sources()] == ["steam-shortcuts"]
+    assert [s["id"] for s in mod.list_sources()] == ["steam-shortcuts", "steam-library"]
 
 
 def test_list_sources_defaults_builtin_false(tmp_path, monkeypatch):
@@ -382,7 +384,7 @@ def test_remove_source_refuses_builtin(tmp_path, monkeypatch):
     mod = _reload_sources(tmp_path, monkeypatch)
     mod.ensure_builtin_sources()
     assert mod.remove_source("steam-shortcuts") is False
-    assert len(mod.list_sources()) == 1
+    assert len(mod.list_sources()) == 2
 
 
 def test_source_config_root(tmp_path, monkeypatch):
@@ -400,3 +402,26 @@ def test_builtin_capabilities_and_disk_usage(tmp_path, monkeypatch):
         "can_play": True, "can_write_config": True, "can_download_to": False,
     }
     assert mod.get_disk_usage(builtin) == {"used": None, "total": None, "free": None}
+
+
+def test_ensure_builtin_sources_adds_steam_library_after_existing(tmp_path, monkeypatch):
+    _make_app_config(tmp_path, {"sources": [
+        {"id": "steam-shortcuts", "name": "Steam Shortcuts", "type": "steam_shortcuts",
+         "builtin": True, "enabled": True, "path": None, "url": None},
+    ]})
+    mod = _reload_sources(tmp_path, monkeypatch)
+    assert mod.ensure_builtin_sources() is True
+    sources = mod.list_sources()
+    assert [s["id"] for s in sources] == ["steam-shortcuts", "steam-library"]
+    assert sources[0]["enabled"] is True
+    lib = sources[1]
+    assert (lib["type"], lib["name"], lib["builtin"], lib["enabled"]) == ("steam_library", "Steam Library", True, False)
+    assert mod.remove_source("steam-library") is False
+
+
+def test_steam_library_config_root_caps_disk(tmp_path, monkeypatch):
+    mod = _reload_sources(tmp_path, monkeypatch)
+    lib = {"id": "steam-library", "type": "steam_library", "path": None}
+    assert mod.source_config_root(lib) == tmp_path / ".config" / "deckyfin" / "steam_library"
+    assert mod.detect_capabilities(lib) == {"can_play": True, "can_write_config": True, "can_download_to": False}
+    assert mod.get_disk_usage(lib) == {"used": None, "total": None, "free": None}
