@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from deckyfin_config import get_app_config, set_app_config
+from deckyfin_steamgrid import _ssl_context
 
 CHANNELS = ("stable", "main")
 DEFAULT_SLUG = "avivkilloz/deckyfin"
@@ -79,13 +80,24 @@ def compare_builds(installed: dict, latest: Optional[dict], channel: str) -> str
     return "update_available" if b > a else "up_to_date"
 
 
+def _default_opener(req, timeout=None):
+    """Default opener — reuses deckyfin_steamgrid's SSL context, since the
+    Decky sandbox often can't find system CA certs on Arch-based systems
+    (SteamOS included) and a plain urlopen() raises SSLCertVerificationError.
+
+    Looked up lazily (via `urllib.request.urlopen`, not bound at import
+    time) so tests can monkeypatch `urllib.request.urlopen` directly.
+    """
+    return urllib.request.urlopen(req, context=_ssl_context(), timeout=timeout)
+
+
 def _get_json(url: str, opener: Callable) -> dict:
     req = urllib.request.Request(url, headers=_HEADERS)
     with opener(req, timeout=_TIMEOUT) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
 
-def fetch_latest(channel: str, slug: str, opener: Callable = urllib.request.urlopen) -> dict:
+def fetch_latest(channel: str, slug: str, opener: Callable = _default_opener) -> dict:
     base = f"https://api.github.com/repos/{slug}"
     url = f"{base}/releases/tags/latest-main" if channel == "main" else f"{base}/releases/latest"
     try:

@@ -3,6 +3,7 @@
 Exposes game management methods to the React frontend via Decky IPC.
 """
 
+import asyncio
 import logging
 import os
 import ssl
@@ -2516,7 +2517,6 @@ class Plugin:
 
     async def get_update_info(self, channel: Optional[str] = None) -> dict:
         """Installed build vs newest build on the channel (GitHub)."""
-        import asyncio
         plugin_dir = Path(__file__).resolve().parent
         ch = channel if channel in ("stable", "main") else get_update_channel()
         installed = read_installed_build(plugin_dir)

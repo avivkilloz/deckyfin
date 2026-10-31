@@ -136,3 +136,25 @@ def test_fetch_latest_missing_release(up):
         raise urllib.error.HTTPError(getattr(req, "full_url", req), 404, "Not Found", {}, None)
     res = up.fetch_latest("main", "x/y", opener=opener)
     assert res["latest"] is None and res["error"] == "No build on this channel yet"
+
+
+def test_fetch_latest_default_opener_passes_ssl_context(up, monkeypatch):
+    """The default opener (used when `fetch_latest` is called without an
+    injected `opener`) must pass an SSL context — the Decky sandbox on
+    Arch-based systems (SteamOS included) often can't find system CA certs,
+    so a plain urlopen() raises SSLCertVerificationError. No real network
+    call happens: urlopen itself is monkeypatched."""
+    captured = {}
+
+    def fake_urlopen(req, context=None, timeout=None):
+        captured["context"] = context
+        captured["url"] = req.full_url if hasattr(req, "full_url") else req
+        return _Resp(json.dumps({**REL, "assets": []}).encode())
+
+    monkeypatch.setattr(up.urllib.request, "urlopen", fake_urlopen)
+
+    res = up.fetch_latest("stable", "x/y")
+
+    assert captured["url"] == "https://api.github.com/repos/x/y/releases/latest"
+    assert captured["context"] is not None
+    assert res == {"latest": None, "error": "No build on this channel yet"}
