@@ -605,17 +605,18 @@ export const GameLibrary: VFC = () => {
       else next.delete(gameId);
       return next;
     });
+    const revert = () => setHiddenIds((prev) => {
+      const next = new Set(prev);
+      if (hidden) next.delete(gameId);
+      else next.add(gameId);
+      return next;
+    });
     try {
       const res = await setGameHidden(gameId, hidden);
-      if (res?.hidden) setHiddenIds(new Set(res.hidden));
+      if (res?.success && res.hidden) setHiddenIds(new Set(res.hidden));
+      else revert();
     } catch (_) {
-      // Revert on failure
-      setHiddenIds((prev) => {
-        const next = new Set(prev);
-        if (hidden) next.delete(gameId);
-        else next.add(gameId);
-        return next;
-      });
+      revert();
     }
   }, []);
 
@@ -1011,6 +1012,8 @@ export const GameLibrary: VFC = () => {
       onShowHiddenGames={() => {
         setShowHidden(true);
         saveUiState({ view: "library" }).catch(() => {});
+        loadData();
+        refreshBgTasks();
         setView("library");
       }}
     />;
@@ -1619,6 +1622,11 @@ export const GameLibrary: VFC = () => {
               </div>
             </>
           )}
+        </div>
+      )}
+      {!loading && !error && displayGames.length > 0 && !showHidden && hiddenFilteredGames.length === 0 && (
+        <div style={{ padding: "24px 16px", textAlign: "center", color: "#aaa", fontSize: "0.85em" }}>
+          All games are hidden — turn on Show hidden in filters to see them.
         </div>
       )}
       {viewMode === "art" ? (

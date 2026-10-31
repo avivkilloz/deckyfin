@@ -2071,7 +2071,6 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
                   boxSizing: "border-box" as const,
                   textAlign: "center" as const,
                   borderRadius: "0 0 6px 6px",
-                  borderTop: "1px solid #2a2a2a",
                   border: isHidden ? "1px solid #27ae60" : BTN_STYLE.border,
                   color: isHidden ? "#2ecc71" : BTN_STYLE.color,
                   background: isHidden ? "#1a3a1a" : "transparent",
