@@ -218,6 +218,7 @@ interface Props {
   runningTaskCount?: number;
   artEnabled?: boolean;
   /** Live Steam download/verify states, from the library's single subscription. */
+  markVerifying?: (appid: number) => void;
   downloads?: Record<number, DownloadState>;
   /** Mark an appid the user just asked Steam to verify. */
   /** Placeholder appids whose download finished and whose reload is still in flight. */
@@ -251,6 +252,21 @@ const fmtBytes = (b: number): string => {
 };
 
 // ── Guarded SteamClient calls (undocumented API — may be missing in some Steam versions) ──
+// Called as methods (they may rely on `this`); a returned Promise is awaited so rejections surface.
+const steamCall = async (fn: () => unknown): Promise<string | null> => {
+  try {
+    const r: any = fn();
+    if (r && typeof r.then === "function") await r;
+    return null;
+  } catch (e: any) {
+    return e?.message || "Steam call failed";
+  }
+};
+const verifyApp = (appid: number) => steamCall(() => {
+  const apps = (window as any).SteamClient?.Apps;
+  if (typeof apps?.VerifyApp !== "function") throw new Error("Verify isn't available in this Steam version");
+  return apps.VerifyApp(appid);
+});
 /** Close Decky's quick-access menu so a Steam page/dialog we opened is visible (guarded). */
 const closeSideMenus = () => {
   try { (Navigation as any)?.CloseSideMenus?.(); } catch { /* unavailable */ }
@@ -260,7 +276,7 @@ const openInSteamLibrary = (appid: number) => {
   closeSideMenus();
 };
 
-export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigateToSettings, initialSourceId, runningTaskCount = 0, artEnabled = true, downloads = NO_DOWNLOADS, finishingAppids = NO_APPIDS }) => {
+export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigateToSettings, initialSourceId, runningTaskCount = 0, artEnabled = true, downloads = NO_DOWNLOADS, markVerifying, finishingAppids = NO_APPIDS }) => {
   // ── Refs ─────────────────────────────────────────────────────────────
   const rootRef = useRef<HTMLDivElement>(null);
   const backRef = useRef<HTMLDivElement>(null);
@@ -834,6 +850,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
     ? artBackground([headerArtUri])
     : headerArtResolved && storeAppid ? artBackground(steamArtUrls(storeAppid)) : null;
   // Appid the user last clicked Verify on (labels a queued entry as a verify, not an update)
+  const [verifyRequestedFor, setVerifyRequestedFor] = useState<number | null>(null);
 
   // Fill Proton/launch options from Steam's live values (Store games). Steam is the
   // truth, so they also become the last-synced snapshot. The form is left alone when
@@ -1613,6 +1630,15 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
       setFeedback({ ok: false, msg: err?.message || "Failed to apply to Steam" });
     }
     setLoading(null);
+  };
+
+  const handleVerifyClick = async () => {
+    if (!appidForSteam) return;
+    const appid = appidForSteam;
+    markVerifying?.(appid);
+    setVerifyRequestedFor(appid);
+    const err = await verifyApp(appid);
+    setFeedback(err ? { ok: false, msg: err } : { ok: true, msg: "Verifying files in Steam…" });
   };
 
   const handleRemoveSteam = async () => {
@@ -2527,7 +2553,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
           <div style={{ padding: "6px 12px 8px", borderTop: "1px solid #2a2a2a", fontSize: "0.78em", color: "#aaa" }}>
             <div style={{ marginBottom: download.status === "queued" ? 0 : "4px" }}>
               {download.status === "queued"
-                ? "⏳ Queued in Steam"
+                ? `⏳ ${verifyRequestedFor === appidForSteam ? "Verify" : "Update"} queued in Steam`
                 : download.status === "verifying"
                   ? `▸ ${formatDownloadLabel(download)}`
                   : `▸ Updating in Steam… ${Math.round(download.progress * 100)}%`}
@@ -2577,6 +2603,15 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
                   border: capabilities.can_play && steamNeedsSync ? "1px solid #27ae60" : "1px solid #555",
                   color: capabilities.can_play && steamNeedsSync ? "#2ecc71" : "#e0e0e0" }}>
                 {loading === "add" ? "Adding…" : loading === "update" ? "Updating…" : steamInfo ? "Update Steam Game" : "Add to Steam"}
+              </Focusable>
+            )}
+            {isLibrarySource && !isNotInstalled && appidForSteam && (
+              <Focusable
+                onActivate={handleVerifyClick}
+                onClick={handleVerifyClick}
+                focusClassName="is-focused"
+                style={{ ...BTN_STYLE, display: "block", width: "100%", boxSizing: "border-box" as const, textAlign: "center" as const, marginBottom: "6px" }}>
+                {download?.status === "verifying" ? formatDownloadLabel(download) : "Verify files"}
               </Focusable>
             )}
             {steamInfo?.unsigned_appid && (

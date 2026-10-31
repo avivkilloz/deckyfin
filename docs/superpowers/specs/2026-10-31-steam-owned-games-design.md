@@ -1,16 +1,16 @@
 # Steam Owned Games Design (not-installed Store games, install/uninstall/verify)
 
 **Date:** 2026-10-31  
-**Status:** Approved — revised 2026-10-31: install/uninstall/verify dropped; Steam's own game page is the entry point
+**Status:** Approved — revised 2026-10-31: install/uninstall dropped (Verify kept); Steam's own game page is the entry point
 
 ## Revision (2026-10-31, after device testing)
 
-Deckyfin no longer starts installs, uninstalls or verifies itself. Every game
+Deckyfin no longer starts installs or uninstalls itself (Verify files stays for installed Store games). Every game
 Steam knows (installed or not) gets **"Open in Steam Library"**, which opens
-Steam's own game page where the user installs, uninstalls, verifies or plays.
+Steam's own game page where the user installs, uninstalls or plays.
 The clickable Steam icon in the game page's art header does the same. Download
-progress display is unchanged. Sections below describing Install / Uninstall /
-Verify buttons are superseded by this note.
+progress display is unchanged. Sections below describing Install / Uninstall
+buttons are superseded by this note.
 
 ## Overview
 
