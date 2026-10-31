@@ -41,16 +41,38 @@ def repo_slug(plugin_dir: Path) -> str:
     return m.group(1) if m else DEFAULT_SLUG
 
 
+# When version.json is missing or fails to fetch (older rolling builds, a
+# transient asset-fetch failure, etc.), best-effort recover the main-channel
+# version/commit from the release's own name/body — set by ci.yml's
+# `main-build` job: name "Latest main (<base>+main.<sha7>)", body "Rolling
+# build of main at <40-hex sha>."
+_NAME_VERSION_RE = re.compile(r"Latest main \(([^()]+\+main\.([0-9a-f]{7}))\)")
+_BODY_SHA_RE = re.compile(r"Rolling build of main at ([0-9a-f]{40})")
+
+
+def _recover_main_build_info(release: dict) -> dict:
+    recovered: dict = {}
+    name_match = _NAME_VERSION_RE.search(str(release.get("name") or ""))
+    if name_match:
+        recovered["version"] = name_match.group(1)
+        recovered["commit"] = name_match.group(2)
+    body_match = _BODY_SHA_RE.search(str(release.get("body") or ""))
+    if body_match:
+        recovered["commit"] = body_match.group(1)  # full sha beats the short one from the name
+    return recovered
+
+
 def parse_release(release: dict, version_info: Optional[dict]) -> Optional[dict]:
     assets = release.get("assets") or []
     zip_asset = next((a for a in assets if a.get("name") == "deckyfin.zip"), None)
     if not zip_asset:
         return None
     info = version_info or {}
+    recovered = _recover_main_build_info(release)
     tag = str(release.get("tag_name") or "")
     return {
-        "version": info.get("version") or (tag[1:] if tag.startswith("v") else tag),
-        "commit": info.get("commit") or None,
+        "version": info.get("version") or recovered.get("version") or (tag[1:] if tag.startswith("v") else tag),
+        "commit": info.get("commit") or recovered.get("commit") or None,
         "published_at": release.get("published_at"),
         "zip_url": zip_asset.get("browser_download_url"),
         "html_url": release.get("html_url"),
@@ -68,11 +90,18 @@ def compare_builds(installed: dict, latest: Optional[dict], channel: str) -> str
     if channel == "main":
         if installed.get("channel") != "main" or not installed.get("commit"):
             return "update_available"
-        same = latest.get("commit") and installed["commit"].startswith(latest["commit"][:7]) \
+        if not latest.get("commit"):
+            # The latest commit couldn't be determined at all (no version.json
+            # and the release name/body didn't match) — don't claim an update
+            # is or isn't available.
+            return "unknown"
+        same = installed["commit"].startswith(latest["commit"][:7]) \
             and latest["commit"].startswith(installed["commit"][:7])
         return "up_to_date" if same else "update_available"
-    # stable
-    if installed.get("channel") != "stable":
+    # stable: only a main build forces update_available (so the user can
+    # switch back to stable); an unstamped/dev build (channel None) falls
+    # through to the ordinary semver comparison below.
+    if installed.get("channel") == "main":
         return "update_available"
     a, b = _semver(installed.get("version", "")), _semver(latest.get("version", ""))
     if a is None or b is None:
@@ -105,6 +134,10 @@ def fetch_latest(channel: str, slug: str, opener: Callable = _default_opener) ->
     except urllib.error.HTTPError as e:
         if e.code == 404:
             return {"latest": None, "error": "No build on this channel yet"}
+        headers = getattr(e, "headers", None)
+        remaining = headers.get("X-RateLimit-Remaining") if headers else None
+        if e.code == 403 and remaining == "0":
+            return {"latest": None, "error": "GitHub rate limit reached — try again later"}
         return {"latest": None, "error": f"GitHub returned HTTP {e.code}"}
     except Exception as e:
         return {"latest": None, "error": f"Couldn't reach GitHub: {e}"}

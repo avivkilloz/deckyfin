@@ -75,6 +75,7 @@ def test_parse_release_without_zip(up):
     ({"version": "0.1.10", "channel": "stable", "commit": "c"}, {"version": "0.1.9", "commit": "b"}, "stable", "up_to_date"),
     ({"version": "0.1.8+main.abc", "channel": "main", "commit": "abc"}, {"version": "0.1.8", "commit": "x"}, "stable", "update_available"),
     ({"version": "0.1.0", "channel": None, "commit": None}, {"version": "0.1.8", "commit": "x"}, "stable", "update_available"),
+    ({"version": "0.1.9", "channel": None, "commit": None}, {"version": "0.1.9", "commit": "x"}, "stable", "up_to_date"),
     ({"version": "0.1.8+main.abc", "channel": "main", "commit": "abc"}, {"version": "0.1.8+main.def", "commit": "def"}, "main", "update_available"),
     ({"version": "0.1.8+main.abc", "channel": "main", "commit": "abc"}, {"version": "0.1.8+main.abc", "commit": "abc"}, "main", "up_to_date"),
     ({"version": "0.1.0", "channel": None, "commit": None}, {"version": "0.1.8+main.def", "commit": "def"}, "main", "update_available"),
@@ -82,6 +83,49 @@ def test_parse_release_without_zip(up):
 ])
 def test_compare_builds(up, installed, latest, channel, expected):
     assert up.compare_builds(installed, latest, channel) == expected
+
+
+REL_MAIN_NO_VERSION_JSON = {
+    "tag_name": "latest-main",
+    "name": "Latest main (0.1.8+main.9ea1504)",
+    "body": "Rolling build of main at 9ea15049c1a2b3c4d5e6f708192a3b4c5d6e7f80. Not a stable release.",
+    "published_at": "2026-10-30T12:00:00Z",
+    "html_url": "https://github.com/x/y/releases/tag/latest-main",
+    "assets": [{"name": "deckyfin.zip", "browser_download_url": "https://x/deckyfin.zip"}],
+}
+
+
+def test_parse_release_recovers_version_and_commit_from_name_and_body(up):
+    result = up.parse_release(REL_MAIN_NO_VERSION_JSON, None)
+    assert result["version"] == "0.1.8+main.9ea1504"
+    # Full 40-hex sha from the body is preferred over the 7-char one in the name.
+    assert result["commit"] == "9ea15049c1a2b3c4d5e6f708192a3b4c5d6e7f80"
+
+
+def test_parse_release_recovers_version_from_name_when_body_has_no_sha(up):
+    rel = {**REL_MAIN_NO_VERSION_JSON, "body": "no sha here"}
+    result = up.parse_release(rel, None)
+    assert result["version"] == "0.1.8+main.9ea1504"
+    assert result["commit"] == "9ea1504"
+
+
+def test_parse_release_commit_unknown_when_name_and_body_dont_match(up):
+    rel = {**REL_MAIN_NO_VERSION_JSON, "name": "something else", "body": "no sha here"}
+    result = up.parse_release(rel, None)
+    assert result["commit"] is None
+    assert result["version"] == "latest-main"  # falls back to the tag, not the recovered version
+
+
+def test_parse_release_version_info_commit_wins_over_recovery(up):
+    result = up.parse_release(REL_MAIN_NO_VERSION_JSON, {"version": "0.1.8+main.real", "commit": "realcommit"})
+    assert result["version"] == "0.1.8+main.real"
+    assert result["commit"] == "realcommit"
+
+
+def test_compare_builds_main_unknown_when_latest_commit_cant_be_determined(up):
+    installed = {"version": "0.1.8+main.abc1234", "channel": "main", "commit": "abc1234def"}
+    latest = {"version": "latest-main", "commit": None}
+    assert up.compare_builds(installed, latest, "main") == "unknown"
 
 
 def test_repo_slug(tmp_path, up):
@@ -127,6 +171,29 @@ def test_fetch_latest_network_error(up):
         raise OSError("offline")
     res = up.fetch_latest("stable", "x/y", opener=opener)
     assert res["latest"] is None and "offline" in res["error"]
+
+
+def test_fetch_latest_rate_limited(up):
+    import urllib.error
+
+    def opener(req, timeout=None):
+        headers = {"X-RateLimit-Remaining": "0"}
+        raise urllib.error.HTTPError(getattr(req, "full_url", req), 403, "Forbidden", headers, None)
+
+    res = up.fetch_latest("stable", "x/y", opener=opener)
+    assert res["latest"] is None
+    assert res["error"] == "GitHub rate limit reached — try again later"
+
+
+def test_fetch_latest_403_without_rate_limit_header_is_generic(up):
+    import urllib.error
+
+    def opener(req, timeout=None):
+        raise urllib.error.HTTPError(getattr(req, "full_url", req), 403, "Forbidden", {}, None)
+
+    res = up.fetch_latest("stable", "x/y", opener=opener)
+    assert res["latest"] is None
+    assert res["error"] == "GitHub returned HTTP 403"
 
 
 def test_fetch_latest_missing_release(up):
