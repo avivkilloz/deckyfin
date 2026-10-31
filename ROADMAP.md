@@ -101,6 +101,31 @@ The `agent` source location type will allow Deckyfin to talk to a **Deckyfin age
 
 ---
 
+## Planned: Nexus Mods manager
+
+Download, install and manage mods from [Nexus Mods](https://www.nexusmods.com/) per game, from the game page.
+
+- **Nexus account link** — personal API key (stored like the SteamGridDB key); premium accounts can download directly through the API, free accounts go through Nexus's "Mod Manager Download" (`nxm://`) links
+- **Per-game mod list** — install, enable/disable, update and uninstall mods; mods are kept outside the game folder and deployed into it (symlinks, hardlinks or copy), so disabling or removing a mod restores the original files
+- **Load order** — for games that need it (e.g. Bethesda titles), with LOOT-style sorting
+- **Nexus Collections** — install a curated mod set in one step
+- **Works across sources** — mods are tracked per game, so they follow the game through transfers and survive rescans
+
+Reference: [Amethyst Mod Manager](https://github.com/ChrisDKN/Amethyst-Mod-Manager) (Python, Linux) already solves most of this — Nexus integration, deployment by symlinks/hardlinks/VFS, LOOT-based load order and Collections. It is **GPL-3.0** while Deckyfin is **MIT**: use it as a reference for approach and behaviour and write Deckyfin's own implementation; copying its code would require relicensing Deckyfin under GPL-3.0.
+
+## Planned: Torrent download source
+
+Download and install games from torrents or magnet links the user provides, as an alternative to copying from a mount or agent source.
+
+- **Built-in torrent client** in the backend (e.g. a libtorrent binding), with download progress shown like transfers
+- **Destination** — any local source; the downloaded folder becomes a game in that source and goes through the normal flow (exe detection, Add to Steam, Proton, deps)
+- **Archives and installers** — extract archives and run Windows installers inside a Proton prefix when the download isn't a ready-to-run folder
+- **Seeding control** — stop or keep seeding after completion, bandwidth limits
+
+Scope: a general torrent client for content the user has the right to download (DRM-free releases, personal backups, games distributed by torrent). No built-in integration with sites that distribute pirated copies of commercial games.
+
+---
+
 ## Design principles
 
 **Automation where possible, manual where needed.** Every library type aims to auto-configure as much as possible — executable path, launch options, start directory, artwork. The user should only need to fill in what Deckyfin cannot detect. Manual override is always available for non-standard setups.
