@@ -220,7 +220,6 @@ interface Props {
   /** Live Steam download/verify states, from the library's single subscription. */
   downloads?: Record<number, DownloadState>;
   /** Mark an appid the user just asked Steam to verify. */
-  markVerifying?: (appid: number) => void;
   /** Placeholder appids whose download finished and whose reload is still in flight. */
   finishingAppids?: Set<number>;
 }
@@ -252,31 +251,6 @@ const fmtBytes = (b: number): string => {
 };
 
 // ── Guarded SteamClient calls (undocumented API — may be missing in some Steam versions) ──
-// Called as methods (they may rely on `this`); a returned Promise is awaited so rejections surface.
-const steamCall = async (fn: () => unknown): Promise<string | null> => {
-  try {
-    const r: any = fn();
-    if (r && typeof r.then === "function") await r;
-    return null;
-  } catch (e: any) {
-    return e?.message || "Steam call failed";
-  }
-};
-const openInstall = (appid: number) => steamCall(() => {
-  const inst = (window as any).SteamClient?.Installs;
-  if (typeof inst?.OpenInstallWizard !== "function") throw new Error("Install isn't available in this Steam version");
-  return inst.OpenInstallWizard([appid]);
-});
-const openUninstall = (appid: number) => steamCall(() => {
-  const inst = (window as any).SteamClient?.Installs;
-  if (typeof inst?.OpenUninstallWizard !== "function") throw new Error("Uninstall isn't available in this Steam version");
-  return inst.OpenUninstallWizard([appid], false);
-});
-const verifyApp = (appid: number) => steamCall(() => {
-  const apps = (window as any).SteamClient?.Apps;
-  if (typeof apps?.VerifyApp !== "function") throw new Error("Verify isn't available in this Steam version");
-  return apps.VerifyApp(appid);
-});
 /** Close Decky's quick-access menu so a Steam page/dialog we opened is visible (guarded). */
 const closeSideMenus = () => {
   try { (Navigation as any)?.CloseSideMenus?.(); } catch { /* unavailable */ }
@@ -286,7 +260,7 @@ const openInSteamLibrary = (appid: number) => {
   closeSideMenus();
 };
 
-export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigateToSettings, initialSourceId, runningTaskCount = 0, artEnabled = true, downloads = NO_DOWNLOADS, markVerifying, finishingAppids = NO_APPIDS }) => {
+export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigateToSettings, initialSourceId, runningTaskCount = 0, artEnabled = true, downloads = NO_DOWNLOADS, finishingAppids = NO_APPIDS }) => {
   // ── Refs ─────────────────────────────────────────────────────────────
   const rootRef = useRef<HTMLDivElement>(null);
   const backRef = useRef<HTMLDivElement>(null);
@@ -860,7 +834,6 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
     ? artBackground([headerArtUri])
     : headerArtResolved && storeAppid ? artBackground(steamArtUrls(storeAppid)) : null;
   // Appid the user last clicked Verify on (labels a queued entry as a verify, not an update)
-  const [verifyRequestedFor, setVerifyRequestedFor] = useState<number | null>(null);
 
   // Fill Proton/launch options from Steam's live values (Store games). Steam is the
   // truth, so they also become the last-synced snapshot. The form is left alone when
@@ -1642,28 +1615,6 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
     setLoading(null);
   };
 
-  // ── Install / Verify / Uninstall via Steam's own wizards (undocumented API) ──
-  const handleInstallClick = async () => {
-    if (!appidForSteam) return;
-    const err = await openInstall(appidForSteam);
-    if (err) setFeedback({ ok: false, msg: err });
-    else closeSideMenus();
-  };
-  const handleVerifyClick = async () => {
-    if (!appidForSteam) return;
-    const appid = appidForSteam;
-    markVerifying?.(appid);
-    setVerifyRequestedFor(appid);
-    const err = await verifyApp(appid);
-    setFeedback(err ? { ok: false, msg: err } : { ok: true, msg: "Verifying files in Steam…" });
-  };
-  const handleUninstallClick = async () => {
-    if (!appidForSteam) return;
-    const err = await openUninstall(appidForSteam);
-    if (err) setFeedback({ ok: false, msg: err });
-    else closeSideMenus();
-  };
-
   const handleRemoveSteam = async () => {
     setLoading("remove");
     setFeedback(null);
@@ -2007,19 +1958,31 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
               whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</span>
           </div>
           {steamInfo && (
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="#c7d5e0"
-              style={{ position: "absolute", bottom: "7px", right: "8px", filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.8))" }}>
-              <path d="M11.979 0C5.678 0 .511 4.86.022 11.037l6.432 2.658c.545-.371 1.203-.59 1.912-.59.063 0 .125.004.188.006l2.861-4.142V8.91c0-2.495 2.028-4.524 4.524-4.524 2.494 0 4.524 2.031 4.524 4.527s-2.03 4.525-4.524 4.525h-.105l-4.076 2.911c0 .052.004.105.004.159 0 1.875-1.515 3.396-3.39 3.396-1.635 0-3.016-1.173-3.331-2.727L.436 15.27C1.862 20.307 6.486 24 11.979 24c6.627 0 11.999-5.373 11.999-12S18.605 0 11.979 0zM7.54 18.21l-1.473-.61c.262.543.714.999 1.314 1.25 1.297.539 2.793-.076 3.332-1.375.263-.63.264-1.319.005-1.949s-.75-1.121-1.377-1.383c-.624-.26-1.29-.249-1.878-.03l1.523.63c.956.4 1.409 1.5 1.009 2.455-.397.957-1.497 1.41-2.455 1.012H7.54zm11.415-9.303c0-1.662-1.353-3.015-3.015-3.015-1.665 0-3.015 1.353-3.015 3.015 0 1.665 1.35 3.015 3.015 3.015 1.663 0 3.015-1.35 3.015-3.015zm-5.273-.005c0-1.252 1.013-2.266 2.265-2.266 1.249 0 2.266 1.014 2.266 2.266 0 1.251-1.017 2.265-2.266 2.265-1.252 0-2.265-1.014-2.265-2.265z"/>
-            </svg>
+            <Focusable
+              onActivate={() => openInSteamLibrary(steamInfo.unsigned_appid)}
+              onClick={() => openInSteamLibrary(steamInfo.unsigned_appid)}
+              focusClassName="is-focused"
+              style={{ position: "absolute", bottom: "4px", right: "5px", padding: "3px", borderRadius: "50%", cursor: "pointer", display: "flex" }}>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="#c7d5e0"
+                style={{ filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.8))" }}>
+                <path d="M11.979 0C5.678 0 .511 4.86.022 11.037l6.432 2.658c.545-.371 1.203-.59 1.912-.59.063 0 .125.004.188.006l2.861-4.142V8.91c0-2.495 2.028-4.524 4.524-4.524 2.494 0 4.524 2.031 4.524 4.527s-2.03 4.525-4.524 4.525h-.105l-4.076 2.911c0 .052.004.105.004.159 0 1.875-1.515 3.396-3.39 3.396-1.635 0-3.016-1.173-3.331-2.727L.436 15.27C1.862 20.307 6.486 24 11.979 24c6.627 0 11.999-5.373 11.999-12S18.605 0 11.979 0zM7.54 18.21l-1.473-.61c.262.543.714.999 1.314 1.25 1.297.539 2.793-.076 3.332-1.375.263-.63.264-1.319.005-1.949s-.75-1.121-1.377-1.383c-.624-.26-1.29-.249-1.878-.03l1.523.63c.956.4 1.409 1.5 1.009 2.455-.397.957-1.497 1.41-2.455 1.012H7.54zm11.415-9.303c0-1.662-1.353-3.015-3.015-3.015-1.665 0-3.015 1.353-3.015 3.015 0 1.665 1.35 3.015 3.015 3.015 1.663 0 3.015-1.35 3.015-3.015zm-5.273-.005c0-1.252 1.013-2.266 2.265-2.266 1.249 0 2.266 1.014 2.266 2.266 0 1.251-1.017 2.265-2.266 2.265-1.252 0-2.265-1.014-2.265-2.265z"/>
+              </svg>
+            </Focusable>
           )}
         </div>
       ) : (
         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px", padding: "4px 2px" }}>
           <h2 style={{ margin: 0, fontSize: name.length > 32 ? "0.78em" : name.length > 22 ? "0.9em" : "1.05em", fontWeight: 700, color: "#e0e0e0", flex: 1, minWidth: 0 }}>{name}</h2>
           {steamInfo && (
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="#c7d5e0" style={{ flexShrink: 0 }}>
-              <path d="M11.979 0C5.678 0 .511 4.86.022 11.037l6.432 2.658c.545-.371 1.203-.59 1.912-.59.063 0 .125.004.188.006l2.861-4.142V8.91c0-2.495 2.028-4.524 4.524-4.524 2.494 0 4.524 2.031 4.524 4.527s-2.03 4.525-4.524 4.525h-.105l-4.076 2.911c0 .052.004.105.004.159 0 1.875-1.515 3.396-3.39 3.396-1.635 0-3.016-1.173-3.331-2.727L.436 15.27C1.862 20.307 6.486 24 11.979 24c6.627 0 11.999-5.373 11.999-12S18.605 0 11.979 0zM7.54 18.21l-1.473-.61c.262.543.714.999 1.314 1.25 1.297.539 2.793-.076 3.332-1.375.263-.63.264-1.319.005-1.949s-.75-1.121-1.377-1.383c-.624-.26-1.29-.249-1.878-.03l1.523.63c.956.4 1.409 1.5 1.009 2.455-.397.957-1.497 1.41-2.455 1.012H7.54zm11.415-9.303c0-1.662-1.353-3.015-3.015-3.015-1.665 0-3.015 1.353-3.015 3.015 0 1.665 1.35 3.015 3.015 3.015 1.663 0 3.015-1.35 3.015-3.015zm-5.273-.005c0-1.252 1.013-2.266 2.265-2.266 1.249 0 2.266 1.014 2.266 2.266 0 1.251-1.017 2.265-2.266 2.265-1.252 0-2.265-1.014-2.265-2.265z"/>
-            </svg>
+            <Focusable
+              onActivate={() => openInSteamLibrary(steamInfo.unsigned_appid)}
+              onClick={() => openInSteamLibrary(steamInfo.unsigned_appid)}
+              focusClassName="is-focused"
+              style={{ flexShrink: 0, padding: "3px", borderRadius: "50%", cursor: "pointer", display: "flex" }}>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="#c7d5e0">
+                <path d="M11.979 0C5.678 0 .511 4.86.022 11.037l6.432 2.658c.545-.371 1.203-.59 1.912-.59.063 0 .125.004.188.006l2.861-4.142V8.91c0-2.495 2.028-4.524 4.524-4.524 2.494 0 4.524 2.031 4.524 4.527s-2.03 4.525-4.524 4.525h-.105l-4.076 2.911c0 .052.004.105.004.159 0 1.875-1.515 3.396-3.39 3.396-1.635 0-3.016-1.173-3.331-2.727L.436 15.27C1.862 20.307 6.486 24 11.979 24c6.627 0 11.999-5.373 11.999-12S18.605 0 11.979 0zM7.54 18.21l-1.473-.61c.262.543.714.999 1.314 1.25 1.297.539 2.793-.076 3.332-1.375.263-.63.264-1.319.005-1.949s-.75-1.121-1.377-1.383c-.624-.26-1.29-.249-1.878-.03l1.523.63c.956.4 1.409 1.5 1.009 2.455-.397.957-1.497 1.41-2.455 1.012H7.54zm11.415-9.303c0-1.662-1.353-3.015-3.015-3.015-1.665 0-3.015 1.353-3.015 3.015 0 1.665 1.35 3.015 3.015 3.015 1.663 0 3.015-1.35 3.015-3.015zm-5.273-.005c0-1.252 1.013-2.266 2.265-2.266 1.249 0 2.266 1.014 2.266 2.266 0 1.251-1.017 2.265-2.266 2.265-1.252 0-2.265-1.014-2.265-2.265z"/>
+              </svg>
+            </Focusable>
           )}
         </div>
       )}
@@ -2095,12 +2058,12 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
             </div>
           ) : (
             <Focusable
-              onActivate={appidForSteam ? handleInstallClick : undefined}
-              onClick={appidForSteam ? handleInstallClick : undefined}
+              onActivate={appidForSteam ? () => openInSteamLibrary(appidForSteam) : undefined}
+              onClick={appidForSteam ? () => openInSteamLibrary(appidForSteam) : undefined}
               focusClassName="is-focused"
               style={{ ...BTN_STYLE, display: "block", width: "100%", boxSizing: "border-box" as const, textAlign: "center" as const, marginBottom: "10px",
                 border: "1px solid #27ae60", color: "#2ecc71", opacity: appidForSteam ? 1 : 0.4 }}>
-              ⬇ Install
+              Open in Steam Library
             </Focusable>
           )}
           {feedback && <p style={{ margin: "0 0 8px 0", color: feedback.ok ? "lightgreen" : "tomato", fontSize: "0.9em" }}>{feedback.msg}</p>}
@@ -2564,7 +2527,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
           <div style={{ padding: "6px 12px 8px", borderTop: "1px solid #2a2a2a", fontSize: "0.78em", color: "#aaa" }}>
             <div style={{ marginBottom: download.status === "queued" ? 0 : "4px" }}>
               {download.status === "queued"
-                ? `⏳ ${verifyRequestedFor === appidForSteam ? "Verify" : "Update"} queued in Steam`
+                ? "⏳ Queued in Steam"
                 : download.status === "verifying"
                   ? `▸ ${formatDownloadLabel(download)}`
                   : `▸ Updating in Steam… ${Math.round(download.progress * 100)}%`}
@@ -2616,26 +2579,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
                 {loading === "add" ? "Adding…" : loading === "update" ? "Updating…" : steamInfo ? "Update Steam Game" : "Add to Steam"}
               </Focusable>
             )}
-            {isLibrarySource && !isNotInstalled && appidForSteam && (
-              <>
-                <Focusable
-                  onActivate={handleVerifyClick}
-                  onClick={handleVerifyClick}
-                  focusClassName="is-focused"
-                  style={{ ...BTN_STYLE, display: "block", width: "100%", boxSizing: "border-box" as const, textAlign: "center" as const, marginBottom: "6px" }}>
-                  {download?.status === "verifying" ? formatDownloadLabel(download) : "Verify files"}
-                </Focusable>
-                <Focusable
-                  onActivate={handleUninstallClick}
-                  onClick={handleUninstallClick}
-                  focusClassName="is-focused"
-                  style={{ ...BTN_STYLE, display: "block", width: "100%", boxSizing: "border-box" as const, textAlign: "center" as const, marginBottom: "6px",
-                    border: "1px solid #c0392b", color: "#e74c3c" }}>
-                  Uninstall…
-                </Focusable>
-              </>
-            )}
-            {steamInfo?.unsigned_appid && !isNotInstalled && (
+            {steamInfo?.unsigned_appid && (
               <Focusable
                 onActivate={() => openInSteamLibrary(steamInfo.unsigned_appid)}
                 onClick={() => openInSteamLibrary(steamInfo.unsigned_appid)}

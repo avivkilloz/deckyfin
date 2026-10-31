@@ -495,7 +495,7 @@ export const GameLibrary: VFC = () => {
     (showOwned && filterInstallStatus !== "all" ? 1 : 0);
 
   // ── Live download/verify progress, and reload once a tracked app finishes ──
-  const { downloads, markVerifying } = useSteamDownloads();
+  const { downloads } = useSteamDownloads();
   // Appids of displayed owned-not-installed entries (placeholders, or not-installed Steam sources
   // attached to a source game) — the only downloads whose finishing changes what the backend
   // reports (updates/verifies of installed games don't).
@@ -994,7 +994,6 @@ export const GameLibrary: VFC = () => {
         }}
         artEnabled={artEnabled}
         downloads={downloads}
-        markVerifying={markVerifying}
         finishingAppids={finishingAppids}
       />
     );
