@@ -75,6 +75,14 @@ from deckyfin_sources import (
 from steam_utils import get_user_id, list_steam_users, set_active_steam_user as _set_active_steam_user
 from steam_games import convert_appid_to_unsigned_32bit
 from deckyfin_steam_shortcuts import upsert_store_entry as _upsert_builtin_store_entry, attach_builtin_games as _attach_builtin_games
+from deckyfin_updates import (
+    read_installed_build,
+    repo_slug,
+    fetch_latest,
+    compare_builds,
+    get_update_channel,
+    set_update_channel as _set_update_channel,
+)
 from deckyfin_hidden import (
     get_hidden_games as _get_hidden_games,
     set_game_hidden as _set_game_hidden,
@@ -2505,6 +2513,20 @@ class Plugin:
         except Exception as e:
             logging.getLogger(APP_NAME).warning("Failed to get card art for '%s': %s", game_name, e)
             return {"data_uri": None}
+
+    async def get_update_info(self, channel: Optional[str] = None) -> dict:
+        """Installed build vs newest build on the channel (GitHub)."""
+        import asyncio
+        plugin_dir = Path(__file__).resolve().parent
+        ch = channel if channel in ("stable", "main") else get_update_channel()
+        installed = read_installed_build(plugin_dir)
+        res = await asyncio.to_thread(fetch_latest, ch, repo_slug(plugin_dir))
+        latest = res["latest"]
+        return {"channel": ch, "installed": installed, "latest": latest,
+                "status": compare_builds(installed, latest, ch), "error": res["error"]}
+
+    async def set_update_channel(self, channel: str) -> dict:
+        return {"success": _set_update_channel(channel)}
 
 
 
