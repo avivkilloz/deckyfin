@@ -6,7 +6,9 @@ import { sourceTypeLabel, sourceTypeColors, isBuiltinSourceType } from "../sourc
 import { useArtwork } from "../hooks/useArtwork";
 import { formatDownloadLabel, DownloadState } from "../downloadStates";
 import { steamArtUrls, artBackground } from "../steamOwned";
+import { steamDbUrl, protonDbUrl } from "../externalLinks";
 import { CompactTextField } from "../components/CompactTextField";
+import { ExternalLink } from "../components/ExternalLink";
 import {
   getCachedArt, setCachedArt, invalidateArtCache,
   getCachedSteamInfo, setCachedSteamInfo, invalidateSteamInfoCache,
@@ -2139,18 +2141,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
           {feedback && <p style={{ margin: "0 0 8px 0", color: feedback.ok ? "lightgreen" : "tomato", fontSize: "0.9em" }}>{feedback.msg}</p>}
           <p style={{ fontSize: "0.78em", color: "#888", margin: 0, lineHeight: 1.5 }}>
             Look up requirements on{" "}
-            <Focusable
-              onActivate={() => Navigation.NavigateToExternalWeb(steamAppId ? `https://steamdb.info/app/${steamAppId}/` : `https://steamdb.info/search/?a=all&q=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`)}
-              onClick={() => Navigation.NavigateToExternalWeb(steamAppId ? `https://steamdb.info/app/${steamAppId}/` : `https://steamdb.info/search/?a=all&q=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`)}
-              focusClassName="is-focused" style={{ display: "inline", color: "#5dade2", cursor: "pointer", background: "transparent", border: "none", padding: 0, fontSize: "inherit" }}>
-              SteamDB
-            </Focusable>{" "}or check{" "}
-            <Focusable
-              onActivate={() => Navigation.NavigateToExternalWeb(steamAppId ? `https://www.protondb.com/app/${steamAppId}` : `https://www.protondb.com/search?q=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`)}
-              onClick={() => Navigation.NavigateToExternalWeb(steamAppId ? `https://www.protondb.com/app/${steamAppId}` : `https://www.protondb.com/search?q=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`)}
-              focusClassName="is-focused" style={{ display: "inline", color: "#5dade2", cursor: "pointer", background: "transparent", border: "none", padding: 0, fontSize: "inherit" }}>
-              ProtonDB
-            </Focusable>{" "}for community reports.
+            <ExternalLink url={steamDbUrl(name, steamAppId)}>SteamDB</ExternalLink>{" "}or check{" "}
+            <ExternalLink url={protonDbUrl(name, steamAppId)}>ProtonDB</ExternalLink>{" "}for community reports.
           </p>
         </div>
       )}
@@ -2207,8 +2199,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
             <Focusable focusClassName="" style={{ display: "flex", alignItems: "center", gap: "5px", marginBottom: "2px" }}>
               <span style={{ fontSize: "0.78em", color: "#888" }}>Steam App ID</span>
               <Focusable focusClassName="is-focused"
-                onActivate={() => Navigation.NavigateToExternalWeb(steamAppId ? `https://www.steamdb.info/app/${steamAppId}/` : `https://www.steamdb.info/search/?a=all&q=${encodeURIComponent(name)}`)}
-                onClick={() => Navigation.NavigateToExternalWeb(steamAppId ? `https://www.steamdb.info/app/${steamAppId}/` : `https://www.steamdb.info/search/?a=all&q=${encodeURIComponent(name)}`)}
+                onActivate={() => Navigation.NavigateToExternalWeb(steamDbUrl(name, steamAppId))}
+                onClick={() => Navigation.NavigateToExternalWeb(steamDbUrl(name, steamAppId))}
                 style={{ padding: "1px 4px", fontSize: "0.65em", borderRadius: "12px", border: "1px solid #555", color: "#888", cursor: "pointer", lineHeight: 1 }}>
                 ℹ
               </Focusable>
@@ -2298,12 +2290,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
           <div style={{ padding: "8px" }}>
             <p style={{ fontSize: "0.78em", color: "#888", margin: "0 0 8px 0", lineHeight: 1.5 }}>
               Wrapper scripts and extra flags passed to the launch command. Toggle common wrappers like GameMode or MangoHUD, or type raw arguments directly. Check{" "}
-              <Focusable
-                onActivate={() => Navigation.NavigateToExternalWeb(steamAppId ? `https://www.protondb.com/app/${steamAppId}` : `https://www.protondb.com/search?q=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`)}
-                onClick={() => Navigation.NavigateToExternalWeb(steamAppId ? `https://www.protondb.com/app/${steamAppId}` : `https://www.protondb.com/search?q=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`)}
-                focusClassName="is-focused" style={{ display: "inline", color: "#5dade2", cursor: "pointer", background: "transparent", border: "none", padding: 0, fontSize: "inherit" }}>
-                ProtonDB
-              </Focusable>{" "}for community launch flag recommendations.
+              <ExternalLink url={protonDbUrl(name, steamAppId)}>ProtonDB</ExternalLink>{" "}for community launch flag recommendations.
               {onNavigateToSettings && <>{" "}To add more popular options, go to{" "}<Focusable onActivate={onNavigateToSettings} onClick={onNavigateToSettings} focusClassName="is-focused" style={{ display: "inline", color: "#5dade2", cursor: "pointer", background: "transparent", border: "none", padding: 0, fontSize: "inherit" }}>Settings → Popular Launcher Options</Focusable>.</>}
             </p>
             {/* Orphan shortcuts' launch_options is the raw VDF string, which already
@@ -2377,12 +2364,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
             <div style={{ padding: "8px 12px 4px", borderBottom: "1px solid #2a2a2a" }}>
               <p style={{ fontSize: "0.78em", color: "#888", margin: 0, lineHeight: 1.5 }}>
                 The Proton/Wine build used to run this game. Leave blank to use Steam's default. Check{" "}
-                <Focusable
-                  onActivate={() => Navigation.NavigateToExternalWeb(steamAppId ? `https://www.protondb.com/app/${steamAppId}` : `https://www.protondb.com/search?q=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`)}
-                  onClick={() => Navigation.NavigateToExternalWeb(steamAppId ? `https://www.protondb.com/app/${steamAppId}` : `https://www.protondb.com/search?q=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`)}
-                  focusClassName="is-focused" style={{ display: "inline", color: "#5dade2", cursor: "pointer", background: "transparent", border: "none", padding: 0, fontSize: "inherit" }}>
-                  ProtonDB
-                </Focusable>{" "}for community-tested recommendations.
+                <ExternalLink url={protonDbUrl(name, steamAppId)}>ProtonDB</ExternalLink>{" "}for community-tested recommendations.
                 {onNavigateToSettings && <>{" "}To download additional Proton builds, go to{" "}<Focusable onActivate={onNavigateToSettings} onClick={onNavigateToSettings} focusClassName="is-focused" style={{ display: "inline", color: "#5dade2", cursor: "pointer", background: "transparent", border: "none", padding: 0, fontSize: "inherit" }}>Settings → Proton Versions</Focusable>.</>}
               </p>
             </div>
@@ -2417,18 +2399,8 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
           <div style={{ padding: "8px" }}>
             <p style={{ fontSize: "0.78em", color: "#888", margin: "0 0 8px 0", lineHeight: 1.5 }}>
               Winetricks packages installed into this game's Proton prefix — DirectX, Visual C++ runtimes, and other Windows libraries. Look up requirements on{" "}
-              <Focusable
-                onActivate={() => Navigation.NavigateToExternalWeb(steamAppId ? `https://steamdb.info/app/${steamAppId}/` : `https://steamdb.info/search/?a=all&q=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`)}
-                onClick={() => Navigation.NavigateToExternalWeb(steamAppId ? `https://steamdb.info/app/${steamAppId}/` : `https://steamdb.info/search/?a=all&q=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`)}
-                focusClassName="is-focused" style={{ display: "inline", color: "#5dade2", cursor: "pointer", background: "transparent", border: "none", padding: 0, fontSize: "inherit" }}>
-                SteamDB
-              </Focusable>{" "}or check{" "}
-              <Focusable
-                onActivate={() => Navigation.NavigateToExternalWeb(steamAppId ? `https://www.protondb.com/app/${steamAppId}` : `https://www.protondb.com/search?q=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`)}
-                onClick={() => Navigation.NavigateToExternalWeb(steamAppId ? `https://www.protondb.com/app/${steamAppId}` : `https://www.protondb.com/search?q=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`)}
-                focusClassName="is-focused" style={{ display: "inline", color: "#5dade2", cursor: "pointer", background: "transparent", border: "none", padding: 0, fontSize: "inherit" }}>
-                ProtonDB
-              </Focusable>{" "}reports for the dependencies other players needed.
+              <ExternalLink url={steamDbUrl(name, steamAppId)}>SteamDB</ExternalLink>{" "}or check{" "}
+              <ExternalLink url={protonDbUrl(name, steamAppId)}>ProtonDB</ExternalLink>{" "}reports for the dependencies other players needed.
               {onNavigateToSettings && <>{" "}To add more popular dependency chips, go to{" "}<Focusable onActivate={onNavigateToSettings} onClick={onNavigateToSettings} focusClassName="is-focused" style={{ display: "inline", color: "#5dade2", cursor: "pointer", background: "transparent", border: "none", padding: 0, fontSize: "inherit" }}>Settings → Popular Dependencies</Focusable>.</>}
             </p>
             <Focusable focusClassName="" style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "10px" }}>
@@ -2460,16 +2432,10 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
         {showSavePaths && <div style={{ padding: "8px" }}>
           <p style={{ fontSize: "0.78em", color: "#888", margin: "0 0 8px 0", lineHeight: 1.5 }}>
             Paths inside the Proton prefix to back up and restore saves. Select a prefix location and type the game-specific subfolder. Look up the correct path on{" "}
-            <Focusable onActivate={() => Navigation.NavigateToExternalWeb(`https://www.pcgamingwiki.com/wiki/Special:Search?search=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`)}
-              onClick={() => Navigation.NavigateToExternalWeb(`https://www.pcgamingwiki.com/wiki/Special:Search?search=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`)}
-              focusClassName="is-focused" style={{ display: "inline", color: "#5dade2", cursor: "pointer", background: "transparent", border: "none", padding: 0, fontSize: "inherit" }}>
+            <ExternalLink url={`https://www.pcgamingwiki.com/wiki/Special:Search?search=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`}>
               PCGamingWiki
-            </Focusable>{" "}or{" "}
-            <Focusable onActivate={() => Navigation.NavigateToExternalWeb(steamAppId ? `https://steamdb.info/app/${steamAppId}/` : `https://steamdb.info/search/?a=all&q=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`)}
-              onClick={() => Navigation.NavigateToExternalWeb(steamAppId ? `https://steamdb.info/app/${steamAppId}/` : `https://steamdb.info/search/?a=all&q=${encodeURIComponent(name.replace(/\s*\(.*?\)\s*$/, "").trim())}`)}
-              focusClassName="is-focused" style={{ display: "inline", color: "#5dade2", cursor: "pointer", background: "transparent", border: "none", padding: 0, fontSize: "inherit" }}>
-              SteamDB
-            </Focusable>.
+            </ExternalLink>{" "}or{" "}
+            <ExternalLink url={steamDbUrl(name, steamAppId)}>SteamDB</ExternalLink>.
             {onNavigateToSettings && <>{" "}To add custom prefix shortcuts, go to{" "}<Focusable onActivate={onNavigateToSettings} onClick={onNavigateToSettings} focusClassName="is-focused" style={{ display: "inline", color: "#5dade2", cursor: "pointer", background: "transparent", border: "none", padding: 0, fontSize: "inherit" }}>Settings → Popular Save Prefixes</Focusable>.</>}
           </p>
           {syncPaths.length > 0 && (
