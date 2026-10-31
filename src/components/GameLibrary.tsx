@@ -13,7 +13,7 @@ import { CompactTextField } from "../components/CompactTextField";
 import { isBuiltinSourceType } from "../sourceStyle";
 import { readOwnedApps, mergeOwnedGames } from "../steamOwned";
 import { DownloadState, formatDownloadLabel } from "../downloadStates";
-import { applyHiddenFilter } from "../hiddenGames";
+import { applyHiddenFilter, countHiddenPresent } from "../hiddenGames";
 
 const getGames = callable<[], MergedGame[]>("get_games");
 const getHiddenGames = callable<[], string[]>("get_hidden_games");
@@ -656,6 +656,13 @@ export const GameLibrary: VFC = () => {
     () => applyHiddenFilter(displayGames, hiddenIds, showHidden),
     [displayGames, hiddenIds, showHidden],
   );
+  // Only count hidden ids that match a game currently in the library's displayed
+  // list — a game whose source got unmounted stays in hiddenIds (so it's still
+  // hidden if the source returns) but shouldn't inflate this count.
+  const hiddenGamesCount = useMemo(
+    () => countHiddenPresent(displayGames, hiddenIds),
+    [displayGames, hiddenIds],
+  );
   const filteredGames = hiddenFilteredGames.filter((g) => {
     if (disabledIds.size > 0 && g.sources.every((s) => disabledIds.has(s.source_id)))
       return false;
@@ -1014,7 +1021,7 @@ export const GameLibrary: VFC = () => {
         if (!val) setViewMode("list");
         setArtEnabledBackend(val).catch(() => {});
       }}
-      hiddenGamesCount={hiddenIds.size}
+      hiddenGamesCount={hiddenGamesCount}
       onShowHiddenGames={() => {
         setShowHidden(true);
         saveUiState({ view: "library" }).catch(() => {});

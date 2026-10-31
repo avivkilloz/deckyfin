@@ -15,3 +15,26 @@ export function applyHiddenFilter<T extends { id: string }>(
   if (showHidden || hiddenIds.size === 0) return games;
   return games.filter((g) => !hiddenIds.has(g.id));
 }
+
+/**
+ * Count hidden ids that match a game currently in `games` (e.g. the library's
+ * displayed list). Ids hidden while their source was mounted but now absent
+ * (an unmounted/offline source) are intentionally not counted here — they stay
+ * in the stored hidden set so the game is still hidden if the source returns,
+ * but they shouldn't inflate the "N hidden games" count shown in Settings.
+ */
+export function countHiddenPresent<T extends { id: string }>(
+  games: T[],
+  hiddenIds: Set<string>
+): number {
+  if (hiddenIds.size === 0) return 0;
+  const seen = new Set<string>();
+  let count = 0;
+  for (const g of games) {
+    if (hiddenIds.has(g.id) && !seen.has(g.id)) {
+      seen.add(g.id);
+      count++;
+    }
+  }
+  return count;
+}
