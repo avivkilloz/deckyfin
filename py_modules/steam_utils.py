@@ -98,11 +98,23 @@ def find_logged_in_user_from_loginusers(steam_root: Path) -> Optional[str]:
         users = loginusers_data.get("users", {})
         for steam_id64_str, user_data in users.items():
             if user_data.get("MostRecent") == "1":
-                steam_id64 = int(steam_id64_str)
-                account_id = steam_id64_to_account_id(steam_id64)
-                return str(account_id)
+                return str(steam_id64_to_account_id(int(steam_id64_str)))
 
-        return None
+        # Current Steam no longer writes MostRecent: the newest login wins,
+        # AutoLogin breaks ties.
+        def _rank(item):
+            data = item[1] if isinstance(item[1], dict) else {}
+            try:
+                ts = int(data.get("timestamp") or data.get("Timestamp") or 0)
+            except ValueError:
+                ts = 0
+            return (ts, data.get("AutoLogin") == "1")
+
+        candidates = [(k, v) for k, v in users.items() if str(k).isdigit()]
+        if not candidates:
+            return None
+        steam_id64_str, _ = max(candidates, key=_rank)
+        return str(steam_id64_to_account_id(int(steam_id64_str)))
     except Exception:
         logger.warning("Failed to parse loginusers.vdf", exc_info=True)
         return None
@@ -131,6 +143,27 @@ def list_steam_users() -> list[dict]:
     return users
 
 
+# Account id of the user logged in to Steam, as reported by the frontend
+# (read from Steam's UI). Most reliable source; in-memory only.
+_active_account_id: Optional[str] = None
+
+
+def set_active_steam_user(steam_id64: Optional[str]) -> Optional[str]:
+    """Record the logged-in user (SteamID64 from Steam's UI). Returns the account id, or None if invalid."""
+    global _active_account_id
+    try:
+        account_id = str(steam_id64_to_account_id(int(str(steam_id64))))
+    except (TypeError, ValueError):
+        _active_account_id = None
+        return None
+    if int(account_id) <= 0:
+        _active_account_id = None
+        return None
+    _active_account_id = account_id
+    logger.info("Active Steam user reported by Steam UI: %s", account_id)
+    return account_id
+
+
 def get_user_id(user_id_override: Optional[str] = None) -> str:
     """Get user ID, using override if provided, otherwise finding the logged-in user."""
     if user_id_override:
@@ -147,6 +180,9 @@ def get_user_id(user_id_override: Optional[str] = None) -> str:
     if not userdata_path.exists():
         raise RuntimeError("Could not find Steam userdata directory")
 
+    if _active_account_id and (userdata_path / _active_account_id).is_dir():
+        return _active_account_id
+
     logged_in_user = find_logged_in_user_from_loginusers(steam_root)
     if logged_in_user:
         user_path = userdata_path / logged_in_user
@@ -154,7 +190,11 @@ def get_user_id(user_id_override: Optional[str] = None) -> str:
             logger.info("Auto-detected logged in Steam user %s", logged_in_user)
             return logged_in_user
 
-    user_dirs = [d for d in userdata_path.iterdir() if d.is_dir() and d.name.isdigit()]
+    # "0" is Steam's anonymous/offline placeholder, never a real account
+    user_dirs = sorted(
+        (d for d in userdata_path.iterdir() if d.is_dir() and d.name.isdigit() and d.name != "0"),
+        key=lambda d: d.name,
+    )
     if not user_dirs:
         raise RuntimeError("No user directories found")
 

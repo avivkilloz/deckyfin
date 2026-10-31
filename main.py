@@ -72,7 +72,7 @@ from deckyfin_sources import (
     ensure_builtin_sources as _ensure_builtin_sources,
     source_config_root as _source_config_root,
 )
-from steam_utils import get_user_id, list_steam_users
+from steam_utils import get_user_id, list_steam_users, set_active_steam_user as _set_active_steam_user
 from steam_games import convert_appid_to_unsigned_32bit
 from deckyfin_steam_shortcuts import upsert_store_entry as _upsert_builtin_store_entry, attach_builtin_games as _attach_builtin_games
 from deckyfin_hidden import (
@@ -969,6 +969,17 @@ class Plugin:
             flag_file.touch(exist_ok=True)
         else:
             flag_file.unlink(missing_ok=True)
+
+    async def set_active_steam_user(self, steam_id64: str) -> dict:
+        """Frontend reports the SteamID64 logged in to Steam's UI (multi-account installs)."""
+        account_id = _set_active_steam_user(steam_id64)
+        try:
+            resolved = get_user_id()
+        except Exception as e:
+            resolved = None
+            _debug(f"set_active_steam_user: get_user_id failed: {e!r}")
+        _debug(f"set_active_steam_user: reported={account_id!r} using={resolved!r}")
+        return {"success": account_id is not None, "user_id": resolved}
 
     async def list_steam_users(self) -> list:
         return list_steam_users()

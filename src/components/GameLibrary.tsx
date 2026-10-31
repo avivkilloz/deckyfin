@@ -3,6 +3,7 @@ import { callable } from "@decky/api";
 import { Focusable } from "@decky/ui";
 import { MergedGame, Source, TransferStatus } from "../types";
 import { useArtwork } from "../hooks/useArtwork";
+import { readActiveSteamId64 } from "../steamUser";
 import { useSteamDownloads } from "../hooks/useSteamDownloads";
 import { GameCard } from "../components/GameCard";
 import { GameArtRow } from "../components/GameArtRow";
@@ -43,6 +44,7 @@ const clearPrefixInitStatus = callable<[prefix_id: string], { success: boolean }
 const listSaveSyncStatuses = callable<[], Record<string, { sync_id: string; game_name: string; source_id: string; direction: string; from_source_id?: string; to_source_id?: string; status: string; error: string | null; copied: string[]; saves_dir?: string }>>("list_save_sync_statuses");
 const clearSaveSyncStatus = callable<[sync_id: string], { success: boolean }>("clear_save_sync_status");
 const backupAllSaves = callable<[source_id: string], { success: boolean; started?: string[]; skipped?: string[]; failed?: string[]; error?: string }>("backup_all_saves");
+const setActiveSteamUser = callable<[steam_id64: string], { success: boolean; user_id: string | null }>("set_active_steam_user");
 const batchAddToSteam = callable<[source_id: string], { success: boolean; job_id?: string; error?: string }>("batch_add_to_steam");
 const getArtEligibleGames = callable<[], { id: string; name: string; sgdb_id: number; unsigned_appid: number | null }[]>("get_art_eligible_games");
 const applyDeckyfinCardArt = callable<[game_name: string, sgdb_id: number, game_id?: string], { success: boolean; error?: string }>("apply_deckyfin_card_art");
@@ -310,6 +312,10 @@ export const GameLibrary: VFC = () => {
   const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
+    // Tell the backend which Steam account is logged in before anything reads
+    // per-account files (shortcuts.vdf etc.) — multi-account installs.
+    const steamId64 = readActiveSteamId64();
+    if (steamId64) await setActiveSteamUser(steamId64).catch(() => {});
     let gamesRes: MergedGame[] = [];
     try {
       gamesRes = await getGames();
