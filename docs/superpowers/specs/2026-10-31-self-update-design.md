@@ -23,8 +23,11 @@ and the release assets are reachable without authentication.
 
 Every packaged build stamps `plugin.json`:
 - `version` — Stable: `X.Y.Z` (from the tag, as today). Main:
-  `<base>+main.<sha7>` where `<base>` is the `version` already in the repo's
-  `plugin.json` (e.g. `0.1.0+main.9ea1504`).
+  `<base>+main.<sha7>` where `<base>` is the newest `vX.Y.Z` tag reachable
+  from the commit (`git describe --tags --abbrev=0 --match 'v*'`, checkout with
+  full history), falling back to the repo's `plugin.json` version
+  (e.g. `0.1.8+main.9ea1504`). The repo's `plugin.json` still says `0.1.0`, so
+  using it directly would make main builds look older than Stable.
 - `deckyfin_build` (new object, ignored by Decky):
   `{ "channel": "stable" | "main", "commit": "<full sha>", "built_at": "<ISO8601 UTC>" }`.
 
