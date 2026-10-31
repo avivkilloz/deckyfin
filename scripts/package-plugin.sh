@@ -3,6 +3,9 @@
 # Usage: scripts/package-plugin.sh <version> <channel: stable|main>
 # Requires: npm run build already done; jq; python3.
 set -euo pipefail
+trap 'rm -rf package' EXIT
+
+cd "$(dirname "$0")/.."
 
 VERSION="${1:?version required}"
 CHANNEL="${2:?channel required}"
