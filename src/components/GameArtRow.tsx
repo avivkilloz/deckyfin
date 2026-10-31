@@ -17,9 +17,10 @@ interface Props {
   notInstalled?: boolean;
   download?: DownloadState;
   steamAppId?: number;
+  isHidden?: boolean;
 }
 
-export const GameArtRow = memo(function GameArtRow({ game, isInSteam, onClick, notInstalled, download, steamAppId }: Props) {
+export const GameArtRow = memo(function GameArtRow({ game, isInSteam, onClick, notInstalled, download, steamAppId, isHidden }: Props) {
   const [artUri, setArtUri] = useState<string | null>(null);
   // True once the backend art lookup finished (or was skipped) — gates the Steam art fallback so it never flashes.
   const [artResolved, setArtResolved] = useState(false);
@@ -56,7 +57,7 @@ export const GameArtRow = memo(function GameArtRow({ game, isInSteam, onClick, n
         borderRadius: "6px",
         overflow: "hidden",
         cursor: "pointer",
-        opacity: notInstalled ? 0.55 : 1,
+        opacity: notInstalled || isHidden ? 0.55 : 1,
         background: artBg ?? "linear-gradient(135deg, #667eea, #764ba2)",
       }}
       onFocus={(e) => (e.currentTarget.style.boxShadow = "0 0 0 3px #51cbf8, 0 0 12px rgba(81,203,248,0.4)")}
@@ -68,14 +69,25 @@ export const GameArtRow = memo(function GameArtRow({ game, isInSteam, onClick, n
         </div>
       )}
 
-      {notInstalled && (
-        <span style={{
-          position: "absolute", top: "6px", left: "8px",
-          fontSize: "10px", fontWeight: 700, padding: "2px 6px", borderRadius: "4px",
-          background: "rgba(0,0,0,0.65)", color: "#ccc",
-        }}>
-          Not installed
-        </span>
+      {(notInstalled || isHidden) && (
+        <div style={{ position: "absolute", top: "6px", left: "8px", display: "flex", gap: "4px" }}>
+          {isHidden && (
+            <span style={{
+              fontSize: "10px", fontWeight: 700, padding: "2px 6px", borderRadius: "4px",
+              background: "rgba(0,0,0,0.65)", color: "#e67e22",
+            }}>
+              Hidden
+            </span>
+          )}
+          {notInstalled && (
+            <span style={{
+              fontSize: "10px", fontWeight: 700, padding: "2px 6px", borderRadius: "4px",
+              background: "rgba(0,0,0,0.65)", color: "#ccc",
+            }}>
+              Not installed
+            </span>
+          )}
+        </div>
       )}
 
       {download && (

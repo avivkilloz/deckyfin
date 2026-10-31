@@ -12,8 +12,11 @@ import { CompactTextField } from "../components/CompactTextField";
 import { isBuiltinSourceType } from "../sourceStyle";
 import { readOwnedApps, mergeOwnedGames } from "../steamOwned";
 import { DownloadState, formatDownloadLabel } from "../downloadStates";
+import { applyHiddenFilter } from "../hiddenGames";
 
 const getGames = callable<[], MergedGame[]>("get_games");
+const getHiddenGames = callable<[], string[]>("get_hidden_games");
+const setGameHidden = callable<[game_id: string, hidden: boolean], { success: boolean; hidden?: string[]; error?: string }>("set_game_hidden");
 const listNonSteamGames = callable<[], { name: string }[]>("list_nonsteam_games");
 const getUiState = callable<[], Record<string, any>>("get_ui_state");
 const saveUiState = callable<[state: Record<string, any>], { success: boolean }>("save_ui_state");
@@ -97,6 +100,7 @@ export const GameLibrary: VFC = () => {
   const { applyArtById } = useArtwork();
   const [games, setGames] = useState<MergedGame[]>([]);
   const [steamNames, setSteamNames] = useState<Set<string>>(new Set());
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<"library" | "settings" | "game-detail" | "tasks">("library");
@@ -155,6 +159,7 @@ export const GameLibrary: VFC = () => {
   const [filterSteamStatus, setFilterSteamStatus] = useState<SteamFilter>("all");
   const [filterCollections, setFilterCollections] = useState<Set<string>>(new Set());
   const [filterInstallStatus, setFilterInstallStatus] = useState<InstallFilter>("all");
+  const [showHidden, setShowHidden] = useState(false);
 
   const clearFilters = () => {
     setSearchQuery("");
@@ -162,6 +167,7 @@ export const GameLibrary: VFC = () => {
     setFilterSteamStatus("all");
     setFilterCollections(new Set());
     setFilterInstallStatus("all");
+    setShowHidden(false);
   };
 
   const toggleSourceFilter = (id: string) => {
@@ -316,6 +322,12 @@ export const GameLibrary: VFC = () => {
       setSteamNames(new Set((steamGames || []).map((g) => g.name)));
     } catch (_) {
       setSteamNames(new Set());
+    }
+    try {
+      const hidden = await getHiddenGames();
+      setHiddenIds(new Set(hidden || []));
+    } catch (_) {
+      setHiddenIds(new Set());
     }
     // On first load only: restore the last open view and view mode from persisted config,
     // and pre-load all background task state so the tasks view never flashes "No background tasks."
@@ -486,13 +498,14 @@ export const GameLibrary: VFC = () => {
 
   const hasActiveFilters =
     searchQuery !== "" || filterSourceIds.size > 0 || filterSteamStatus !== "all" || filterCollections.size > 0 ||
-    (showOwned && filterInstallStatus !== "all");
+    (showOwned && filterInstallStatus !== "all") || showHidden;
 
   const activeFilterCount =
     (filterSourceIds.size > 0 ? 1 : 0) +
     (filterSteamStatus !== "all" ? 1 : 0) +
     (filterCollections.size > 0 ? 1 : 0) +
-    (showOwned && filterInstallStatus !== "all" ? 1 : 0);
+    (showOwned && filterInstallStatus !== "all" ? 1 : 0) +
+    (showHidden ? 1 : 0);
 
   // ── Live download/verify progress, and reload once a tracked app finishes ──
   const { downloads, markVerifying } = useSteamDownloads();
@@ -584,6 +597,28 @@ export const GameLibrary: VFC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displayGames]);
 
+  const handleToggleHidden = useCallback(async (gameId: string, hidden: boolean) => {
+    // Optimistic update so the library reflects the toggle immediately.
+    setHiddenIds((prev) => {
+      const next = new Set(prev);
+      if (hidden) next.add(gameId);
+      else next.delete(gameId);
+      return next;
+    });
+    try {
+      const res = await setGameHidden(gameId, hidden);
+      if (res?.hidden) setHiddenIds(new Set(res.hidden));
+    } catch (_) {
+      // Revert on failure
+      setHiddenIds((prev) => {
+        const next = new Set(prev);
+        if (hidden) next.delete(gameId);
+        else next.add(gameId);
+        return next;
+      });
+    }
+  }, []);
+
   const openGame = (game: MergedGame) => {
     setInitialSourceId(null); // manual navigation — no source restore
     setSelectedGame(game);
@@ -610,7 +645,11 @@ export const GameLibrary: VFC = () => {
   // Built-in sources (Steam Shortcuts) always exist, so they must not count toward
   // "user configured a source" for onboarding/empty-state messaging.
   const configuredSourceCount = xferSources.filter((s) => !s.builtin).length;
-  const filteredGames = displayGames.filter((g) => {
+  const hiddenFilteredGames = useMemo(
+    () => applyHiddenFilter(displayGames, hiddenIds, showHidden),
+    [displayGames, hiddenIds, showHidden],
+  );
+  const filteredGames = hiddenFilteredGames.filter((g) => {
     if (disabledIds.size > 0 && g.sources.every((s) => disabledIds.has(s.source_id)))
       return false;
     if (searchQuery && !g.name.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -968,6 +1007,12 @@ export const GameLibrary: VFC = () => {
         if (!val) setViewMode("list");
         setArtEnabledBackend(val).catch(() => {});
       }}
+      hiddenGamesCount={hiddenIds.size}
+      onShowHiddenGames={() => {
+        setShowHidden(true);
+        saveUiState({ view: "library" }).catch(() => {});
+        setView("library");
+      }}
     />;
   }
 
@@ -996,6 +1041,8 @@ export const GameLibrary: VFC = () => {
         downloads={downloads}
         markVerifying={markVerifying}
         finishingAppids={finishingAppids}
+        isHidden={hiddenIds.has(selectedGame.id)}
+        onToggleHidden={(hidden) => handleToggleHidden(selectedGame.id, hidden)}
       />
     );
   }
@@ -1519,6 +1566,21 @@ export const GameLibrary: VFC = () => {
               </Focusable>
             </>
           )}
+
+          {/* Visibility */}
+          <div style={{ fontSize: "0.75em", color: "#888", margin: "12px 0 6px", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            Visibility
+          </div>
+          <Focusable focusClassName="" style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+            <Focusable
+              onActivate={() => setShowHidden((v) => !v)}
+              onClick={() => setShowHidden((v) => !v)}
+              focusClassName="is-focused"
+              style={CHIP(showHidden)}
+            >
+              Show hidden
+            </Focusable>
+          </Focusable>
         </div>
       )}
 
@@ -1570,6 +1632,7 @@ export const GameLibrary: VFC = () => {
               notInstalled={isNotInstalled(game)}
               download={downloads[appidOf(game) ?? -1]}
               steamAppId={appidOf(game)}
+              isHidden={hiddenIds.has(game.id)}
             />
           ))}
         </div>
@@ -1593,6 +1656,7 @@ export const GameLibrary: VFC = () => {
               notInstalled={isNotInstalled(game)}
               download={downloads[appidOf(game) ?? -1]}
               steamAppId={appidOf(game)}
+              isHidden={hiddenIds.has(game.id)}
             />
           ))}
         </div>
@@ -1601,6 +1665,7 @@ export const GameLibrary: VFC = () => {
           {filteredGames.map((game) => {
             const rowNotInstalled = isNotInstalled(game);
             const rowDownload = downloads[appidOf(game) ?? -1];
+            const rowHidden = hiddenIds.has(game.id);
             return (
             <Focusable
               key={game.id}
@@ -1613,7 +1678,7 @@ export const GameLibrary: VFC = () => {
                 cursor: "pointer",
                 border: "1px solid rgba(255,255,255,0.08)",
                 background: "transparent",
-                opacity: rowNotInstalled ? 0.55 : 1,
+                opacity: rowNotInstalled || rowHidden ? 0.55 : 1,
               }}
               onFocus={(e) => (e.currentTarget.style.boxShadow = "0 0 0 3px #51cbf8, 0 0 12px rgba(81,203,248,0.4)")}
               onBlur={(e) => (e.currentTarget.style.boxShadow = "none")}
@@ -1623,6 +1688,11 @@ export const GameLibrary: VFC = () => {
               <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                 <span style={{ fontSize: "13px", fontWeight: 600, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{game.name}</span>
                 <div style={{ display: "flex", alignItems: "center", gap: "4px", flexShrink: 0 }}>
+                  {rowHidden && (
+                    <span style={{ fontSize: "10px", fontWeight: 700, padding: "1px 5px", borderRadius: "4px", background: "rgba(230,126,34,0.18)", color: "#e67e22" }}>
+                      Hidden
+                    </span>
+                  )}
                   {rowNotInstalled && (
                     <span style={{ fontSize: "10px", fontWeight: 700, padding: "1px 5px", borderRadius: "4px", background: "rgba(255,255,255,0.08)", color: "#aaa" }}>
                       Not installed

@@ -223,6 +223,10 @@ interface Props {
   /** Mark an appid the user just asked Steam to verify. */
   /** Placeholder appids whose download finished and whose reload is still in flight. */
   finishingAppids?: Set<number>;
+  /** Whether this game's merged id is in the hidden-games list. */
+  isHidden?: boolean;
+  /** Toggle hidden state for this game (true = hide, false = unhide). */
+  onToggleHidden?: (hidden: boolean) => void;
 }
 
 const NO_DOWNLOADS: Record<number, DownloadState> = {};
@@ -276,7 +280,7 @@ const openInSteamLibrary = (appid: number) => {
   closeSideMenus();
 };
 
-export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigateToSettings, initialSourceId, runningTaskCount = 0, artEnabled = true, downloads = NO_DOWNLOADS, markVerifying, finishingAppids = NO_APPIDS }) => {
+export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigateToSettings, initialSourceId, runningTaskCount = 0, artEnabled = true, downloads = NO_DOWNLOADS, markVerifying, finishingAppids = NO_APPIDS, isHidden = false, onToggleHidden }) => {
   // ── Refs ─────────────────────────────────────────────────────────────
   const rootRef = useRef<HTMLDivElement>(null);
   const backRef = useRef<HTMLDivElement>(null);
@@ -2055,6 +2059,27 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
                 </Fragment>
               ))}
             </div>
+            {onToggleHidden && (
+              <Focusable
+                onActivate={() => onToggleHidden(!isHidden)}
+                onClick={() => onToggleHidden(!isHidden)}
+                focusClassName="is-focused"
+                style={{
+                  ...BTN_STYLE,
+                  display: "block",
+                  width: "100%",
+                  boxSizing: "border-box" as const,
+                  textAlign: "center" as const,
+                  borderRadius: "0 0 6px 6px",
+                  borderTop: "1px solid #2a2a2a",
+                  border: isHidden ? "1px solid #27ae60" : BTN_STYLE.border,
+                  color: isHidden ? "#2ecc71" : BTN_STYLE.color,
+                  background: isHidden ? "#1a3a1a" : "transparent",
+                }}
+              >
+                {isHidden ? "Unhide" : "Hide from Deckyfin"}
+              </Focusable>
+            )}
           </div>
         )}
       </div>

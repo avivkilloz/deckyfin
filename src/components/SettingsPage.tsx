@@ -72,6 +72,8 @@ interface Props {
   onBack: () => void;
   artEnabled?: boolean;
   onArtEnabledChange?: (val: boolean) => void;
+  hiddenGamesCount?: number;
+  onShowHiddenGames?: () => void;
 }
 
 const BTN_STYLE: React.CSSProperties = {
@@ -84,7 +86,7 @@ const BTN_STYLE: React.CSSProperties = {
   color: "#e0e0e0",
 };
 
-export const SettingsPage: VFC<Props> = ({ onBack, artEnabled = true, onArtEnabledChange }) => {
+export const SettingsPage: VFC<Props> = ({ onBack, artEnabled = true, onArtEnabledChange, hiddenGamesCount = 0, onShowHiddenGames }) => {
   const backRef = useRef<HTMLDivElement>(null);
 
   // ── Auto-focus Back button on mount so B-button works immediately ──
@@ -606,6 +608,23 @@ export const SettingsPage: VFC<Props> = ({ onBack, artEnabled = true, onArtEnabl
           {showAddForm ? "✕ Cancel" : "+ Add Source"}
         </Focusable>
       </div>
+
+      {hiddenGamesCount > 0 && (
+        onShowHiddenGames ? (
+          <Focusable
+            onActivate={onShowHiddenGames}
+            onClick={onShowHiddenGames}
+            focusClassName="is-focused"
+            style={{ display: "block", margin: "0 0 10px", padding: "4px 10px", borderRadius: "4px", cursor: "pointer", fontSize: "0.82em", color: "#888" }}
+          >
+            {hiddenGamesCount} hidden game{hiddenGamesCount !== 1 ? "s" : ""} — tap to view
+          </Focusable>
+        ) : (
+          <div style={{ margin: "0 0 10px", fontSize: "0.82em", color: "#888" }}>
+            {hiddenGamesCount} hidden game{hiddenGamesCount !== 1 ? "s" : ""}
+          </div>
+        )
+      )}
 
       {/* Add source form */}
       {showAddForm && (
