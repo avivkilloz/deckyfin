@@ -71,11 +71,29 @@ jobs:
           echo "version=${BASE}+main.$(git rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
       - name: Package plugin
         run: scripts/package-plugin.sh "${{ steps.ver.outputs.version }}" main
+      - name: Guard against a newer commit on main
+        # `concurrency: cancel-in-progress` cancels runs by arrival order, not
+        # commit order — a slow run for an older commit can still finish and
+        # publish after a faster run for a newer commit already did, leaving
+        # latest-main pointing at stale code. Re-check main's tip right
+        # before publishing and skip (without failing the job) if it moved.
+        id: guard
+        run: |
+          git fetch origin main
+          latest_main_sha="$(git rev-parse origin/main)"
+          if [ "$latest_main_sha" != "$GITHUB_SHA" ]; then
+            echo "Newer commit on main ($latest_main_sha); skipping latest-main publish for $GITHUB_SHA"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Move latest-main tag
+        if: steps.guard.outputs.skip != 'true'
         run: |
           git tag -f latest-main
           git push -f origin refs/tags/latest-main
       - name: Publish latest-main pre-release
+        if: steps.guard.outputs.skip != 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest-main
@@ -83,6 +101,14 @@ jobs:
           prerelease: true
           make_latest: false
           body: "Rolling build of main at ${{ github.sha }}. Not a stable release."
+          # Keep deckyfin.zip listed before version.json: softprops/action-gh-release
+          # uploads assets in order, and uploads aren't atomic across a mid-window
+          # reader. If the zip lands first, a client that reads version.json during
+          # that window sees stale metadata paired with the already-fresh zip — so
+          # clicking "Update" still installs the correct, latest content (just
+          # possibly mislabeled for a moment). Reversing the order would risk the
+          # opposite: fresh metadata pointing at a zip that hasn't been replaced yet,
+          # so "Update" could install stale code while claiming it's current.
           files: |
             deckyfin.zip
             version.json
