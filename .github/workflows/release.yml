@@ -37,30 +37,14 @@ jobs:
       - name: Build frontend
         run: npm run build
 
-      - name: Stamp version into plugin.json
-        run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          jq --arg v "$VERSION" '.version = $v' plugin.json > plugin.json.tmp
-          mv plugin.json.tmp plugin.json
-
       - name: Package plugin
-        run: |
-          mkdir -p package/deckyfin
-          # Core plugin files
-          cp main.py plugin.json package.json LICENSE package/deckyfin/
-          # Built frontend
-          cp -r dist package/deckyfin/
-          # Python modules
-          cp -r py_modules package/deckyfin/
-          # Plugin icon (plugin.json references src/assets/icon.svg)
-          mkdir -p package/deckyfin/src
-          cp -r src/assets package/deckyfin/src/
-          # Zip with the plugin folder at the root
-          cd package && zip -r ../deckyfin.zip deckyfin/
+        run: scripts/package-plugin.sh "${GITHUB_REF_NAME#v}" stable
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: deckyfin.zip
+          files: |
+            deckyfin.zip
+            version.json
           generate_release_notes: true
           fail_on_unmatched_files: true

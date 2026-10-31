@@ -41,3 +41,49 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  main-build:
+    name: Publish latest-main build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [test, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: latest-main
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+      - run: npm ci
+      - run: npm run build
+      - name: Compute version
+        id: ver
+        run: |
+          BASE="$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true)"
+          BASE="${BASE#v}"
+          [ -n "$BASE" ] || BASE="$(jq -r .version plugin.json)"
+          echo "version=${BASE}+main.$(git rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Package plugin
+        run: scripts/package-plugin.sh "${{ steps.ver.outputs.version }}" main
+      - name: Move latest-main tag
+        run: |
+          git tag -f latest-main
+          git push -f origin refs/tags/latest-main
+      - name: Publish latest-main pre-release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest-main
+          name: Latest main (${{ steps.ver.outputs.version }})
+          prerelease: true
+          make_latest: false
+          body: "Rolling build of main at ${{ github.sha }}. Not a stable release."
+          files: |
+            deckyfin.zip
+            version.json
+          fail_on_unmatched_files: true

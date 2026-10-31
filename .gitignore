@@ -13,6 +13,8 @@ dist/
 # Build
 .DS_Store
 #*.log
+deckyfin.zip
+version.json
 
 # IDE
 .vscode/
