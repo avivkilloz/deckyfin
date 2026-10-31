@@ -594,6 +594,7 @@ export const SettingsPage: VFC<Props> = ({ onBack, artEnabled = true, onArtEnabl
   const [updateFeedback, setUpdateFeedback] = useState<string | null>(null);
   const [installError, setInstallError] = useState<string | null>(null);
   const [updateLoadError, setUpdateLoadError] = useState<string | null>(null);
+  const [channelError, setChannelError] = useState<string | null>(null);
   // Bumped before every loadUpdateInfo() call; a response only applies its
   // state updates if it's still the most recently issued request, so a
   // rapid channel switch (or a switch that races the mount fetch) can't
@@ -623,11 +624,12 @@ export const SettingsPage: VFC<Props> = ({ onBack, artEnabled = true, onArtEnabl
     if (ch === updateInfo?.channel) return;
     setUpdateFeedback(null);
     setInstallError(null);
+    setChannelError(null);
     try {
       const res = await setUpdateChannel(ch);
-      if (!res?.success) setUpdateFeedback("Couldn't save the channel choice");
+      if (!res?.success) setChannelError("Couldn't save the channel choice");
     } catch {
-      setUpdateFeedback("Couldn't save the channel choice");
+      setChannelError("Couldn't save the channel choice");
     }
     await loadUpdateInfo(ch);
   };
@@ -635,6 +637,7 @@ export const SettingsPage: VFC<Props> = ({ onBack, artEnabled = true, onArtEnabl
   const handleCheckAgain = () => {
     setUpdateFeedback(null);
     setInstallError(null);
+    setChannelError(null);
     loadUpdateInfo(updateInfo?.channel);
   };
 
@@ -1457,7 +1460,11 @@ export const SettingsPage: VFC<Props> = ({ onBack, artEnabled = true, onArtEnabl
         ))}
       </Focusable>
 
-      {updateLoadError && (
+      {channelError && (
+        <p style={{ fontSize: "0.85em", color: "tomato", marginBottom: "8px" }}>{channelError}</p>
+      )}
+
+      {updateLoadError && !updateInfo && (
         <p style={{ fontSize: "0.85em", color: "tomato", marginBottom: "8px" }}>{updateLoadError}</p>
       )}
 
@@ -1465,24 +1472,38 @@ export const SettingsPage: VFC<Props> = ({ onBack, artEnabled = true, onArtEnabl
         <p style={{ fontSize: "0.85em", color: "#888", marginBottom: "10px" }}>Checking…</p>
       )}
 
-      {updateInfo && (
-        <div style={{ fontSize: "0.85em", color: "#e0e0e0", marginBottom: "10px", lineHeight: 1.7 }}>
-          <div>Installed: {describeBuild(updateInfo.installed)}</div>
-          <div>
-            Latest:{" "}
-            {updateInfo.latest
-              ? `${updateInfo.latest.version} · ${
-                  updateInfo.latest.published_at
-                    ? new Date(updateInfo.latest.published_at).toLocaleDateString()
-                    : "unknown date"
-                }`
-              : updateInfo.error || "Unknown"}
+      {updateInfo && (() => {
+        // A failed reload (updateLoadError) after an earlier successful check
+        // leaves `updateInfo` holding stale data — don't keep showing its old
+        // "latest" value as if it were current; show the error in its place
+        // instead, once, on the Latest line. A backend-reported error
+        // (updateInfo.error, e.g. rate limiting) is shown the same way.
+        const effectiveError = updateLoadError || updateInfo.error;
+        const effectiveLatest = updateLoadError ? null : updateInfo.latest;
+        const channelLabel = updateInfo.channel === "main" ? "Latest main" : "Stable";
+        return (
+          <div style={{ fontSize: "0.85em", color: "#e0e0e0", marginBottom: "10px", lineHeight: 1.7 }}>
+            <div>Installed: {describeBuild(updateInfo.installed)}</div>
+            <div>
+              Latest on {channelLabel}:{" "}
+              {effectiveError
+                ? effectiveError
+                : effectiveLatest
+                  ? `${effectiveLatest.version}${
+                      effectiveLatest.commit ? ` (${effectiveLatest.commit.slice(0, 7)})` : ""
+                    } · ${
+                      effectiveLatest.published_at
+                        ? new Date(effectiveLatest.published_at).toLocaleDateString()
+                        : "unknown date"
+                    }`
+                  : "Unknown"}
+            </div>
+            <div>Status: {effectiveError ? "—" : statusLabel(updateInfo.status, null)}</div>
           </div>
-          <div>Status: {statusLabel(updateInfo.status, updateInfo.error)}</div>
-        </div>
-      )}
+        );
+      })()}
 
-      {updateInfo?.status === "update_available" && updateInfo.latest && (
+      {updateInfo?.status === "update_available" && !updateLoadError && updateInfo.latest && (
         <Focusable
           onActivate={runningTaskCount > 0 ? undefined : handleUpdateDeckyfin}
           onClick={runningTaskCount > 0 ? undefined : handleUpdateDeckyfin}
@@ -1500,7 +1521,7 @@ export const SettingsPage: VFC<Props> = ({ onBack, artEnabled = true, onArtEnabl
           Update Deckyfin
         </Focusable>
       )}
-      {updateInfo?.status === "update_available" && runningTaskCount > 0 && (
+      {updateInfo?.status === "update_available" && !updateLoadError && runningTaskCount > 0 && (
         <span style={{ display: "block", fontSize: "0.78em", color: "#888", marginBottom: "8px" }}>
           Finish running tasks first
         </span>
