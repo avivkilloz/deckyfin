@@ -1029,6 +1029,7 @@ export const GameLibrary: VFC = () => {
         refreshBgTasks();
         setView("library");
       }}
+      runningTaskCount={runningTaskCount}
     />;
   }
 

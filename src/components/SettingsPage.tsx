@@ -5,6 +5,7 @@ import { Source } from "../types";
 import { sourceTypeLabel, sourceTypeColors } from "../sourceStyle";
 import { CompactTextField } from "../components/CompactTextField";
 import { readOwnedApps } from "../steamOwned";
+import { BuildInfo, LatestInfo, describeBuild, statusLabel, installViaDecky } from "../updates";
 
 const GUIDES_BASE = "https://github.com/avivkilloz/deckyfin/blob/main/guides";
 const SOURCE_GUIDE_URLS: Record<string, string> = {
@@ -68,12 +69,23 @@ const installProtontricks = callable<
   { success: boolean; message: string }
 >("install_protontricks");
 
+type UpdateInfoResult = {
+  channel: "stable" | "main";
+  installed: BuildInfo;
+  latest: LatestInfo | null;
+  status: string;
+  error: string | null;
+};
+const getUpdateInfo = callable<[channel?: string], UpdateInfoResult>("get_update_info");
+const setUpdateChannel = callable<[channel: string], { success: boolean }>("set_update_channel");
+
 interface Props {
   onBack: () => void;
   artEnabled?: boolean;
   onArtEnabledChange?: (val: boolean) => void;
   hiddenGamesCount?: number;
   onShowHiddenGames?: () => void;
+  runningTaskCount?: number;
 }
 
 const BTN_STYLE: React.CSSProperties = {
@@ -86,7 +98,7 @@ const BTN_STYLE: React.CSSProperties = {
   color: "#e0e0e0",
 };
 
-export const SettingsPage: VFC<Props> = ({ onBack, artEnabled = true, onArtEnabledChange, hiddenGamesCount = 0, onShowHiddenGames }) => {
+export const SettingsPage: VFC<Props> = ({ onBack, artEnabled = true, onArtEnabledChange, hiddenGamesCount = 0, onShowHiddenGames, runningTaskCount = 0 }) => {
   const backRef = useRef<HTMLDivElement>(null);
 
   // ── Auto-focus Back button on mount so B-button works immediately ──
@@ -575,6 +587,59 @@ export const SettingsPage: VFC<Props> = ({ onBack, artEnabled = true, onArtEnabl
     setPtInstalling(false);
   };
   // ── End Protontricks ────────────────────────────────────────────────
+
+  // ── Updates ──────────────────────────────────────────────────────────
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfoResult | null>(null);
+  const [updateLoading, setUpdateLoading] = useState(false);
+  const [updateFeedback, setUpdateFeedback] = useState<string | null>(null);
+  const [installError, setInstallError] = useState<string | null>(null);
+  const [updateLoadError, setUpdateLoadError] = useState<string | null>(null);
+
+  const loadUpdateInfo = useCallback(async (channel?: string) => {
+    setUpdateLoading(true);
+    try {
+      const res = await getUpdateInfo(channel);
+      setUpdateInfo(res);
+      setUpdateLoadError(null);
+    } catch (err: any) {
+      setUpdateLoadError(err?.message || "Failed to check for updates");
+    }
+    setUpdateLoading(false);
+  }, []);
+
+  useEffect(() => {
+    loadUpdateInfo();
+  }, [loadUpdateInfo]);
+
+  const handleSelectChannel = async (ch: "stable" | "main") => {
+    if (ch === updateInfo?.channel) return;
+    setUpdateFeedback(null);
+    setInstallError(null);
+    try {
+      await setUpdateChannel(ch);
+    } catch {}
+    await loadUpdateInfo(ch);
+  };
+
+  const handleCheckAgain = () => {
+    setUpdateFeedback(null);
+    setInstallError(null);
+    loadUpdateInfo(updateInfo?.channel);
+  };
+
+  const handleUpdateDeckyfin = async () => {
+    if (runningTaskCount > 0 || !updateInfo?.latest) return;
+    setInstallError(null);
+    setUpdateFeedback("Starting install via Decky…");
+    const err = await installViaDecky(updateInfo.latest.zip_url, updateInfo.latest.version);
+    if (err) {
+      setUpdateFeedback(null);
+      setInstallError(err);
+    } else {
+      setUpdateFeedback("Install started — follow Decky's confirmation dialog.");
+    }
+  };
+  // ── End Updates ──────────────────────────────────────────────────────
 
   return (
     <Focusable
@@ -1347,6 +1412,118 @@ export const SettingsPage: VFC<Props> = ({ onBack, artEnabled = true, onArtEnabl
           {artEnabled ? "Enabled" : "Disabled"}
         </Focusable>
       </div>
+
+      <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.12)", margin: "20px 0" }} />
+
+      {/* ── Updates ─────────────────────────────────────────────────────── */}
+      <h4 style={{ margin: "0 0 10px 0" }}>Updates</h4>
+
+      <Focusable focusClassName="" style={{ display: "flex", gap: "6px", marginBottom: "10px" }}>
+        {([
+          { ch: "stable" as const, label: "Stable" },
+          { ch: "main" as const, label: "Latest main" },
+        ]).map(({ ch, label }) => (
+          <Focusable
+            key={ch}
+            onActivate={() => handleSelectChannel(ch)}
+            onClick={() => handleSelectChannel(ch)}
+            focusClassName="is-focused"
+            style={{
+              padding: "4px 10px",
+              margin: "0 2px",
+              fontSize: "0.82em",
+              borderRadius: "12px",
+              cursor: "pointer",
+              border: updateInfo?.channel === ch ? "1px solid #0078d4" : "1px solid #555",
+              background: updateInfo?.channel === ch ? "#0078d4" : "transparent",
+              color: updateInfo?.channel === ch ? "white" : "#ccc",
+            }}
+          >
+            {label}
+          </Focusable>
+        ))}
+      </Focusable>
+
+      {updateLoadError && (
+        <p style={{ fontSize: "0.85em", color: "tomato", marginBottom: "8px" }}>{updateLoadError}</p>
+      )}
+
+      {!updateInfo && !updateLoadError && (
+        <p style={{ fontSize: "0.85em", color: "#888", marginBottom: "10px" }}>Checking…</p>
+      )}
+
+      {updateInfo && (
+        <div style={{ fontSize: "0.85em", color: "#e0e0e0", marginBottom: "10px", lineHeight: 1.7 }}>
+          <div>Installed: {describeBuild(updateInfo.installed)}</div>
+          <div>
+            Latest:{" "}
+            {updateInfo.latest
+              ? `${updateInfo.latest.version} · ${
+                  updateInfo.latest.published_at
+                    ? new Date(updateInfo.latest.published_at).toLocaleDateString()
+                    : "unknown date"
+                }`
+              : updateInfo.error || "Unknown"}
+          </div>
+          <div>Status: {statusLabel(updateInfo.status, updateInfo.error)}</div>
+        </div>
+      )}
+
+      {updateInfo?.status === "update_available" && updateInfo.latest && (
+        <Focusable
+          onActivate={runningTaskCount > 0 ? undefined : handleUpdateDeckyfin}
+          onClick={runningTaskCount > 0 ? undefined : handleUpdateDeckyfin}
+          focusClassName="is-focused"
+          style={{
+            ...BTN_STYLE,
+            display: "inline-block",
+            marginBottom: "8px",
+            borderColor: "#27ae60",
+            color: "#2ecc71",
+            opacity: runningTaskCount > 0 ? 0.4 : 1,
+            cursor: runningTaskCount > 0 ? "default" : "pointer",
+          }}
+        >
+          Update Deckyfin
+        </Focusable>
+      )}
+      {updateInfo?.status === "update_available" && runningTaskCount > 0 && (
+        <span style={{ display: "block", fontSize: "0.78em", color: "#888", marginBottom: "8px" }}>
+          Finish running tasks first
+        </span>
+      )}
+
+      {updateFeedback && (
+        <p style={{ fontSize: "0.85em", color: "lightgreen", marginBottom: "8px" }}>{updateFeedback}</p>
+      )}
+
+      {installError && (
+        <div style={{ fontSize: "0.82em", color: "tomato", marginBottom: "8px", lineHeight: 1.5 }}>
+          <div>{installError}</div>
+          {updateInfo?.latest && (
+            <div style={{ wordBreak: "break-all" as const, color: "#aaa", marginTop: "2px" }}>{updateInfo.latest.zip_url}</div>
+          )}
+          <div style={{ marginTop: "2px" }}>
+            Install it from Decky settings → Developer → Install plugin from URL
+          </div>
+        </div>
+      )}
+
+      <Focusable
+        onActivate={handleCheckAgain}
+        onClick={handleCheckAgain}
+        focusClassName="is-focused"
+        style={{
+          display: "inline-block",
+          fontSize: "0.82em",
+          color: "#0078d4",
+          textDecoration: "underline",
+          cursor: "pointer",
+          opacity: updateLoading ? 0.6 : 1,
+        }}
+      >
+        {updateLoading ? "Checking…" : "Check again"}
+      </Focusable>
 
       <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.12)", margin: "20px 0" }} />
 
