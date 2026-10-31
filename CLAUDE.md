@@ -15,6 +15,9 @@ npm run build
 # Watch frontend for changes
 npm run watch
 
+# Run frontend unit tests (vitest, pure modules only — see "Frontend tests" below)
+npm test
+
 # Run backend tests
 pytest tests/ -v
 
@@ -72,3 +75,15 @@ All three snapshots are persisted in the game config (`steam_snapshot`, `deps_sn
 - `start_dir` — working directory when launching (not the same as game root)
 
 **callable name collision:** If a `callable()` proxy name matches a React `useState` setter, rename the state setter with a `State` suffix (e.g. `setNeedsRestartState`).
+
+**Built-in sources:** `steam_shortcuts` and `steam_library` are synthetic sources that surface orphan Steam shortcuts and installed Store games as regular games, without the user configuring a folder. They're seeded by `ensure_builtin_sources()` (`deckyfin_sources.py`) with `builtin: true`, `enabled: false` (disabled until the user opts in), and `path: null`. Each has its own Deckyfin-only config root under `~/.config/deckyfin/<type>/` (`store_root()` in `deckyfin_steam_shortcuts.py` / `deckyfin_steam_library.py`) for data Steam doesn't track (deps, sync paths, etc). Backend type set: `BUILTIN_SOURCE_TYPES` (`deckyfin_consts.py`); frontend: `isBuiltinSourceType()` (`src/sourceStyle.ts`).
+
+**Per-source config name:** A merged game (`MergedGame`) can be named differently in each source's own config. Any call that writes or looks up one source's record (`update_game_config`, `remove_game`, etc.) must use that source's `config.name` (`currentConfig.name` / `storedName` in `GameDetail`) — never the merged `game.name`, which is only for UI display and cross-source cache keys.
+
+**Steam account detection:** On multi-account installs, the frontend reads the SteamID64 of the account logged in to Steam's UI from `window.App.m_CurrentUser.strSteamID` (`src/steamUser.ts`, guarded) and reports it via the `set_active_steam_user` callable before any per-account read (shortcuts.vdf, userdata, etc). The backend falls back to `loginusers.vdf` — its `MostRecent` flag, else the newest `timestamp` (ties broken by `AutoLogin`) — and only then to a sorted `userdata/<id>` listing. `userdata/0` is Steam's anonymous/offline placeholder and is always excluded (`steam_utils.py`).
+
+**Steam client APIs are internal:** `SteamClient.*` and `window.App`/`collectionStore`/`appStore` are undocumented Steam UI internals with no stability guarantee across Steam updates. Always guard access with a `typeof`/optional-chaining check and a try/catch (see `src/steamUser.ts`, `src/steamOwned.ts`).
+
+**Hidden games:** Hiding a game from the Deckyfin library is tracked centrally, not per source — a list of `MergedGame.id` strings under the `hidden_games` key in the app config (`~/.config/deckyfin/config.json`, `deckyfin_hidden.py`), so it survives rescans and applies uniformly regardless of which source(s) the game comes from.
+
+**Frontend tests:** `npm test` runs vitest (`*.test.ts` files) over the pure helper modules in `src/`. A module is only testable this way if it (and everything it imports) avoids importing `@decky/api`/`@decky/ui` at module level — extract logic into a plain `.ts` helper first, and keep the `@decky/*`-touching code in the `.tsx` component that calls it.
