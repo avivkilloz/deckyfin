@@ -978,7 +978,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
           if (s.status === "done") {
             const installed = s.installed || [];
             setLastInstalledDeps(installed);
-            updateGameConfig(currentConfig.name, { deps_snapshot: installed }, selectedSource.source_id).catch(() => {});
+            updateGameConfig(currentConfig.name, { deps_snapshot: installed, ...(isLibrarySource ? { steam_app_id: currentConfig.steam_app_id ?? null } : {}) }, selectedSource.source_id).catch(() => {});
             clearDepInstallStatus(currentConfig.name, selectedSource.source_id).catch(() => {});
           }
         }
@@ -1001,7 +1001,7 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
             if (s.status === "done") {
               const deps = pendingDepsRef.current;
               setLastInstalledDeps(deps);
-              updateGameConfig(currentConfig.name, { deps_snapshot: deps }, selectedSource.source_id).catch(() => {});
+              updateGameConfig(currentConfig.name, { deps_snapshot: deps, ...(isLibrarySource ? { steam_app_id: currentConfig.steam_app_id ?? null } : {}) }, selectedSource.source_id).catch(() => {});
               clearDepInstallStatus(currentConfig.name, selectedSource.source_id).catch(() => {});
             }
           } else {
@@ -1154,7 +1154,12 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
   // ── Auto-save config on any field change (debounced 600ms) ────────────────
   useEffect(() => {
     const payload = {
-      name, executable, start_dir: startDir || null, steam_app_id: steamAppId ?? null,
+      name, executable, start_dir: startDir || null,
+      // For Store games, pin this to the config's own appid rather than the
+      // (also user-visible) steamAppId field: the backend uses this key to
+      // skip a re-scan of every Steam library to recover it (main.py's
+      // update_game_config Store branch).
+      steam_app_id: isLibrarySource ? (currentConfig.steam_app_id ?? null) : (steamAppId ?? null),
       proton_version: protonVersion || null, proton_dependencies: mergedDeps,
       proton_sync_paths: syncPaths, launch_options: launchOptions || null,
       selected_launchers: checkedLaunchers, collections: mergedCollections,
@@ -1476,7 +1481,9 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
         name,
         executable,
         start_dir: startDir || null,
-        steam_app_id: steamAppId ?? null,
+        // See the auto-save effect above: pin this to currentConfig's appid for
+        // Store games so the backend skips its library re-scan.
+        steam_app_id: isLibrarySource ? (currentConfig.steam_app_id ?? null) : (steamAppId ?? null),
         proton_version: protonVersion || null,
         proton_dependencies: mergedDeps,
         proton_sync_paths: syncPaths,
@@ -1637,7 +1644,9 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
       steamBaselineRef.current = { proton: protonVersion, launch: finalLaunchOptions };
       updateGameConfig(
         storedName,
-        { steam_snapshot: JSON.stringify(snapshot), ...(collectionsChanged ? { needs_restart: true } : {}) },
+        // Only reachable for Store games (isLibrarySource) — include the appid so
+        // the backend skips its library re-scan.
+        { steam_snapshot: JSON.stringify(snapshot), steam_app_id: currentConfig.steam_app_id ?? null, ...(collectionsChanged ? { needs_restart: true } : {}) },
         selectedSource.source_id,
       ).catch(() => {});
       setFeedback({ ok: true, msg: "Applied to Steam" });
