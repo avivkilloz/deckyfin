@@ -1491,10 +1491,15 @@ class Plugin:
             _debug(f"list_subfolders: unexpected error for {path!r}: {e}")
             return []
 
-    async def get_game_prefix_path(self, shortcut_app_id: int) -> Optional[str]:
-        """Return the Proton prefix path for a non-Steam shortcut, or None if not initialised."""
+    async def get_game_prefix_path(self, shortcut_app_id: int, library_path: Optional[str] = None) -> Optional[str]:
+        """Return the Proton prefix path, or None if not initialised.
+
+        `library_path` is the Steam library holding the game (Store games may live
+        on another drive); omit it for non-Steam shortcuts, which always live under
+        the Steam root.
+        """
         from deckyfin_saves import get_prefix_path
-        return get_prefix_path(shortcut_app_id)
+        return get_prefix_path(shortcut_app_id, library_path)
 
     async def list_dir_contents(self, path: str) -> dict:
         """List files and subdirectories at path. Returns {dirs, files}."""

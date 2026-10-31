@@ -107,7 +107,7 @@ const listPrefixInitStatuses = callable<
 const clearPrefixInitStatus = callable<[prefix_id: string], { success: boolean }>("clear_prefix_init_status");
 const getUiState = callable<[], Record<string, any>>("get_ui_state");
 const saveUiState = callable<[state: Record<string, any>], { success: boolean }>("save_ui_state");
-const getGamePrefixPath = callable<[shortcut_app_id: number], string | null>("get_game_prefix_path");
+const getGamePrefixPath = callable<[shortcut_app_id: number, library_path?: string | null], string | null>("get_game_prefix_path");
 const listDirContents = callable<[path: string], { dirs: string[]; files: string[] }>("list_dir_contents");
 const syncSaves = callable<
   [game_name: string, source_id: string, direction: string, shortcut_app_id: number],
@@ -331,8 +331,14 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
   const isShortcutSource = selectedSource?.source_type === "steam_shortcuts";
   const isLibrarySource = selectedSource?.source_type === "steam_library";
   const isBuiltinSource = isShortcutSource || isLibrarySource;
+  // Store games: currentConfig.has_prefix is only as fresh as the last library
+  // reload. If the prefix browser finds a prefix mid-session (e.g. the user just
+  // launched the game from Steam) this flips true so deps/saves sections appear
+  // without waiting for a reload. Reset whenever the displayed game changes.
+  const [prefixFoundLocally, setPrefixFoundLocally] = useState(false);
+  useEffect(() => { setPrefixFoundLocally(false); }, [game.name, selectedSource?.source_id]);
   // Store games: prefix-dependent actions only once a prefix exists or Proton is forced
-  const hasPrefix = !isLibrarySource || !!currentConfig.has_prefix;
+  const hasPrefix = !isLibrarySource || !!currentConfig.has_prefix || prefixFoundLocally;
 
   // ── Editable config fields ──────────────────────────────────────────────
   const [name, setName] = useState(currentConfig.name);
@@ -1221,11 +1227,16 @@ export const GameDetail: VFC<Props> = ({ game, onBack, onNeedsRestart, onNavigat
   };
 
   // Store games' prefix lives in their own library's compatdata (backend-resolved);
-  // non-Steam shortcuts' prefix is looked up under the Steam root.
+  // non-Steam shortcuts' prefix is looked up under the Steam root. Always ask the
+  // backend fresh rather than trusting currentConfig.prefix_path/has_prefix, which
+  // are only as recent as the last library reload — a prefix created by launching
+  // the game from Steam while this page is open wouldn't show up otherwise.
   const resolvePrefixRoot = async (): Promise<string | null> => {
-    if (isLibrarySource) return currentConfig.prefix_path || null;
     if (!steamInfo) return null;
-    return getGamePrefixPath(steamInfo.unsigned_appid).catch(() => null);
+    const libraryPath = isLibrarySource ? currentConfig.library_path : undefined;
+    const root = await getGamePrefixPath(steamInfo.unsigned_appid, libraryPath).catch(() => null);
+    if (isLibrarySource && root && !currentConfig.has_prefix) setPrefixFoundLocally(true);
+    return root;
   };
   const noPrefixMsg = isLibrarySource
     ? "No Proton prefix yet — launch the game once from Steam."
