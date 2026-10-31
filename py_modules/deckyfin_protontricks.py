@@ -497,7 +497,7 @@ def _init_prefix_for_deps(compatdata_path: Path, steam_root: Optional[Path]) -> 
         )
 
 
-def _resolve_prefix_dir(pfxid: str, compatdata_path: Optional[str] = None) -> tuple:
+def _resolve_prefix_dir(pfxid: str, compatdata_path: Optional[str] = None) -> tuple[Optional[str], Optional[Path], Optional[str]]:
     """Return (prefix_dir, steam_root, error).
 
     With `compatdata_path` (Store games): use it as-is and never create it —

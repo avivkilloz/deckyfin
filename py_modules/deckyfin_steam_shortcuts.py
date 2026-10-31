@@ -25,7 +25,7 @@ def _config_exists(source_path: str) -> bool:
         return False
 
 
-def build_ownership(sources: list, load_games: LoadGames) -> tuple:
+def build_ownership(sources: list, load_games: LoadGames) -> tuple[set[str], list[str]]:
     """Return (lower-cased owned names, owned source paths) across all non-builtin sources.
 
     A source whose game list is known (enabled, config file present and loadable)
