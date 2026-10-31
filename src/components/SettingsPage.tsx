@@ -594,17 +594,25 @@ export const SettingsPage: VFC<Props> = ({ onBack, artEnabled = true, onArtEnabl
   const [updateFeedback, setUpdateFeedback] = useState<string | null>(null);
   const [installError, setInstallError] = useState<string | null>(null);
   const [updateLoadError, setUpdateLoadError] = useState<string | null>(null);
+  // Bumped before every loadUpdateInfo() call; a response only applies its
+  // state updates if it's still the most recently issued request, so a
+  // rapid channel switch (or a switch that races the mount fetch) can't
+  // have its result clobbered by an older, slower-resolving response.
+  const updateRequestIdRef = useRef(0);
 
   const loadUpdateInfo = useCallback(async (channel?: string) => {
+    const requestId = ++updateRequestIdRef.current;
     setUpdateLoading(true);
     try {
       const res = await getUpdateInfo(channel);
+      if (requestId !== updateRequestIdRef.current) return;
       setUpdateInfo(res);
       setUpdateLoadError(null);
     } catch (err: any) {
+      if (requestId !== updateRequestIdRef.current) return;
       setUpdateLoadError(err?.message || "Failed to check for updates");
     }
-    setUpdateLoading(false);
+    if (requestId === updateRequestIdRef.current) setUpdateLoading(false);
   }, []);
 
   useEffect(() => {
@@ -616,8 +624,11 @@ export const SettingsPage: VFC<Props> = ({ onBack, artEnabled = true, onArtEnabl
     setUpdateFeedback(null);
     setInstallError(null);
     try {
-      await setUpdateChannel(ch);
-    } catch {}
+      const res = await setUpdateChannel(ch);
+      if (!res?.success) setUpdateFeedback("Couldn't save the channel choice");
+    } catch {
+      setUpdateFeedback("Couldn't save the channel choice");
+    }
     await loadUpdateInfo(ch);
   };
 
@@ -630,13 +641,15 @@ export const SettingsPage: VFC<Props> = ({ onBack, artEnabled = true, onArtEnabl
   const handleUpdateDeckyfin = async () => {
     if (runningTaskCount > 0 || !updateInfo?.latest) return;
     setInstallError(null);
-    setUpdateFeedback("Starting install via Decky…");
+    // Decky's installer call may only resolve after the user confirms, the
+    // zip downloads, and the plugin reloads — Deckyfin itself may be torn
+    // down mid-flight. Set the message up front rather than after the
+    // await, and don't try to claim a new state once/if it does resolve.
+    setUpdateFeedback("Follow Decky's prompt to install the update — Deckyfin will reload when it's done.");
     const err = await installViaDecky(updateInfo.latest.zip_url, updateInfo.latest.version);
     if (err) {
       setUpdateFeedback(null);
       setInstallError(err);
-    } else {
-      setUpdateFeedback("Install started — follow Decky's confirmation dialog.");
     }
   };
   // ── End Updates ──────────────────────────────────────────────────────
