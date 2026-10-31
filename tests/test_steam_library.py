@@ -4,9 +4,21 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 _py_modules = str(Path(__file__).resolve().parent.parent / "py_modules")
 if _py_modules not in sys.path:
     sys.path.insert(0, _py_modules)
+
+import deckyfin_steam_library as _dsl  # noqa: E402 (needs sys.path insert above)
+
+_TOOL_APPIDS = sorted(_dsl._TOOL_APPIDS)
+_TOOL_NAMES = [
+    "Proton 9.0",
+    "Proton Experimental",
+    "Proton Hotfix",
+    "Steam Linux Runtime 3.0 (sniper)",
+]
 
 
 def _reload(tmp_path, monkeypatch):
@@ -97,6 +109,34 @@ def test_has_prefix_false_without_prefix_or_proton(tmp_path, monkeypatch):
     _manifest(root, 3139440, "GunZ")
     [g] = mod.list_installed_games(root, {}, {})
     assert g["has_prefix"] is False
+
+
+@pytest.mark.parametrize("appid", _TOOL_APPIDS)
+def test_list_installed_games_excludes_tool_appid(tmp_path, monkeypatch, appid):
+    mod = _reload(tmp_path, monkeypatch)
+    root = tmp_path / "Steam"
+    _library_folders(root, root)
+    _manifest(root, appid, "Some Compatibility Tool")
+    assert mod.list_installed_games(root, {}, {}) == []
+
+
+@pytest.mark.parametrize("name", _TOOL_NAMES)
+def test_list_installed_games_excludes_tool_name(tmp_path, monkeypatch, name):
+    mod = _reload(tmp_path, monkeypatch)
+    root = tmp_path / "Steam"
+    _library_folders(root, root)
+    _manifest(root, 900000, name)
+    assert mod.list_installed_games(root, {}, {}) == []
+
+
+def test_list_installed_games_does_not_exclude_lookalike_name(tmp_path, monkeypatch):
+    """A real game whose name merely starts with "Proton" must not be filtered."""
+    mod = _reload(tmp_path, monkeypatch)
+    root = tmp_path / "Steam"
+    _library_folders(root, root)
+    _manifest(root, 900001, "Protonaut")
+    games = mod.list_installed_games(root, {}, {})
+    assert [g["name"] for g in games] == ["Protonaut"]
 
 
 def test_read_compat_mapping(tmp_path, monkeypatch):
