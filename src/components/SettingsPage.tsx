@@ -1,4 +1,4 @@
-import { VFC, useState, useEffect, useRef, useCallback } from "react";
+import { VFC, useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { callable } from "@decky/api";
 import { Navigation, Focusable } from "@decky/ui";
 import { Source } from "../types";
@@ -343,6 +343,10 @@ export const SettingsPage: VFC<Props> = ({ onBack, artEnabled = true, onArtEnabl
   const [activeTransfers, setActiveTransfers] = useState<import("../types").TransferStatus[]>([]);
   const [sourceMessage, setSourceMessage] = useState<{ id: string; msg: string } | null>(null);
   const [builtinCounts, setBuiltinCounts] = useState<Record<string, number>>({});
+  // readOwnedApps() reads the Steam client's own app collections (not derived from
+  // `sources`), which is unnecessary work to repeat on every render (disk usage
+  // polling, transfer status, etc). Only recompute when the source list changes.
+  const ownedApps = useMemo(() => readOwnedApps(), [sources]);
   useEffect(() => {
     sources.filter((s) => s.builtin && s.enabled !== false).forEach((s) => {
       getBuiltinSourceSummary(s.id)
@@ -736,9 +740,8 @@ export const SettingsPage: VFC<Props> = ({ onBack, artEnabled = true, onArtEnabl
         const srcBtn: React.CSSProperties = { ...BTN_STYLE, fontSize: "0.75em", padding: "2px 8px", whiteSpace: "nowrap", color: "#aaa", borderColor: "#888" };
         const steamLibraryCountSuffix = src.type === "steam_library" && src.show_uninstalled
           ? (() => {
-              const owned = readOwnedApps();
-              if (owned === null) return " · owned library unavailable";
-              const m = owned.filter((a) => !a.installed).length;
+              if (ownedApps === null) return " · owned library unavailable";
+              const m = ownedApps.filter((a) => !a.installed).length;
               return ` · ${m} not installed`;
             })()
           : "";
