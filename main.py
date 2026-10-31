@@ -75,6 +75,11 @@ from deckyfin_sources import (
 from steam_utils import get_user_id, list_steam_users
 from steam_games import convert_appid_to_unsigned_32bit
 from deckyfin_steam_shortcuts import upsert_store_entry as _upsert_builtin_store_entry, attach_builtin_games as _attach_builtin_games
+from deckyfin_hidden import (
+    get_hidden_games as _get_hidden_games,
+    set_game_hidden as _set_game_hidden,
+    filter_hidden as _filter_hidden,
+)
 from deckyfin_consts import APP_NAME, APP_VERSION, STEAM_SHORTCUTS_SOURCE_TYPE, STEAM_LIBRARY_SOURCE_TYPE, BUILTIN_SOURCE_TYPES
 
 DEBUG_LOG = Path(os.environ.get("DECKY_PLUGIN_RUNTIME_DIR", str(Path(__file__).parent))) / "debug.log"
@@ -1141,6 +1146,21 @@ class Plugin:
         except GameConfigError as e:
             return {"success": False, "error": str(e)}
 
+    # ── Hidden Games ──────────────────────────────────────────────────────
+
+    async def get_hidden_games(self) -> list:
+        """Return the list of hidden merged game ids."""
+        return _get_hidden_games()
+
+    async def set_game_hidden(self, game_id: str, hidden: bool) -> dict:
+        """Hide/unhide a game by its merged id. Returns the updated hidden list."""
+        if not isinstance(game_id, str) or not game_id:
+            return {"success": False, "error": "game_id must be a non-empty string"}
+        if not isinstance(hidden, bool):
+            return {"success": False, "error": "hidden must be a boolean"}
+        updated = _set_game_hidden(game_id, hidden)
+        return {"success": True, "hidden": updated}
+
     async def update_game_config(self, name: str, updates: dict, source_id: Optional[str] = None) -> dict:
         """Update specific fields on an existing game config."""
         import functools, json as _json
@@ -1603,6 +1623,7 @@ class Plugin:
         job_id = _uuid.uuid4().hex[:8]
         source_name = source.get("name", source_id)
         games = _load_source_games(source)
+        games, hidden_skipped = _filter_hidden(games, _get_hidden_games())
         _batch_add_registry[job_id] = {
             "job_id": job_id,
             "source_name": source_name,
@@ -1612,7 +1633,7 @@ class Plugin:
             "processed": 0,
             "added": [],
             "updated": [],
-            "skipped": [],
+            "skipped": list(hidden_skipped),
             "failed": [],
             "needs_restart": False,
             "error": None,
@@ -2059,10 +2080,11 @@ class Plugin:
             uid = str(get_user_id())
             source_name = source.get("name", source_id)
             games = _load_source_games(source)
+            games, hidden_skipped = _filter_hidden(games, _get_hidden_games())
 
             # First pass: categorize without starting any threads
             to_backup = []
-            skipped = []
+            skipped = list(hidden_skipped)
             pre_failed = []
 
             for cfg in games:
